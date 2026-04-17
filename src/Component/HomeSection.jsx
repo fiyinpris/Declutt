@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { Link } from "react-router-dom";
 import heroImage from "../images/hero-2.avif";
 import heroImage2 from "../images/hero-image.avif";
 import stepImg1 from "../images/step1.jpg";
@@ -47,7 +48,7 @@ const useScrollProgress = () => {
   return [ref, progress];
 };
 
-// ── Icons ───────────────────────────────────────────────────────────────────
+// ── Icons ────────────────────────────────────────────────────────────────────
 const ListIcon = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -226,7 +227,7 @@ const OrbitRing = () => {
     SIZE = R * 2 + 56;
   return (
     <div
-      className="relative flex items-center justify-center flex-shrink-0"
+      className="relative flex items-center justify-center flex-shrink-0 "
       style={{ width: SIZE, height: SIZE }}
     >
       <svg
@@ -309,7 +310,6 @@ const STEPS = [
   },
 ];
 
-// ── Typewriter ──────────────────────────────────────────────────────────────
 const CYCLE_WORDS = [
   "More space,",
   "More money,",
@@ -351,13 +351,11 @@ const TypewriterWord = () => {
   );
 };
 
-// ── Stacked → spread cards ──────────────────────────────────────────────────
 const StackedCards = () => {
   const [ref, progress] = useScrollProgress();
   const ease = (t) => (t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t);
   const p = ease(progress);
   const TEXT_H = 110;
-
   return (
     <div ref={ref} className="relative w-full py-4">
       <div className="grid grid-cols-2 gap-x-2 gap-y-5 sm:gap-x-3 sm:gap-y-6 lg:hidden">
@@ -413,7 +411,6 @@ const StackedCards = () => {
           );
         })}
       </div>
-
       <div
         className="hidden lg:block relative w-full"
         style={{ height: "clamp(280px, 32vw, 440px)" }}
@@ -487,7 +484,6 @@ const StackedCards = () => {
           );
         })}
       </div>
-
       <div
         className="hidden lg:flex justify-center mt-3"
         style={{ opacity: Math.max(0, 1 - p * 5), pointerEvents: "none" }}
@@ -514,11 +510,9 @@ const StackedCards = () => {
   );
 };
 
-// ── Section 4 ────────────────────────────────────────────────────────────────
 const Section4 = () => {
   const [ref, inView] = useInView(0.2);
   const [cardPhase, setCardPhase] = useState("hidden");
-
   useEffect(() => {
     const cycle = () => {
       setCardPhase("hidden");
@@ -531,7 +525,6 @@ const Section4 = () => {
     const interval = setInterval(cycle, 5800);
     return () => clearInterval(interval);
   }, []);
-
   const FLOAT_ITEMS = [
     { text: "Free to list", pos: "top-4 left-4" },
     { text: "50k+ buyers", pos: "top-4 right-4" },
@@ -540,9 +533,7 @@ const Section4 = () => {
     { text: "Secure deals", pos: "bottom-4 left-4" },
     { text: "Local & nationwide", pos: "bottom-4 right-4" },
   ];
-
   const imgH = "clamp(380px, 50vw, 520px)";
-
   return (
     <section
       ref={ref}
@@ -600,7 +591,6 @@ const Section4 = () => {
             </button>
           </div>
         </div>
-
         <div
           className="relative rounded-2xl sm:rounded-3xl overflow-hidden"
           style={{
@@ -673,7 +663,6 @@ const Section4 = () => {
   );
 };
 
-// ── FAQ ───────────────────────────────────────────────────────────────────────
 const FAQS = [
   {
     q: "Is it free to list items on Declutт?",
@@ -701,7 +690,6 @@ const FAQS = [
   },
 ];
 
-/* Each FAQ row has its OWN intersection observer — triggers as YOU SCROLL to it */
 const FAQItem = ({ q, a, i, open, setOpen }) => {
   const [ref, inView] = useInView(0.3);
   return (
@@ -757,19 +745,16 @@ const FAQSection = () => {
   const [ref, inView] = useInView(0.1);
   const [open, setOpen] = useState(null);
   const [search, setSearch] = useState("");
-
   const filtered = FAQS.filter(
     ({ q, a }) =>
       q.toLowerCase().includes(search.toLowerCase()) ||
       a.toLowerCase().includes(search.toLowerCase()),
   );
-
   return (
     <section
       ref={ref}
       className="w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-20 2xl:px-32 py-12 sm:py-16 pb-20 sm:pb-28"
     >
-      {/* Header — single title only */}
       <div
         className="text-center mb-8 sm:mb-10"
         style={{
@@ -782,9 +767,7 @@ const FAQSection = () => {
           Frequently Asked Questions
         </h2>
       </div>
-
       <div className="max-w-3xl mx-auto">
-        {/* Search box */}
         <div
           className="relative mb-8 sm:mb-10"
           style={{
@@ -820,8 +803,6 @@ const FAQSection = () => {
             className="w-full pl-10 pr-4 py-3 sm:py-3.5 text-sm rounded-xl border border-border bg-card text-foreground placeholder:text-foreground/35 focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 transition-all duration-200"
           />
         </div>
-
-        {/* FAQ items — each animates in individually with stagger */}
         {filtered.length > 0 ? (
           filtered.map(({ q, a }, i) => (
             <FAQItem key={q} q={q} a={a} i={i} open={open} setOpen={setOpen} />
@@ -846,8 +827,27 @@ const FAQSection = () => {
   );
 };
 
-// ── Reviews ───────────────────────────────────────────────────────────────────
-// ── Reviews ───────────────────────────────────────────────────────────────────
+const StarRow = ({ count, size = 13 }) => (
+  <div className="flex gap-0.5">
+    {Array.from({ length: 5 }).map((_, i) => (
+      <svg
+        key={i}
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill={i < count ? "currentColor" : "none"}
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="text-primary"
+      >
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+      </svg>
+    ))}
+  </div>
+);
+
 const REVIEWS = [
   {
     name: "Amaka Obi",
@@ -893,32 +893,9 @@ const REVIEWS = [
   },
 ];
 
-const StarRow = ({ count, size = 13 }) => (
-  <div className="flex gap-0.5">
-    {Array.from({ length: 5 }).map((_, i) => (
-      <svg
-        key={i}
-        width={size}
-        height={size}
-        viewBox="0 0 24 24"
-        fill={i < count ? "currentColor" : "none"}
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="text-primary"
-      >
-        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-      </svg>
-    ))}
-  </div>
-);
-
 const ReviewsSection = () => {
   const [ref, inView] = useInView(0.1);
   const [active, setActive] = useState(0);
-
-  // Auto-rotate featured review
   useEffect(() => {
     const t = setInterval(
       () => setActive((p) => (p + 1) % REVIEWS.length),
@@ -926,115 +903,94 @@ const ReviewsSection = () => {
     );
     return () => clearInterval(t);
   }, []);
-
   const featured = REVIEWS[active];
-
   return (
     <section
       ref={ref}
       className="w-full py-16 sm:py-20 relative overflow-hidden"
       style={{ background: "hsl(27 30% 12%)" }}
     >
-      {/* ── Rich visible effects layer ── */}
+      {/* Background fx */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        {/* === FLOATING ORBS — 5 of them, various sizes === */}
-        <div
-          className="absolute rounded-full"
-          style={{
-            width: "clamp(180px,30vw,360px)",
-            height: "clamp(180px,30vw,360px)",
-            background:
-              "radial-gradient(circle, hsl(35 85% 60% / 0.55) 0%, transparent 68%)",
-            top: "-5%",
-            left: "-3%",
-            animation: "orb-float-1 9s ease-in-out infinite",
-          }}
-        />
-        <div
-          className="absolute rounded-full"
-          style={{
-            width: "clamp(140px,22vw,280px)",
-            height: "clamp(140px,22vw,280px)",
-            background:
-              "radial-gradient(circle, hsl(var(--primary) / 0.5) 0%, transparent 68%)",
-            bottom: "0%",
-            right: "-2%",
-            animation: "orb-float-2 11s ease-in-out infinite",
-          }}
-        />
-        <div
-          className="absolute rounded-full"
-          style={{
-            width: "clamp(100px,16vw,200px)",
-            height: "clamp(100px,16vw,200px)",
-            background:
-              "radial-gradient(circle, hsl(20 75% 55% / 0.45) 0%, transparent 68%)",
-            top: "35%",
-            right: "20%",
-            animation: "orb-float-3 7s ease-in-out infinite",
-          }}
-        />
-        <div
-          className="absolute rounded-full"
-          style={{
-            width: "clamp(80px,12vw,160px)",
-            height: "clamp(80px,12vw,160px)",
-            background:
-              "radial-gradient(circle, hsl(40 80% 65% / 0.4) 0%, transparent 68%)",
-            bottom: "20%",
-            left: "30%",
-            animation: "orb-float-4 13s ease-in-out infinite 2s",
-          }}
-        />
-        <div
-          className="absolute rounded-full"
-          style={{
-            width: "clamp(60px,10vw,130px)",
-            height: "clamp(60px,10vw,130px)",
-            background:
-              "radial-gradient(circle, hsl(var(--primary) / 0.35) 0%, transparent 68%)",
-            top: "15%",
-            left: "45%",
-            animation: "orb-float-1 6s ease-in-out infinite 1s",
-          }}
-        />
-
-        {/* === PULSING RING — center background === */}
-        <div
-          className="absolute rounded-full border-2 border-primary/20"
-          style={{
-            width: "clamp(200px,40vw,500px)",
-            height: "clamp(200px,40vw,500px)",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%,-50%)",
-            animation: "pulse-ring 4s ease-out infinite",
-          }}
-        />
-        <div
-          className="absolute rounded-full border border-primary/10"
-          style={{
-            width: "clamp(300px,55vw,700px)",
-            height: "clamp(300px,55vw,700px)",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%,-50%)",
-            animation: "pulse-ring 4s ease-out infinite 1.3s",
-          }}
-        />
-        <div
-          className="absolute rounded-full border border-primary/8"
-          style={{
-            width: "clamp(400px,70vw,900px)",
-            height: "clamp(400px,70vw,900px)",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%,-50%)",
-            animation: "pulse-ring 4s ease-out infinite 2.6s",
-          }}
-        />
-
-        {/* === RISING PARTICLES — 16 across full width === */}
+        {[
+          {
+            style: {
+              width: "clamp(180px,30vw,360px)",
+              height: "clamp(180px,30vw,360px)",
+              background:
+                "radial-gradient(circle, hsl(35 85% 60% / 0.55) 0%, transparent 68%)",
+              top: "-5%",
+              left: "-3%",
+              animation: "orb-float-1 9s ease-in-out infinite",
+            },
+          },
+          {
+            style: {
+              width: "clamp(140px,22vw,280px)",
+              height: "clamp(140px,22vw,280px)",
+              background:
+                "radial-gradient(circle, hsl(var(--primary) / 0.5) 0%, transparent 68%)",
+              bottom: "0%",
+              right: "-2%",
+              animation: "orb-float-2 11s ease-in-out infinite",
+            },
+          },
+          {
+            style: {
+              width: "clamp(100px,16vw,200px)",
+              height: "clamp(100px,16vw,200px)",
+              background:
+                "radial-gradient(circle, hsl(20 75% 55% / 0.45) 0%, transparent 68%)",
+              top: "35%",
+              right: "20%",
+              animation: "orb-float-3 7s ease-in-out infinite",
+            },
+          },
+          {
+            style: {
+              width: "clamp(80px,12vw,160px)",
+              height: "clamp(80px,12vw,160px)",
+              background:
+                "radial-gradient(circle, hsl(40 80% 65% / 0.4) 0%, transparent 68%)",
+              bottom: "20%",
+              left: "30%",
+              animation: "orb-float-4 13s ease-in-out infinite 2s",
+            },
+          },
+          {
+            style: {
+              width: "clamp(60px,10vw,130px)",
+              height: "clamp(60px,10vw,130px)",
+              background:
+                "radial-gradient(circle, hsl(var(--primary) / 0.35) 0%, transparent 68%)",
+              top: "15%",
+              left: "45%",
+              animation: "orb-float-1 6s ease-in-out infinite 1s",
+            },
+          },
+        ].map((o, i) => (
+          <div key={i} className="absolute rounded-full" style={o.style} />
+        ))}
+        {["200px,40vw,500px", "300px,55vw,700px", "400px,70vw,900px"].map(
+          (s, i) => (
+            <div
+              key={i}
+              className="absolute rounded-full"
+              style={{
+                width: `clamp(${s})`,
+                height: `clamp(${s})`,
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%,-50%)",
+                border:
+                  i === 0
+                    ? "2px solid rgba(var(--primary-rgb,139,90,43),0.2)"
+                    : "1px solid rgba(var(--primary-rgb,139,90,43),0.1)",
+                animation: `pulse-ring 4s ease-out infinite ${i * 1.3}s`,
+              }}
+            />
+          ),
+        )}
         {[
           { left: "5%", delay: "0s", size: 4, dur: "5s" },
           { left: "12%", delay: "1.4s", size: 3, dur: "7s" },
@@ -1072,8 +1028,6 @@ const ReviewsSection = () => {
             }}
           />
         ))}
-
-        {/* === SHIMMER SWEEP — slow diagonal light === */}
         <div
           className="absolute inset-0"
           style={{
@@ -1082,8 +1036,6 @@ const ReviewsSection = () => {
             animation: "shimmer-sweep 7s ease-in-out infinite",
           }}
         />
-
-        {/* === HORIZONTAL SCAN LINE — subtle moving bar === */}
         <div
           className="absolute left-0 right-0 h-px"
           style={{
@@ -1093,8 +1045,6 @@ const ReviewsSection = () => {
             top: 0,
           }}
         />
-
-        {/* === CORNER SPARKLES === */}
         {[
           { top: "8%", left: "8%", delay: "0s" },
           { top: "12%", right: "12%", delay: "1.5s" },
@@ -1123,60 +1073,7 @@ const ReviewsSection = () => {
         ))}
       </div>
 
-      <style>{`
-        @keyframes orb-float-1 {
-          0%,100% { transform: translate(0,0) scale(1); }
-          33%      { transform: translate(clamp(10px,3vw,40px), clamp(-8px,-2vw,-25px)) scale(1.08); }
-          66%      { transform: translate(clamp(-8px,-2vw,-20px), clamp(10px,2vw,30px)) scale(0.94); }
-        }
-        @keyframes orb-float-2 {
-          0%,100% { transform: translate(0,0) scale(1); }
-          40%      { transform: translate(clamp(-15px,-3vw,-30px), clamp(-12px,-2vw,-35px)) scale(1.1); }
-          70%      { transform: translate(clamp(8px,2vw,25px), clamp(8px,1.5vw,20px)) scale(0.93); }
-        }
-        @keyframes orb-float-3 {
-          0%,100% { transform: translate(0,0) scale(1); }
-          50%      { transform: translate(clamp(-10px,-2vw,-25px), clamp(-10px,-2vw,-30px)) scale(1.15); }
-        }
-        @keyframes orb-float-4 {
-          0%,100% { transform: translate(0,0) scale(1); }
-          30%      { transform: translate(clamp(8px,2vw,20px), clamp(-12px,-2vw,-25px)) scale(1.06); }
-          70%      { transform: translate(clamp(-12px,-2vw,-22px), clamp(8px,1vw,18px)) scale(0.96); }
-        }
-        @keyframes pulse-ring {
-          0%   { opacity: 0.6; transform: translate(-50%,-50%) scale(0.85); }
-          70%  { opacity: 0; }
-          100% { opacity: 0; transform: translate(-50%,-50%) scale(1.2); }
-        }
-        @keyframes rise-particle {
-          0%   { transform: translateY(0) scale(1); opacity: 0; }
-          8%   { opacity: 0.7; }
-          85%  { opacity: 0.15; }
-          100% { transform: translateY(-500px) scale(0.2); opacity: 0; }
-        }
-        @keyframes shimmer-sweep {
-          0%   { transform: translateX(-120%); }
-          60%  { transform: translateX(120%); }
-          100% { transform: translateX(120%); }
-        }
-        @keyframes scan-line {
-          0%   { top: -2px; opacity: 0; }
-          5%   { opacity: 1; }
-          95%  { opacity: 0.6; }
-          100% { top: 100%; opacity: 0; }
-        }
-        @keyframes sparkle {
-          0%,100% { opacity: 0; transform: scale(0.5); }
-          50%      { opacity: 1; transform: scale(1.2); }
-        }
-        @keyframes sparkle-inner {
-          0%,100% { transform: rotate(45deg) scale(1); }
-          50%      { transform: rotate(225deg) scale(1.3); }
-        }
-      `}</style>
-
       <div className="w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-20 2xl:px-32">
-        {/* Section label */}
         <div
           className="mb-8 sm:mb-10"
           style={{
@@ -1192,10 +1089,7 @@ const ReviewsSection = () => {
             What people are saying
           </h2>
         </div>
-
-        {/* Split layout — stacks on mobile/tablet, side-by-side on lg+ */}
         <div className="flex flex-col lg:grid lg:grid-cols-2 gap-5 sm:gap-6">
-          {/* LEFT — featured big quote (frosted glass) */}
           <div
             className="relative rounded-2xl sm:rounded-3xl p-6 sm:p-8 lg:p-10 flex flex-col justify-between min-h-[280px] sm:min-h-[340px] lg:min-h-[420px] overflow-hidden order-1"
             style={{
@@ -1226,11 +1120,7 @@ const ReviewsSection = () => {
             >
               "
             </span>
-
-            {/* Stars */}
             <StarRow count={featured.stars} size={16} />
-
-            {/* Quote text */}
             <p
               key={active}
               className="text-base sm:text-lg lg:text-xl xl:text-2xl font-medium text-white/90 leading-snug flex-1 my-5 sm:my-6"
@@ -1238,8 +1128,6 @@ const ReviewsSection = () => {
             >
               "{featured.text}"
             </p>
-
-            {/* Person + nav dots */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center text-xs font-bold border border-white/20 flex-shrink-0">
@@ -1271,8 +1159,6 @@ const ReviewsSection = () => {
               </div>
             </div>
           </div>
-
-          {/* RIGHT — mini review cards, 2-col on sm/md, single col on mobile & lg */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3 order-2">
             {REVIEWS.filter((_, i) => i !== active)
               .slice(0, 4)
@@ -1324,6 +1210,85 @@ const ReviewsSection = () => {
   );
 };
 
+// ── NEW: Minimal CTA Strip ───────────────────────────────────────────────────
+// Clicking "Log in" scrolls up to the navbar and focuses the login link.
+const CTASection = () => {
+  const [ref, inView] = useInView(0.3);
+
+  const handleLoginClick = () => {
+    // Scroll to the very top where the navbar lives
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  return (
+    <section
+      ref={ref}
+      className="w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-20 2xl:px-32 py-16 sm:py-20 pb-24 sm:pb-32"
+    >
+      <div
+        className="w-full max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6 sm:gap-10 border-t border-border/60 pt-10 sm:pt-12"
+        style={{
+          opacity: inView ? 1 : 0,
+          transform: inView ? "translateY(0)" : "translateY(24px)",
+          transition: "opacity 0.6s ease, transform 0.6s ease",
+        }}
+      >
+        {/* Left — text */}
+        <div className="text-center sm:text-left">
+          <p className="text-xs font-semibold uppercase tracking-widest text-primary mb-2">
+            Ready to start?
+          </p>
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground leading-snug">
+            Your clutter is someone's{" "}
+            <span className="text-primary">treasure.</span>
+          </h2>
+          <p className="mt-2 text-sm text-foreground/55 max-w-md">
+            Join thousands of Nigerians buying and selling smarter every day —
+            for free.
+          </p>
+        </div>
+
+        {/* Right — actions */}
+        <div className="flex flex-col sm:flex-row items-center gap-3 flex-shrink-0">
+          <button
+            onClick={handleLoginClick}
+            className="group flex items-center gap-2 text-sm font-semibold text-foreground/60 hover:text-primary transition-colors duration-200"
+          >
+            Already have an account?{" "}
+            <span className="text-primary underline underline-offset-4 decoration-primary/40 group-hover:decoration-primary transition-all duration-200 flex items-center gap-1">
+              Log in
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="translate-x-0 group-hover:translate-x-1 transition-transform duration-200"
+              >
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
+            </span>
+          </button>
+
+          <span className="hidden sm:block w-px h-5 bg-border/60" />
+
+          <Link
+            to="/signup"
+            className="main-button text-sm px-6 py-2.5 whitespace-nowrap"
+          >
+            Get started free
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+// ── Notifications ─────────────────────────────────────────────────────────────
 const NOTIFICATIONS = [
   {
     name: "Amara O.",
@@ -1348,7 +1313,7 @@ const NOTIFICATIONS = [
   },
 ];
 
-// ── Main ─────────────────────────────────────────────────────────────────────
+// ── Main ──────────────────────────────────────────────────────────────────────
 export const HomeSection = () => {
   const [activeImage, setActiveImage] = useState(0);
   const [imgProgress, setImgProgress] = useState(0);
@@ -1382,7 +1347,6 @@ export const HomeSection = () => {
     const show = () => {
       setToastVisible(true);
       setTimeout(() => setToastAnimating(true), 10);
-      // Auto-hide after 6s
       setTimeout(() => {
         setToastAnimating(false);
         setTimeout(() => {
@@ -1392,7 +1356,7 @@ export const HomeSection = () => {
       }, 6000);
     };
     const t1 = setTimeout(show, 2500);
-    const t2 = setInterval(show, 30000); // next notification every 30 seconds
+    const t2 = setInterval(show, 30000);
     return () => {
       clearTimeout(t1);
       clearInterval(t2);
@@ -1472,9 +1436,8 @@ export const HomeSection = () => {
               </button>
             </div>
           </div>
-
           <div
-            className="flex-1 flex flex-col items-center w-full opacity-0 mt-4"
+            className="flex-1 flex flex-col items-center w-full opacity-0"
             style={{ animation: "fade-in 0.8s ease-out 0.2s forwards" }}
           >
             <div className="relative w-full max-w-sm sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl 2xl:max-w-3xl h-[320px] sm:h-[370px] md:h-[420px] lg:h-[480px] xl:h-[540px] 2xl:h-[640px]">
@@ -1489,7 +1452,6 @@ export const HomeSection = () => {
                 className="absolute top-0 -left-1 sm:-left-3 md:-left-5 w-[88%] sm:w-[85%] h-[270px] sm:h-[315px] md:h-[365px] lg:h-[415px] xl:h-[465px] 2xl:h-[560px] object-cover rounded-xl sm:rounded-2xl shadow-xl border border-background transition-all duration-700"
               />
             </div>
-            {/* Dots sit here, always below the image box, never overlapping */}
             <div className="flex gap-2 items-center mt-6">
               {images.map((_, i) => (
                 <button
@@ -1527,7 +1489,8 @@ export const HomeSection = () => {
           <div
             className="absolute inset-0 -z-10 rounded-3xl"
             style={{
-              background: `radial-gradient(ellipse at 20% 50%,hsl(var(--primary)/0.08) 0%,transparent 65%)`,
+              background:
+                "radial-gradient(ellipse at 20% 50%,hsl(var(--primary)/0.08) 0%,transparent 65%)",
             }}
           />
           <OrbitRing />
@@ -1612,6 +1575,9 @@ export const HomeSection = () => {
       {/* ════════ FAQ ════════ */}
       <FAQSection />
 
+      {/* ════════ CTA Strip ════════ */}
+      <CTASection />
+
       {/* Purchase toast */}
       {toastVisible &&
         createPortal(
@@ -1643,7 +1609,6 @@ export const HomeSection = () => {
             </div>
             <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              {/* X close button */}
               <button
                 onClick={dismissToast}
                 aria-label="Dismiss"
@@ -1665,25 +1630,6 @@ export const HomeSection = () => {
           </div>,
           document.body,
         )}
-
-      <style>{`
-        @keyframes orbit-spin {
-          from { transform: rotate(0deg) translateX(100px) rotate(0deg); }
-          to   { transform: rotate(360deg) translateX(100px) rotate(-360deg); }
-        }
-        @keyframes blink-cursor {
-          0%, 100% { opacity: 1; }
-          50%       { opacity: 0; }
-        }
-        @keyframes slide-in-up {
-          from { opacity: 0; transform: translateY(60px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50%       { transform: translateY(-6px); }
-        }
-      `}</style>
     </>
   );
 };

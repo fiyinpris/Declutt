@@ -273,3 +273,199 @@ body {
   overflow-x: hidden;
   max-width: 100%;
 }
+/* ── Paste these keyframes into your existing index.css ──────────────────── */
+
+/* Hero grid background */
+.hero-grid {
+  background-image:
+    linear-gradient(to right, hsl(32 48% 48% / 0.2) 1px, transparent 1px),
+    linear-gradient(to bottom, hsl(32 48% 48% / 0.2) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+.dark .hero-grid {
+  background-image:
+    linear-gradient(to right, hsl(32 52% 54% / 0.22) 1px, transparent 1px),
+    linear-gradient(to bottom, hsl(32 52% 54% / 0.22) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* ── Keyframes (moved from HomeSection inline <style> tags) ── */
+
+@keyframes orbit-spin {
+  from {
+    transform: rotate(0deg) translateX(100px) rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg) translateX(100px) rotate(-360deg);
+  }
+}
+
+@keyframes blink-cursor {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes slide-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(60px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Reviews section background animations */
+@keyframes orb-float-1 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(clamp(10px, 3vw, 40px), clamp(-8px, -2vw, -25px))
+      scale(1.08);
+  }
+  66% {
+    transform: translate(clamp(-8px, -2vw, -20px), clamp(10px, 2vw, 30px))
+      scale(0.94);
+  }
+}
+@keyframes orb-float-2 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  40% {
+    transform: translate(clamp(-15px, -3vw, -30px), clamp(-12px, -2vw, -35px))
+      scale(1.1);
+  }
+  70% {
+    transform: translate(clamp(8px, 2vw, 25px), clamp(8px, 1.5vw, 20px))
+      scale(0.93);
+  }
+}
+@keyframes orb-float-3 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(clamp(-10px, -2vw, -25px), clamp(-10px, -2vw, -30px))
+      scale(1.15);
+  }
+}
+@keyframes orb-float-4 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  30% {
+    transform: translate(clamp(8px, 2vw, 20px), clamp(-12px, -2vw, -25px))
+      scale(1.06);
+  }
+  70% {
+    transform: translate(clamp(-12px, -2vw, -22px), clamp(8px, 1vw, 18px))
+      scale(0.96);
+  }
+}
+@keyframes pulse-ring {
+  0% {
+    opacity: 0.6;
+    transform: translate(-50%, -50%) scale(0.85);
+  }
+  70% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+}
+@keyframes rise-particle {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.7;
+  }
+  85% {
+    opacity: 0.15;
+  }
+  100% {
+    transform: translateY(-500px) scale(0.2);
+    opacity: 0;
+  }
+}
+@keyframes shimmer-sweep {
+  0% {
+    transform: translateX(-120%);
+  }
+  60% {
+    transform: translateX(120%);
+  }
+  100% {
+    transform: translateX(120%);
+  }
+}
+@keyframes scan-line {
+  0% {
+    top: -2px;
+    opacity: 0;
+  }
+  5% {
+    opacity: 1;
+  }
+  95% {
+    opacity: 0.6;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+@keyframes sparkle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+@keyframes sparkle-inner {
+  0%,
+  100% {
+    transform: rotate(45deg) scale(1);
+  }
+  50% {
+    transform: rotate(225deg) scale(1.3);
+  }
+}

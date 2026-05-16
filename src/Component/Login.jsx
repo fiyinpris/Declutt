@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-/* ── Icons ─────────────────────────────────────────────────────────── */
 const EyeIcon = ({ open }) =>
   open ? (
     <svg
@@ -55,7 +54,6 @@ const GoogleIcon = () => (
   </svg>
 );
 
-/* ── Logo ─────────────────────────────────────────────────────────── */
 const DecluttLogo = () => (
   <span className="relative inline-block font-bold text-foreground text-2xl">
     De
@@ -88,7 +86,6 @@ const DecluttLogo = () => (
   </span>
 );
 
-/* ── Divider ─────────────────────────────────────────────────────── */
 const Divider = ({ label = "or" }) => (
   <div className="flex items-center gap-3">
     <div className="flex-1 h-px bg-border" />
@@ -97,7 +94,6 @@ const Divider = ({ label = "or" }) => (
   </div>
 );
 
-/* ── Error map ───────────────────────────────────────────────────── */
 const friendlyError = (code) => {
   const map = {
     "auth/invalid-credential":
@@ -120,7 +116,6 @@ const friendlyError = (code) => {
   return map[code] ?? `Login failed (${code}). Please try again.`;
 };
 
-/* ── Main ────────────────────────────────────────────────────────── */
 const Login = () => {
   const { login, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
@@ -136,7 +131,7 @@ const Login = () => {
     setError("");
   };
 
-  /* ── Email/password ── */
+  // ── After login → always go HOME ──
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.email.trim() || !form.password) {
@@ -146,13 +141,8 @@ const Login = () => {
     setLoading(true);
     setError("");
     try {
-      const { role } = await login({
-        email: form.email.trim(),
-        password: form.password,
-      });
-      navigate(
-        role === "seller" ? "/seller" : role === "admin" ? "/admin" : "/buyer",
-      );
+      await login({ email: form.email.trim(), password: form.password });
+      navigate("/"); // ← always go to home
     } catch (err) {
       const msg = friendlyError(err.code);
       if (msg) setError(msg);
@@ -161,15 +151,12 @@ const Login = () => {
     }
   };
 
-  /* ── Google ── */
   const handleGoogle = async () => {
     setGLoading(true);
     setError("");
     try {
-      const { role } = await loginWithGoogle("buyer");
-      navigate(
-        role === "seller" ? "/seller" : role === "admin" ? "/admin" : "/buyer",
-      );
+      await loginWithGoogle("buyer");
+      navigate("/"); // ← always go to home
     } catch (err) {
       const msg = friendlyError(err.code);
       if (msg) setError(msg);
@@ -185,7 +172,6 @@ const Login = () => {
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center px-4 py-16 sm:py-20 bg-background relative overflow-hidden">
-      {/* Background */}
       <div
         className="hero-grid absolute inset-0 opacity-30 pointer-events-none"
         style={{
@@ -196,19 +182,23 @@ const Login = () => {
         }}
       />
       <div
-        className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full pointer-events-none"
+        className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full pointer-events-none"
         style={{
           background:
             "radial-gradient(circle, hsl(var(--primary)/0.1) 0%, transparent 65%)",
         }}
       />
 
-      <div className="relative z-10 w-full max-w-[500px] mt-5">
+      <div className="relative z-10 w-full max-w-sm sm:max-w-md mt-5">
+        <div className="text-center mb-6">
+          <Link to="/">
+            <DecluttLogo />
+          </Link>
+        </div>
         <div
           className="bg-card rounded-3xl shadow-2xl overflow-hidden"
           style={{ border: "2px solid hsl(var(--border))" }}
         >
-          {/* Card body */}
           <div className="px-6 sm:px-8 py-6 space-y-5">
             <div>
               <h1 className="text-lg font-bold text-foreground">
@@ -225,12 +215,11 @@ const Login = () => {
               </p>
             </div>
 
-            {/* Google */}
             <button
               type="button"
               onClick={handleGoogle}
               disabled={gLoading}
-              className="w-full flex items-center justify-center gap-3 py-3 rounded-xl bg-background font-semibold text-sm text-foreground/80 hover:text-foreground hover:bg-border/30 transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center gap-3 py-3 rounded-xl bg-background font-semibold text-sm text-foreground/80 hover:text-foreground hover:bg-border/30 transition-all duration-200 disabled:opacity-60"
               style={{ border: "2px solid hsl(var(--border))" }}
             >
               {gLoading ? (
@@ -248,12 +237,11 @@ const Login = () => {
               ) : (
                 <GoogleIcon />
               )}
-              {gLoading ? "Connecting…" : "Continue with Google"}
+              {gLoading ? "Connecting..." : "Continue with Google"}
             </button>
 
             <Divider label="or continue with email" />
 
-            {/* Error */}
             {error && (
               <div
                 className="flex items-start gap-2.5 px-4 py-3 rounded-xl bg-red-500/8 text-red-500 text-sm"
@@ -262,7 +250,7 @@ const Login = () => {
                 <svg
                   width="16"
                   height="16"
-                  className="flex-shrink-0 mt-0.5"
+                  className="shrink-0 mt-0.5"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -278,7 +266,6 @@ const Login = () => {
               </div>
             )}
 
-            {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-foreground/55 uppercase tracking-widest">
@@ -294,7 +281,6 @@ const Login = () => {
                   className={`${inputCls} ${borderCls}`}
                 />
               </div>
-
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-foreground/55 uppercase tracking-widest">
@@ -326,11 +312,10 @@ const Login = () => {
                   </button>
                 </div>
               </div>
-
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full main-button py-3 text-sm font-bold disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
+                className="w-full main-button py-3 text-sm font-bold disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <>
@@ -345,7 +330,7 @@ const Login = () => {
                     >
                       <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                     </svg>
-                    Signing in…
+                    Signing in...
                   </>
                 ) : (
                   "Sign in"
@@ -353,9 +338,7 @@ const Login = () => {
               </button>
             </form>
           </div>
-
-          {/* Footer */}
-          <div className="px-6 sm:px-8 py-4 border-t-[2px] border-border text-center">
+          <div className="px-6 sm:px-8 py-4 border-t-2 border-border text-center">
             <p className="text-xs text-foreground/35">
               By signing in, you agree to our{" "}
               <span className="text-primary cursor-pointer hover:underline">

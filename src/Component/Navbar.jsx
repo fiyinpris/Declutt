@@ -1,5 +1,5 @@
 // src/Component/Navbar.jsx
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
@@ -34,24 +34,6 @@ const CloseIcon = () => (
     strokeLinejoin="round"
   >
     <path d="M18 6 6 18M6 6l12 12" />
-  </svg>
-);
-
-/* NEW: Bag icon instead of cart box */
-const BagIcon = () => (
-  <svg
-    width="20"
-    height="20"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
-    <line x1="3" y1="6" x2="21" y2="6" />
-    <path d="M16 10a4 4 0 0 1-8 0" />
   </svg>
 );
 
@@ -224,9 +206,7 @@ const LogoutButton = ({ onLogout, state, fullWidth = true }) => (
   <button
     onClick={onLogout}
     disabled={state !== "idle"}
-    className={`${fullWidth ? "w-full" : ""} flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200
-      ${state === "success" ? "bg-green-500 text-white" : state === "loading" ? "bg-red-400 text-white" : "text-red-500/80 hover:text-red-500 hover:bg-red-500/8"}
-      disabled:cursor-not-allowed`}
+    className={`${fullWidth ? "w-full" : ""} flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${state === "success" ? "bg-green-500 text-white" : state === "loading" ? "bg-red-400 text-white" : "text-red-500/80 hover:text-red-500 hover:bg-red-500/8"} disabled:cursor-not-allowed`}
   >
     {state === "loading" && (
       <svg
@@ -415,8 +395,7 @@ const AccountDropdown = ({ profile, logoutState, onLogout }) => {
       <button
         onClick={() => setOpen(!open)}
         aria-label="Account menu"
-        className={`flex items-center justify-center w-9 h-9 rounded-xl transition-all duration-200 focus:outline-none
-          ${open ? "text-primary bg-primary/10" : "text-foreground/60 hover:text-primary hover:bg-primary/10"}`}
+        className={`flex items-center justify-center w-9 h-9 rounded-xl transition-all duration-200 focus:outline-none ${open ? "text-primary bg-primary/10" : "text-foreground/60 hover:text-primary hover:bg-primary/10"}`}
       >
         <AccountIcon />
       </button>
@@ -443,23 +422,21 @@ const AccountDropdown = ({ profile, logoutState, onLogout }) => {
   );
 };
 
-/* ── Cart Drawer ── */
-const CartDrawer = ({ open, onClose, cartItems = [] }) => {
+/* ── Cart Drawer — FIX: per-user cart key ─────────────────────────────────── */
+const CartDrawer = ({ open, onClose, cartItems = [], onRemove }) => {
   const total = cartItems.reduce(
-    (sum, item) => sum + Number(item.price || 0),
+    (sum, item) => sum + Number(item.price || 0) * (item.quantity || 1),
     0,
   );
 
   return (
     <>
-      {/* Overlay */}
       {open && (
         <div
           className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
           onClick={onClose}
         />
       )}
-      {/* Drawer */}
       <div
         className="fixed right-0 top-0 bottom-0 z-50 flex flex-col bg-background"
         style={{
@@ -470,7 +447,6 @@ const CartDrawer = ({ open, onClose, cartItems = [] }) => {
           boxShadow: open ? "-8px 0 40px rgba(0,0,0,0.12)" : "none",
         }}
       >
-        {/* Header */}
         <div
           className="flex items-center justify-between px-6 py-4 shrink-0"
           style={{ borderBottom: "1px solid hsl(var(--border)/0.5)" }}
@@ -518,7 +494,6 @@ const CartDrawer = ({ open, onClose, cartItems = [] }) => {
           </button>
         </div>
 
-        {/* Items */}
         <div className="flex-1 overflow-y-auto px-4 py-4">
           {cartItems.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center gap-4 text-center py-16">
@@ -590,7 +565,10 @@ const CartDrawer = ({ open, onClose, cartItems = [] }) => {
                       ₦{Number(item.price).toLocaleString()}
                     </p>
                   </div>
-                  <button className="w-7 h-7 flex items-center justify-center rounded-lg text-foreground/30 hover:text-red-500 hover:bg-red-500/8 transition-colors shrink-0">
+                  <button
+                    onClick={() => onRemove?.(item.id)}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg text-foreground/30 hover:text-red-500 hover:bg-red-500/8 transition-colors shrink-0"
+                  >
                     <svg
                       width="13"
                       height="13"
@@ -610,7 +588,6 @@ const CartDrawer = ({ open, onClose, cartItems = [] }) => {
           )}
         </div>
 
-        {/* Footer */}
         {cartItems.length > 0 && (
           <div
             className="shrink-0 px-4 pb-6 pt-4"
@@ -634,6 +611,10 @@ const CartDrawer = ({ open, onClose, cartItems = [] }) => {
   );
 };
 
+// ── Helper to get cart key per user ──────────────────────────────────────────
+const getCartKey = (uid) =>
+  uid ? `declutt_cart_${uid}` : "declutt_cart_guest";
+
 const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
@@ -643,8 +624,58 @@ const Navbar = () => {
   const navigate = useNavigate();
   const { state: logoutState, handleLogout } = useLogout(logout, navigate);
 
-  // Placeholder cart items — wire up to your real cart state/context
-  const cartItems = [];
+  const uid = user?.uid || null;
+
+  // FIX: Cart is now keyed by user uid — different accounts don't share cart
+  const [cartItems, setCartItems] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(getCartKey(uid)) || "[]");
+    } catch {
+      return [];
+    }
+  });
+
+  // Reload cart when user changes (login/logout)
+  useEffect(() => {
+    try {
+      setCartItems(JSON.parse(localStorage.getItem(getCartKey(uid)) || "[]"));
+    } catch {
+      setCartItems([]);
+    }
+  }, [uid]);
+
+  useEffect(() => {
+    const sync = (e) => {
+      // Only sync if the cart-updated event is for the current user
+      if (e.detail?.uid !== uid && e.detail?.uid !== undefined) return;
+      try {
+        setCartItems(JSON.parse(localStorage.getItem(getCartKey(uid)) || "[]"));
+      } catch {
+        setCartItems([]);
+      }
+    };
+    // Also handle generic storage events (cross-tab)
+    const storageSync = () => {
+      try {
+        setCartItems(JSON.parse(localStorage.getItem(getCartKey(uid)) || "[]"));
+      } catch {
+        setCartItems([]);
+      }
+    };
+    window.addEventListener("cart-updated", sync);
+    window.addEventListener("storage", storageSync);
+    return () => {
+      window.removeEventListener("cart-updated", sync);
+      window.removeEventListener("storage", storageSync);
+    };
+  }, [uid]);
+
+  const removeFromCart = (id) => {
+    const updated = cartItems.filter((i) => i.id !== id);
+    localStorage.setItem(getCartKey(uid), JSON.stringify(updated));
+    setCartItems(updated);
+    window.dispatchEvent(new CustomEvent("cart-updated", { detail: { uid } }));
+  };
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 10);
@@ -659,9 +690,9 @@ const Navbar = () => {
     };
   }, [menuOpen, cartOpen]);
 
-  useEffect(() => {
-    setMenuOpen(false);
-  }, [location.pathname]);
+  useLayoutEffect(() => {
+    if (menuOpen) setMenuOpen(false);
+  }, [location.pathname, menuOpen]);
 
   const NAV_LINKS = [
     { label: "Home", to: "/" },
@@ -696,13 +727,11 @@ const Navbar = () => {
           boxShadow: scrolled ? "0 1px 12px rgba(0,0,0,0.06)" : "none",
         }}
       >
-        <div className="w-full max-w-[1400px] mx-auto px-4 sm:px-5 md:px-8 lg:px-12 xl:px-16 h-full flex items-center justify-between gap-4">
-          {/* Logo */}
+        <div className="w-full max-w-350 mx-auto px-4 sm:px-5 md:px-8 lg:px-12 xl:px-16 h-full flex items-center justify-between gap-4">
           <Link to="/" className="text-xl sm:text-2xl shrink-0">
             <DecluttLogo />
           </Link>
 
-          {/* Desktop nav links */}
           <nav className="hidden md:flex items-center gap-5 lg:gap-8">
             {NAV_LINKS.map((l) => (
               <Link
@@ -712,23 +741,20 @@ const Navbar = () => {
               >
                 {l.label}
                 {isActive(l.to) && (
-                  <span className="absolute -bottom-0.5 left-0 right-0 h-[2px] bg-primary rounded-full" />
+                  <span className="absolute -bottom-0.5 left-0 right-0 h-0.5 bg-primary rounded-full" />
                 )}
               </Link>
             ))}
           </nav>
 
-          {/* Desktop right side */}
           <div className="hidden md:flex items-center gap-1.5">
             {user && profile ? (
               <>
-                {/* Cart button — no border, just icon + optional badge */}
                 <button
                   onClick={() => setCartOpen(true)}
                   aria-label="Cart"
                   className="relative flex items-center justify-center w-9 h-9 rounded-xl text-foreground/60 hover:text-primary hover:bg-primary/10 transition-all duration-200"
                 >
-                  {/* Shopping bag icon */}
                   <svg
                     width="20"
                     height="20"
@@ -749,7 +775,6 @@ const Navbar = () => {
                     </span>
                   )}
                 </button>
-                {/* Account dropdown — no border */}
                 <AccountDropdown
                   profile={profile}
                   logoutState={logoutState}
@@ -775,7 +800,6 @@ const Navbar = () => {
             )}
           </div>
 
-          {/* Mobile — hamburger only */}
           <div className="md:hidden flex items-center">
             <button
               onClick={() => setMenuOpen(!menuOpen)}
@@ -788,14 +812,13 @@ const Navbar = () => {
         </div>
       </header>
 
-      {/* Cart drawer */}
       <CartDrawer
         open={cartOpen}
         onClose={() => setCartOpen(false)}
         cartItems={cartItems}
+        onRemove={removeFromCart}
       />
 
-      {/* Mobile overlay */}
       {menuOpen && (
         <div
           className="fixed z-40 bg-black/45 backdrop-blur-sm md:hidden"
@@ -804,7 +827,6 @@ const Navbar = () => {
         />
       )}
 
-      {/* Mobile drawer */}
       <div
         className="md:hidden fixed right-0 bottom-0 z-50 flex flex-col bg-background"
         style={{
@@ -847,7 +869,6 @@ const Navbar = () => {
               <p className="text-[10px] font-bold uppercase tracking-widest text-foreground/30 px-4 pb-1">
                 My Account
               </p>
-              {/* Mobile cart button */}
               <button
                 onClick={() => {
                   setMenuOpen(false);

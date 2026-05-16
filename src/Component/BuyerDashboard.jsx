@@ -1,15 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useLayoutEffect } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
-import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
 
-// FIX: trim display name to max 2 words
 const formatDisplayName = (name) => {
   if (!name) return "there";
   return name.trim().split(/\s+/).slice(0, 2).join(" ");
 };
-
 const getInitials = (name) => {
   if (!name) return "?";
   return name
@@ -44,7 +40,6 @@ const NAV_ITEMS = [
     ),
   },
   {
-    // FIX: Cart icon for orders
     id: "orders",
     label: "My Orders",
     icon: (
@@ -143,7 +138,7 @@ const StatCard = ({ label, value, icon, accent, sub }) => (
         {sub && <p className="text-[11px] text-foreground/35 mt-0.5">{sub}</p>}
       </div>
       <div
-        className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${accent ? "bg-primary/20 text-primary" : "bg-primary/10 text-primary"}`}
+        className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${accent ? "bg-primary/20 text-primary" : "bg-primary/10 text-primary"}`}
       >
         {icon}
       </div>
@@ -151,68 +146,8 @@ const StatCard = ({ label, value, icon, accent, sub }) => (
   </div>
 );
 
-const Empty = ({ msg, cta, ctaLink }) => (
-  <div className="py-16 flex flex-col items-center gap-3 text-center">
-    <div className="w-14 h-14 rounded-full bg-border/30 flex items-center justify-center text-foreground/20">
-      <svg
-        width="26"
-        height="26"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.5"
-      >
-        <circle cx="12" cy="12" r="10" />
-        <path d="M12 8v4M12 16h.01" />
-      </svg>
-    </div>
-    <p className="text-sm text-foreground/40">{msg}</p>
-    {cta && (
-      <Link
-        to={ctaLink}
-        className="text-primary text-sm font-semibold hover:underline underline-offset-4"
-      >
-        {cta} →
-      </Link>
-    )}
-  </div>
-);
-
-const ListingCard = ({ listing }) => (
-  <div
-    className="bg-background rounded-xl overflow-hidden hover:shadow-md transition-all duration-200 group"
-    style={{ border: "2px solid hsl(var(--border))" }}
-  >
-    <div className="aspect-video relative overflow-hidden bg-border/20">
-      {listing.imageUrl ? (
-        <img
-          src={listing.imageUrl}
-          alt={listing.name}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-        />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center text-foreground/15 text-xs">
-          No image
-        </div>
-      )}
-    </div>
-    <div className="p-3">
-      <p className="text-sm font-semibold text-foreground truncate">
-        {listing.name}
-      </p>
-      <p className="text-xs text-foreground/45 truncate">
-        {listing.category} · {listing.location}
-      </p>
-      <p className="text-sm font-bold text-primary mt-1.5">
-        ₦{Number(listing.price).toLocaleString()}
-      </p>
-    </div>
-  </div>
-);
-
-/* ── Overview Panel ── */
-const OverviewPanel = ({ profile, listings, setTab }) => {
-  // FIX: first word only for greeting
+/* ── Overview Panel — NO "Fresh in market" section ── */
+const OverviewPanel = ({ profile, setTab }) => {
   const firstName = profile?.name?.trim().split(/\s+/)[0] ?? "there";
   const hour = new Date().getHours();
   const greeting =
@@ -221,7 +156,7 @@ const OverviewPanel = ({ profile, listings, setTab }) => {
   return (
     <div className="space-y-6">
       <div
-        className="rounded-2xl px-6 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+        className="rounded-2xl px-5 sm:px-6 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
         style={{
           background:
             "linear-gradient(135deg, hsl(var(--primary)/0.12), hsl(var(--primary)/0.04))",
@@ -291,19 +226,16 @@ const OverviewPanel = ({ profile, listings, setTab }) => {
             label: "Track your orders",
             desc: "See order status & history",
             tab: "orders",
-            color: "text-amber-500",
           },
           {
             label: "Saved items",
             desc: "Items you've bookmarked",
             tab: "favourites",
-            color: "text-rose-500",
           },
           {
             label: "Redeem points",
             desc: "Use your earned rewards",
             tab: "rewards",
-            color: "text-primary",
           },
         ].map((a) => (
           <button
@@ -312,9 +244,7 @@ const OverviewPanel = ({ profile, listings, setTab }) => {
             className="flex items-center gap-3 p-4 rounded-xl bg-background text-left hover:border-primary/30 transition-all duration-200"
             style={{ border: "2px solid hsl(var(--border))" }}
           >
-            <div
-              className={`w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 ${a.color}`}
-            >
+            <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
               {NAV_ITEMS.find((n) => n.id === a.tab)?.icon}
             </div>
             <div>
@@ -330,45 +260,18 @@ const OverviewPanel = ({ profile, listings, setTab }) => {
               strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="text-foreground/25 ml-auto flex-shrink-0"
+              className="text-foreground/25 ml-auto shrink-0"
             >
               <path d="m9 18 6-6-6-6" />
             </svg>
           </button>
         ))}
       </div>
-
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-sm font-bold text-foreground">
-            Fresh in the market
-          </p>
-          <Link
-            to="/listings"
-            className="text-xs text-primary font-semibold hover:underline underline-offset-4"
-          >
-            Browse all →
-          </Link>
-        </div>
-        {listings.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {listings.slice(0, 6).map((l) => (
-              <ListingCard key={l.id} listing={l} />
-            ))}
-          </div>
-        ) : (
-          <Empty
-            msg="No listings yet."
-            cta="Check back soon"
-            ctaLink="/listings"
-          />
-        )}
-      </div>
+      {/* NOTE: "Fresh in market" section removed as requested */}
     </div>
   );
 };
 
-/* ── Orders Panel ── */
 const ORDER_TABS = [
   "All",
   "Pending",
@@ -377,20 +280,16 @@ const ORDER_TABS = [
   "Delivered",
   "Cancelled",
 ];
-
 const OrdersPanel = () => {
   const [activeTab, setActiveTab] = useState("All");
-  const orders = [];
-
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <p className="text-lg font-bold text-foreground">My Orders</p>
         <span className="text-xs text-foreground/40 bg-border/40 px-3 py-1 rounded-full">
-          {orders.length} total
+          0 total
         </span>
       </div>
-
       <div className="relative border-b border-border">
         <div
           className="flex gap-1 overflow-x-auto"
@@ -400,7 +299,7 @@ const OrdersPanel = () => {
             <button
               key={t}
               onClick={() => setActiveTab(t)}
-              className={`relative px-5 py-3 text-sm font-semibold whitespace-nowrap transition-all duration-150 shrink-0 focus:outline-none rounded-t-lg ${activeTab === t ? "text-primary bg-primary/5" : "text-foreground/45 hover:text-foreground/70 hover:bg-border/20"}`}
+              className={`relative px-4 sm:px-5 py-3 text-sm font-semibold whitespace-nowrap transition-all shrink-0 focus:outline-none rounded-t-lg ${activeTab === t ? "text-primary bg-primary/5" : "text-foreground/45 hover:text-foreground/70 hover:bg-border/20"}`}
             >
               {t}
               {activeTab === t && (
@@ -410,94 +309,38 @@ const OrdersPanel = () => {
           ))}
         </div>
       </div>
-
-      {orders.length === 0 ? (
-        <div className="py-16 flex flex-col items-center gap-4 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-border/30 flex items-center justify-center text-foreground/20">
-            {/* Cart icon in empty state too */}
-            <svg
-              width="30"
-              height="30"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-            >
-              <circle cx="9" cy="21" r="1" />
-              <circle cx="20" cy="21" r="1" />
-              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-foreground/50">
-              No orders yet
-            </p>
-            <p className="text-xs text-foreground/30 mt-1">
-              Items you order will appear here with live status updates.
-            </p>
-          </div>
-          <Link
-            to="/listings"
-            className="main-button text-sm px-5 py-2.5 inline-flex items-center gap-2"
+      <div className="py-16 flex flex-col items-center gap-4 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-border/30 flex items-center justify-center text-foreground/20">
+          <svg
+            width="30"
+            height="30"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
           >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <path d="m21 21-4.3-4.3" />
-            </svg>
-            Start browsing
-          </Link>
+            <circle cx="9" cy="21" r="1" />
+            <circle cx="20" cy="21" r="1" />
+            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+          </svg>
         </div>
-      ) : (
-        orders
-          .filter((o) => activeTab === "All" || o.status === activeTab)
-          .map((order) => (
-            <div
-              key={order.id}
-              className="flex items-center gap-4 p-4 rounded-xl bg-background"
-              style={{ border: "2px solid hsl(var(--border))" }}
-            >
-              <div className="w-14 h-14 rounded-xl bg-border/30 overflow-hidden flex-shrink-0">
-                {order.imageUrl && (
-                  <img
-                    src={order.imageUrl}
-                    alt=""
-                    className="w-full h-full object-cover"
-                  />
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-foreground truncate">
-                  {order.itemName}
-                </p>
-                <p className="text-xs text-foreground/45 mt-0.5">
-                  {order.sellerName} · {order.date}
-                </p>
-                <span
-                  className={`inline-block mt-1.5 text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 ${order.status === "Delivered" ? "bg-green-500/15 text-green-600 border border-green-500/25" : order.status === "Pending" ? "bg-amber-500/15 text-amber-600 border border-amber-500/25" : order.status === "Cancelled" ? "bg-red-500/15 text-red-500 border border-red-500/25" : order.status === "On the way" ? "bg-blue-500/15 text-blue-500 border border-blue-500/25" : "bg-primary/15 text-primary border border-primary/25"}`}
-                >
-                  {order.status}
-                </span>
-              </div>
-              <p className="text-sm font-bold text-primary flex-shrink-0">
-                ₦{Number(order.price).toLocaleString()}
-              </p>
-            </div>
-          ))
-      )}
+        <p className="text-sm font-semibold text-foreground/50">
+          No orders yet
+        </p>
+        <p className="text-xs text-foreground/30">
+          Items you order will appear here with live status updates.
+        </p>
+        <Link
+          to="/listings"
+          className="main-button text-sm px-5 py-2.5 inline-flex items-center gap-2"
+        >
+          Browse listings
+        </Link>
+      </div>
     </div>
   );
 };
 
-/* ── Favourites Panel ── */
 const FavouritesPanel = () => (
   <div className="space-y-4">
     <p className="text-lg font-bold text-foreground">Saved Items</p>
@@ -514,38 +357,19 @@ const FavouritesPanel = () => (
           <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
         </svg>
       </div>
-      <div>
-        <p className="text-sm font-semibold text-foreground/50">
-          Nothing saved yet
-        </p>
-        <p className="text-xs text-foreground/30 mt-1">
-          Tap the heart icon on any listing to save it here.
-        </p>
-      </div>
-      <Link
-        to="/listings"
-        className="main-button text-sm px-5 py-2.5 inline-flex items-center gap-2"
-      >
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <circle cx="11" cy="11" r="8" />
-          <path d="m21 21-4.3-4.3" />
-        </svg>
+      <p className="text-sm font-semibold text-foreground/50">
+        Nothing saved yet
+      </p>
+      <p className="text-xs text-foreground/30">
+        Tap the heart icon on any listing to save it here.
+      </p>
+      <Link to="/listings" className="main-button text-sm px-5 py-2.5">
         Explore listings
       </Link>
     </div>
   </div>
 );
 
-/* ── Rewards Panel ── */
 const RewardsPanel = ({ profile }) => {
   const pts = profile?.rewards ?? 0;
   return (
@@ -560,7 +384,7 @@ const RewardsPanel = ({ profile }) => {
         className="flex items-center gap-4 p-5 rounded-2xl bg-background"
         style={{ border: "2px solid hsl(var(--border))" }}
       >
-        <div className="w-14 h-14 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
+        <div className="w-14 h-14 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
           <svg
             width="28"
             height="28"
@@ -583,62 +407,10 @@ const RewardsPanel = ({ profile }) => {
           Redeem
         </button>
       </div>
-      <div>
-        <p className="text-sm font-bold text-foreground mb-3">
-          How to Earn Points
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {[
-            {
-              title: "Order on Declutt",
-              desc: "Earn points for every purchase.",
-            },
-            {
-              title: "Refer a friend",
-              desc: "Invite friends and earn bonus points.",
-            },
-            {
-              title: "Write a review",
-              desc: "Get rewarded for sharing feedback.",
-            },
-            {
-              title: "Special events",
-              desc: "Earn double points during promos.",
-            },
-          ].map((r) => (
-            <div
-              key={r.title}
-              className="flex items-start gap-3 p-4 rounded-xl bg-background"
-              style={{ border: "2px solid hsl(var(--border))" }}
-            >
-              <div className="w-6 h-6 rounded-full border-[2px] border-primary/40 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <svg
-                  width="11"
-                  height="11"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="text-primary"
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-primary">{r.title}</p>
-                <p className="text-xs text-foreground/50 mt-0.5">{r.desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 };
 
-/* ── Referrals Panel ── */
 const ReferralsPanel = ({ profile }) => {
   const [copied, setCopied] = useState(false);
   const code = profile?.referralCode ?? "—";
@@ -685,7 +457,6 @@ const ReferralsPanel = ({ profile }) => {
   );
 };
 
-/* ── Logout hook ── */
 const useLogout = (logoutFn, navigate) => {
   const [state, setState] = useState("idle");
   const handleLogout = async () => {
@@ -751,7 +522,7 @@ const LogoutButton = ({ onLogout, state }) => (
       </svg>
     )}
     {state === "loading"
-      ? "Signing out…"
+      ? "Signing out..."
       : state === "success"
         ? "Signed out! 👋"
         : "Log out"}
@@ -764,36 +535,19 @@ const BuyerDashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [tab, setTab] = useState("overview");
-  const [listings, setListings] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { state: logoutState, handleLogout } = useLogout(logout, navigate);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const p = new URLSearchParams(location.search).get("tab");
-    if (p && NAV_ITEMS.find((n) => n.id === p)) setTab(p);
+    if (p && NAV_ITEMS.find((n) => n.id === p) && p !== tab) setTab(p);
   }, [location.search]);
-
-  useEffect(() => {
-    getDocs(query(collection(db, "listings"), orderBy("createdAt", "desc")))
-      .then((snap) =>
-        setListings(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
-      )
-      .catch(console.error);
-  }, []);
 
   const initials = getInitials(profile?.name);
   const displayName = formatDisplayName(profile?.name);
 
-  const SidebarContent = ({ mobile = false }) => (
+  const SidebarInner = ({ mobile = false }) => (
     <div className="flex flex-col h-full bg-card">
-      {!mobile && (
-        <div className="px-5 py-4 shrink-0 flex items-center">
-          <Link to="/" className="text-lg font-bold">
-            <span className="text-foreground">De</span>
-            <span className="text-primary">clutt</span>
-          </Link>
-        </div>
-      )}
       {mobile && (
         <div
           className="px-5 py-4 shrink-0 flex items-center justify-between"
@@ -860,7 +614,6 @@ const BuyerDashboard = () => {
             )}
           </div>
           <div className="min-w-0">
-            {/* FIX: max 2-word display name */}
             <p className="text-xs font-bold text-foreground truncate">
               {displayName}
             </p>
@@ -875,90 +628,104 @@ const BuyerDashboard = () => {
   );
 
   return (
-    <div className="min-h-screen bg-background flex pt-16">
-      {/* FIX: sticky sidebar — stops naturally at footer, doesn't overlay it */}
-      <aside
-        className="hidden md:flex flex-col w-64 xl:w-72 shrink-0"
-        style={{
-          position: "sticky",
-          top: `${NAVBAR_H}px`,
-          height: `calc(100vh - ${NAVBAR_H}px)`,
-          borderRight: "1px solid hsl(var(--border)/0.35)",
-          alignSelf: "flex-start",
-        }}
-      >
-        <SidebarContent />
-      </aside>
-
-      {sidebarOpen && (
-        <div
-          className="md:hidden fixed inset-0 z-40 bg-black/45 backdrop-blur-sm"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-      <div
-        className="md:hidden fixed left-0 bottom-0 z-50 w-72 flex flex-col bg-card"
-        style={{
-          top: `${NAVBAR_H}px`,
-          transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
-          transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
-          boxShadow: sidebarOpen ? "4px 0 24px rgba(0,0,0,0.12)" : "none",
-          borderRight: "1px solid hsl(var(--border)/0.4)",
-        }}
-      >
-        <SidebarContent mobile />
-      </div>
-
-      <main className="flex-1 min-w-0 flex flex-col">
-        <div
-          className="md:hidden sticky top-16 z-30 bg-background/90 backdrop-blur-md px-4 h-12 flex items-center justify-between gap-3"
-          style={{ borderBottom: "1px solid hsl(var(--border)/0.4)" }}
+    /*
+      KEY FIX: The outer wrapper uses min-h-screen and flex.
+      The sidebar uses alignSelf:"stretch" (not flex-start) so its border
+      extends all the way down to match the content height → touches footer.
+    */
+    <div
+      className="min-h-screen bg-background flex flex-col"
+      style={{ paddingTop: `${NAVBAR_H}px` }}
+    >
+      <div className="flex flex-1">
+        {/* Desktop sidebar — FULL HEIGHT (stretches with content) */}
+        <aside
+          className="hidden md:flex flex-col w-64 xl:w-72 shrink-0"
+          style={{
+            position: "sticky",
+            top: `${NAVBAR_H}px`,
+            height: `calc(100vh - ${NAVBAR_H}px)`,
+            overflowY: "auto",
+            borderRight: "1px solid hsl(var(--border)/0.35)",
+            background: "hsl(var(--card))",
+            // alignSelf: stretch (default) — sidebar border reaches footer
+          }}
         >
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="flex items-center justify-center w-8 h-8 rounded-xl text-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-            style={{ border: "1.5px solid hsl(var(--border))" }}
+          <SidebarInner />
+        </aside>
+
+        {/* Mobile sidebar overlay */}
+        {sidebarOpen && (
+          <div
+            className="md:hidden fixed inset-0 z-40 bg-black/45 backdrop-blur-sm"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+        <div
+          className="md:hidden fixed left-0 bottom-0 z-50 w-72 flex flex-col bg-card"
+          style={{
+            top: `${NAVBAR_H}px`,
+            transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
+            transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
+            boxShadow: sidebarOpen ? "4px 0 24px rgba(0,0,0,0.12)" : "none",
+            borderRight: "1px solid hsl(var(--border)/0.4)",
+          }}
+        >
+          <SidebarInner mobile />
+        </div>
+
+        <main className="flex-1 min-w-0 flex flex-col">
+          {/* Mobile top bar */}
+          <div
+            className="md:hidden sticky z-30 bg-background/90 backdrop-blur-md px-4 h-12 flex items-center justify-between gap-3"
+            style={{
+              top: `${NAVBAR_H}px`,
+              borderBottom: "1px solid hsl(var(--border)/0.4)",
+            }}
           >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="flex items-center justify-center w-8 h-8 rounded-xl text-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+              style={{ border: "1.5px solid hsl(var(--border))" }}
             >
-              <line x1="3" y1="6" x2="21" y2="6" />
-              <line x1="3" y1="12" x2="21" y2="12" />
-              <line x1="3" y1="18" x2="21" y2="18" />
-            </svg>
-          </button>
-          <span className="text-sm font-bold text-foreground">
-            {NAV_ITEMS.find((n) => n.id === tab)?.label}
-          </span>
-          <Link
-            to="/listings"
-            className="text-xs font-semibold text-primary px-3 py-1.5 rounded-xl"
-            style={{ border: "1.5px solid hsl(var(--primary)/0.3)" }}
-          >
-            Browse
-          </Link>
-        </div>
-        <div className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-5xl w-full mx-auto">
-          {tab === "overview" && (
-            <OverviewPanel
-              profile={profile}
-              listings={listings}
-              setTab={setTab}
-            />
-          )}
-          {tab === "orders" && <OrdersPanel />}
-          {tab === "favourites" && <FavouritesPanel />}
-          {tab === "rewards" && <RewardsPanel profile={profile} />}
-          {tab === "referrals" && <ReferralsPanel profile={profile} />}
-        </div>
-      </main>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="3" y1="6" x2="21" y2="6" />
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <line x1="3" y1="18" x2="21" y2="18" />
+              </svg>
+            </button>
+            <span className="text-sm font-bold text-foreground">
+              {NAV_ITEMS.find((n) => n.id === tab)?.label}
+            </span>
+            <Link
+              to="/listings"
+              className="text-xs font-semibold text-primary px-3 py-1.5 rounded-xl"
+              style={{ border: "1.5px solid hsl(var(--primary)/0.3)" }}
+            >
+              Browse
+            </Link>
+          </div>
+
+          <div className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-5xl w-full mx-auto">
+            {tab === "overview" && (
+              <OverviewPanel profile={profile} setTab={setTab} />
+            )}
+            {tab === "orders" && <OrdersPanel />}
+            {tab === "favourites" && <FavouritesPanel />}
+            {tab === "rewards" && <RewardsPanel profile={profile} />}
+            {tab === "referrals" && <ReferralsPanel profile={profile} />}
+          </div>
+        </main>
+      </div>
     </div>
   );
 };

@@ -8,6 +8,7 @@ import Login from "./Component/Login";
 import Signup from "./Component/Signup";
 import { HomeSection } from "./Component/HomeSection";
 import Listings from "./Component/Listings";
+import ProductDetails from "./Component/ProductDetails";
 import SellerDashboard from "./Component/SellerDashboard";
 import BuyerDashboard from "./Component/BuyerDashboard";
 import AdminDashboard from "./Component/AdminDashboard";
@@ -24,6 +25,10 @@ function App() {
           <Routes>
             <Route path="/" element={<HomeSection />} />
             <Route path="/listings" element={<Listings />} />
+
+            {/* Product Detail Page Route */}
+            <Route path="/product/:id" element={<ProductDetails />} />
+
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
 

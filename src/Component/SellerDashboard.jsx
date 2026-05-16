@@ -55,6 +55,24 @@ const NAV_ITEMS = [
     ),
   },
   {
+    id: "messages",
+    label: "Messages",
+    icon: (
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      </svg>
+    ),
+  },
+  {
     id: "listings",
     label: "My Items",
     icon: (
@@ -332,9 +350,6 @@ const Field = ({ label, children, hint, error, htmlFor }) => (
   </div>
 );
 
-// ── Compress + convert image to base64 ───────────────────────────────────────
-// Resizes to max 800px wide and compresses to JPEG 0.75 quality
-// Result is always well under Firestore's 1MB document limit
 const compressToBase64 = (file) =>
   new Promise((resolve, reject) => {
     const img = new Image();
@@ -361,7 +376,7 @@ const compressToBase64 = (file) =>
     img.src = url;
   });
 
-// ── Listing Modal ─────────────────────────────────────────────────────────────
+// ── Listing Modal with multiple thumbnail support ─────────────────────────────
 const ListingModal = ({
   onClose,
   onSaved,
@@ -369,7 +384,8 @@ const ListingModal = ({
   sellerProfile,
   currentUserUid,
 }) => {
-  const fileRef = useRef();
+  const mainFileRef = useRef();
+  const thumbFileRef = useRef();
 
   const [form, setForm] = useState({
     name: existing?.name || "",
@@ -383,8 +399,15 @@ const ListingModal = ({
     existing?.lat ? { lat: existing.lat, lng: existing.lng } : null,
   );
   const [gpsLoading, setGpsLoading] = useState(false);
-  const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState(existing?.imageUrl || null);
+  // Main image
+  const [mainImageFile, setMainImageFile] = useState(null);
+  const [mainImagePreview, setMainImagePreview] = useState(
+    existing?.imageUrl || null,
+  );
+  // Additional thumbnails (up to 3 extra)
+  const [additionalImages, setAdditionalImages] = useState(
+    existing?.additionalImages || [],
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -409,17 +432,39 @@ const ListingModal = ({
     );
   };
 
-  const handleImage = (e) => {
+  const handleMainImage = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    // Allow up to 10MB raw — we compress it down before saving
     if (file.size > 10 * 1024 * 1024) {
       setError("Image must be under 10MB.");
       return;
     }
-    setImageFile(file);
-    setImagePreview(URL.createObjectURL(file));
+    setMainImageFile(file);
+    setMainImagePreview(URL.createObjectURL(file));
     setError("");
+  };
+
+  const handleAdditionalImages = async (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    const remaining = 3 - additionalImages.length;
+    const toProcess = files.slice(0, remaining);
+    const newImages = [];
+    for (const file of toProcess) {
+      if (file.size > 10 * 1024 * 1024) continue;
+      const preview = URL.createObjectURL(file);
+      newImages.push({ file, preview });
+    }
+    setAdditionalImages((prev) => [
+      ...prev,
+      ...newImages.map((n) => n.preview),
+    ]);
+    // Store files for later compression
+    e.target._pendingFiles = newImages.map((n) => n.file);
+  };
+
+  const removeAdditionalImage = (idx) => {
+    setAdditionalImages((prev) => prev.filter((_, i) => i !== idx));
   };
 
   const handleSave = async (e) => {
@@ -434,7 +479,7 @@ const ListingModal = ({
       setError("Enter a valid price.");
       return;
     }
-    if (!existing && !imageFile) {
+    if (!existing && !mainImageFile) {
       setError("Please upload a product image.");
       return;
     }
@@ -450,15 +495,28 @@ const ListingModal = ({
 
     setSaving(true);
     try {
-      // ✅ Compress image and convert to base64 — no Firebase Storage needed
       let imageUrl = existing?.imageUrl || "";
-      if (imageFile) {
-        imageUrl = await compressToBase64(imageFile);
-        console.log(
-          "✅ Image compressed to base64, size:",
-          Math.round(imageUrl.length / 1024),
-          "KB",
-        );
+      if (mainImageFile) {
+        imageUrl = await compressToBase64(mainImageFile);
+      }
+
+      // Compress additional images that are blob URLs (new uploads)
+      const compressedAdditional = [];
+      for (const img of additionalImages) {
+        if (img.startsWith("blob:")) {
+          // fetch the blob and compress
+          try {
+            const resp = await fetch(img);
+            const blob = await resp.blob();
+            const file = new File([blob], "thumb.jpg", { type: blob.type });
+            const b64 = await compressToBase64(file);
+            compressedAdditional.push(b64);
+          } catch {
+            // skip if failed
+          }
+        } else {
+          compressedAdditional.push(img);
+        }
       }
 
       const payload = {
@@ -468,7 +526,8 @@ const ListingModal = ({
         category: form.category,
         condition: form.condition,
         available: Boolean(form.available),
-        imageUrl, // base64 string — works in <img src> identically to a URL
+        imageUrl,
+        additionalImages: compressedAdditional,
         sellerName: sellerProfile?.name || "",
         sellerContact: sellerProfile?.phone || sellerProfile?.whatsapp || "",
         sellerUid: uid,
@@ -478,13 +537,11 @@ const ListingModal = ({
 
       if (existing) {
         await updateDoc(doc(db, "listings", existing.id), payload);
-        console.log("✅ Updated listing:", existing.id);
       } else {
-        const ref = await addDoc(collection(db, "listings"), {
+        await addDoc(collection(db, "listings"), {
           ...payload,
           createdAt: serverTimestamp(),
         });
-        console.log("✅ Created listing:", ref.id);
       }
 
       onSaved();
@@ -492,9 +549,7 @@ const ListingModal = ({
     } catch (err) {
       console.error("❌ Save error:", err);
       if (err.code === "permission-denied") {
-        setError(
-          "Permission denied — check your Firestore rules in Firebase Console → Firestore → Rules.",
-        );
+        setError("Permission denied — check your Firestore rules.");
       } else {
         setError(`Save failed: ${err.message}`);
       }
@@ -546,14 +601,15 @@ const ListingModal = ({
             </div>
           )}
 
-          <Field label="Product image" htmlFor="listing-image">
+          {/* Main product image */}
+          <Field label="Main product image" htmlFor="listing-image">
             <div
-              onClick={() => fileRef.current?.click()}
+              onClick={() => mainFileRef.current?.click()}
               className="relative h-40 rounded-xl border-2 border-dashed border-border hover:border-primary/50 cursor-pointer overflow-hidden transition-colors flex items-center justify-center bg-background"
             >
-              {imagePreview ? (
+              {mainImagePreview ? (
                 <img
-                  src={imagePreview}
+                  src={mainImagePreview}
                   alt="preview"
                   className="absolute inset-0 w-full h-full object-cover"
                 />
@@ -572,14 +628,14 @@ const ListingModal = ({
                     <path d="m21 15-5-5L5 21" />
                   </svg>
                   <span className="text-xs font-medium">
-                    Click to upload photo
+                    Click to upload main photo
                   </span>
                   <span className="text-[10px] text-foreground/20">
                     JPG, PNG, WEBP · Any size (auto-compressed)
                   </span>
                 </div>
               )}
-              {imagePreview && (
+              {mainImagePreview && (
                 <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 hover:opacity-100">
                   <span className="text-white text-xs font-semibold bg-black/50 px-3 py-1.5 rounded-lg">
                     Change photo
@@ -589,12 +645,77 @@ const ListingModal = ({
             </div>
             <input
               id="listing-image"
-              ref={fileRef}
+              ref={mainFileRef}
               type="file"
               accept="image/*"
-              onChange={handleImage}
+              onChange={handleMainImage}
               className="hidden"
             />
+          </Field>
+
+          {/* Additional thumbnail images */}
+          <Field label={`Additional photos (${additionalImages.length}/3)`}>
+            <div className="flex gap-2 flex-wrap">
+              {additionalImages.map((src, idx) => (
+                <div
+                  key={idx}
+                  className="relative w-20 h-20 rounded-xl overflow-hidden border border-border group"
+                >
+                  <img
+                    src={src}
+                    alt={`thumb ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeAdditionalImage(idx)}
+                    className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <svg
+                      width="10"
+                      height="10"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                    >
+                      <path d="M18 6 6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+              {additionalImages.length < 3 && (
+                <div
+                  onClick={() => thumbFileRef.current?.click()}
+                  className="w-20 h-20 rounded-xl border-2 border-dashed border-border hover:border-primary/50 cursor-pointer flex flex-col items-center justify-center gap-1 text-foreground/30 hover:text-primary transition-colors"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
+                  <span className="text-[9px] font-medium text-center leading-tight">
+                    Add thumb
+                  </span>
+                </div>
+              )}
+            </div>
+            <input
+              ref={thumbFileRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleAdditionalImages}
+              className="hidden"
+            />
+            <p className="text-[11px] text-foreground/35">
+              Up to 3 additional product photos shown as thumbnails
+            </p>
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
@@ -817,7 +938,7 @@ const ItemCard = ({ listing, onEdit, onDelete }) => (
     className="bg-card rounded-2xl overflow-hidden group transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5"
     style={{ border: "1.5px solid hsl(var(--border))" }}
   >
-    <div className="aspect-[4/3] relative overflow-hidden bg-border/20">
+    <div className="aspect-4/3 relative overflow-hidden bg-border/20">
       {listing.imageUrl ? (
         <img
           src={listing.imageUrl}
@@ -948,14 +1069,72 @@ const Empty = ({ msg, cta, ctaAction }) => (
   </div>
 );
 
-// ── Overview Panel ────────────────────────────────────────────────────────────
+// ── Pagination ────────────────────────────────────────────────────────────────
+const Pagination = ({ total, perPage, current, onChange }) => {
+  const pages = Math.ceil(total / perPage);
+  if (pages <= 1) return null;
+  return (
+    <div className="flex items-center justify-center gap-2 mt-6">
+      <button
+        onClick={() => onChange(current - 1)}
+        disabled={current === 1}
+        className="w-8 h-8 rounded-lg border border-border text-foreground/60 hover:text-primary hover:border-primary/40 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center"
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+        >
+          <path d="m15 18-6-6 6-6" />
+        </svg>
+      </button>
+      {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
+        <button
+          key={p}
+          onClick={() => onChange(p)}
+          className={`w-8 h-8 rounded-lg text-sm font-bold transition-all ${current === p ? "bg-primary text-primary-foreground" : "border border-border text-foreground/60 hover:text-primary hover:border-primary/40"}`}
+        >
+          {p}
+        </button>
+      ))}
+      <button
+        onClick={() => onChange(current + 1)}
+        disabled={current === pages}
+        className="w-8 h-8 rounded-lg border border-border text-foreground/60 hover:text-primary hover:border-primary/40 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center"
+      >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+        >
+          <path d="m9 18 6-6-6-6" />
+        </svg>
+      </button>
+    </div>
+  );
+};
+
+// ── Overview Panel — 2 rows × 3 cols = 6 items with pagination ────────────────
 const OverviewPanel = ({ profile, listings, setTab, onAddNew }) => {
+  const [page, setPage] = useState(1);
+  const ITEMS_PER_PAGE = 6; // 2 rows × 3 cols
   const active = listings.filter((l) => l.available).length;
   const sold = listings.filter((l) => !l.available).length;
   const earned = listings
     .filter((l) => !l.available)
     .reduce((s, l) => s + Number(l.price || 0), 0);
   const firstName = profile?.name?.trim().split(/\s+/)[0] ?? "there";
+
+  const paginated = listings.slice(
+    (page - 1) * ITEMS_PER_PAGE,
+    page * ITEMS_PER_PAGE,
+  );
 
   return (
     <div className="space-y-6">
@@ -1085,11 +1264,20 @@ const OverviewPanel = ({ profile, listings, setTab, onAddNew }) => {
           </button>
         </div>
         {listings.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {listings.slice(0, 6).map((l) => (
-              <ItemCard key={l.id} listing={l} />
-            ))}
-          </div>
+          <>
+            {/* 2 rows × 3 cols = 6 items */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {paginated.map((l) => (
+                <ItemCard key={l.id} listing={l} />
+              ))}
+            </div>
+            <Pagination
+              total={listings.length}
+              perPage={ITEMS_PER_PAGE}
+              current={page}
+              onChange={setPage}
+            />
+          </>
         ) : (
           <Empty
             msg="No items yet. Add your first product to get started."
@@ -1102,56 +1290,73 @@ const OverviewPanel = ({ profile, listings, setTab, onAddNew }) => {
   );
 };
 
-// ── Items Panel ───────────────────────────────────────────────────────────────
-const ItemsPanel = ({ listings, onAddNew, onEdit, onDelete }) => (
-  <div className="space-y-5">
-    <div className="flex items-center justify-between">
-      <div>
-        <p className="text-xl font-black text-foreground">My Items</p>
-        <p className="text-xs text-foreground/40 mt-0.5">
-          {listings.length} listing{listings.length !== 1 ? "s" : ""} · hover a
-          card to edit or delete
-        </p>
-      </div>
-      <button
-        onClick={onAddNew}
-        className="main-button text-sm px-5 py-2.5 flex items-center gap-2"
-      >
-        <svg
-          width="13"
-          height="13"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+// ── Items Panel — 3 rows × 3 cols = 9 items with pagination ──────────────────
+const ItemsPanel = ({ listings, onAddNew, onEdit, onDelete }) => {
+  const [page, setPage] = useState(1);
+  const ITEMS_PER_PAGE = 9; // 3 rows × 3 cols
+  const paginated = listings.slice(
+    (page - 1) * ITEMS_PER_PAGE,
+    page * ITEMS_PER_PAGE,
+  );
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-xl font-black text-foreground">My Items</p>
+          <p className="text-xs text-foreground/40 mt-0.5">
+            {listings.length} listing{listings.length !== 1 ? "s" : ""} · hover
+            a card to edit or delete
+          </p>
+        </div>
+        <button
+          onClick={onAddNew}
+          className="main-button text-sm px-5 py-2.5 flex items-center gap-2"
         >
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-        Add item
-      </button>
-    </div>
-    {listings.length > 0 ? (
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        {listings.map((l) => (
-          <ItemCard
-            key={l.id}
-            listing={l}
-            onEdit={onEdit}
-            onDelete={onDelete}
-          />
-        ))}
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          Add item
+        </button>
       </div>
-    ) : (
-      <Empty
-        msg="No items yet. Start by adding your first listing."
-        cta="Add your first item"
-        ctaAction={onAddNew}
-      />
-    )}
-  </div>
-);
+      {listings.length > 0 ? (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {paginated.map((l) => (
+              <ItemCard
+                key={l.id}
+                listing={l}
+                onEdit={onEdit}
+                onDelete={onDelete}
+              />
+            ))}
+          </div>
+          <Pagination
+            total={listings.length}
+            perPage={ITEMS_PER_PAGE}
+            current={page}
+            onChange={setPage}
+          />
+        </>
+      ) : (
+        <Empty
+          msg="No items yet. Start by adding your first listing."
+          cta="Add your first item"
+          ctaAction={onAddNew}
+        />
+      )}
+    </div>
+  );
+};
 
 // ── Orders Panel ──────────────────────────────────────────────────────────────
 const ORDER_TABS = [
@@ -1415,7 +1620,6 @@ const ProfilePanel = ({ profile }) => {
     setPhotoPreview(URL.createObjectURL(file));
   };
 
-  // ✅ Profile photo also uses base64 — no Storage
   const uploadPhoto = async () => {
     if (!photoFile) return;
     setUploading(true);
@@ -1471,7 +1675,6 @@ const ProfilePanel = ({ profile }) => {
 
   const inputCls =
     "w-full px-3.5 py-2.5 rounded-xl border bg-background text-sm text-foreground placeholder:text-foreground/30 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all";
-
   const PField = ({ label, error, children, hint, htmlFor }) => (
     <div className="flex flex-col gap-1.5">
       <label
@@ -1743,6 +1946,298 @@ const ProfilePanel = ({ profile }) => {
   );
 };
 
+// ── Messages Panel (real-time) ────────────────────────────────────────────────
+import {
+  query as fsQuery,
+  collection as fsCol,
+  where as fsWhere,
+  orderBy,
+  onSnapshot,
+  addDoc as fsAddDoc,
+  serverTimestamp as fsST,
+} from "firebase/firestore";
+
+const MessagesPanel = ({ sellerUid }) => {
+  const [threads, setThreads] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [active, setActive] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [reply, setReply] = useState("");
+  const [sending, setSending] = useState(false);
+  const bottomRef = useRef();
+
+  useEffect(() => {
+    if (!sellerUid) return;
+    const q = query(
+      collection(db, "messages"),
+      where("sellerUid", "==", sellerUid),
+      orderBy("createdAt", "asc"),
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      const msgs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const grouped = {};
+      msgs.forEach((m) => {
+        const key = `${m.listingId}_${m.buyerUid}`;
+        if (!grouped[key])
+          grouped[key] = {
+            key,
+            listingName: m.listingName,
+            listingImage: m.listingImageUrl,
+            buyerName: m.buyerName || "Buyer",
+            buyerUid: m.buyerUid,
+            listingId: m.listingId,
+            messages: [],
+            lastText: "",
+            unread: 0,
+          };
+        grouped[key].messages.push(m);
+        grouped[key].lastText = m.text;
+        if (m.from === "buyer" && !m.read) grouped[key].unread++;
+      });
+      const threadList = Object.values(grouped);
+      setThreads(threadList);
+      setLoading(false);
+      if (active) {
+        const updated = grouped[active.key];
+        if (updated) setMessages(updated.messages);
+      }
+    });
+    return () => unsub();
+  }, [sellerUid, active]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const sendReply = async () => {
+    if (!reply.trim() || !active || sending) return;
+    setSending(true);
+    const txt = reply.trim();
+    setReply("");
+    try {
+      await addDoc(collection(db, "messages"), {
+        listingId: active.listingId,
+        sellerUid,
+        buyerUid: active.buyerUid,
+        buyerName: active.buyerName,
+        listingName: active.listingName,
+        text: txt,
+        from: "seller",
+        createdAt: serverTimestamp(),
+        read: false,
+      });
+    } catch (e) {
+      console.error(e);
+    }
+    setSending(false);
+  };
+
+  if (loading)
+    return (
+      <div className="flex justify-center py-20 text-foreground/40">
+        <svg
+          className="animate-spin"
+          width="22"
+          height="22"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+        </svg>
+      </div>
+    );
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="text-xl font-black text-foreground">Messages</p>
+        <p className="text-xs text-foreground/40 mt-0.5">
+          Real-time conversations from buyers
+        </p>
+      </div>
+
+      {threads.length === 0 ? (
+        <Empty msg="No messages yet. When buyers contact you, they'll appear here." />
+      ) : (
+        <div
+          className="grid grid-cols-1 sm:grid-cols-[260px_1fr] gap-4"
+          style={{ minHeight: "500px" }}
+        >
+          <div
+            className="flex flex-col gap-1 overflow-y-auto rounded-2xl"
+            style={{
+              border: "1.5px solid hsl(var(--border))",
+              padding: "8px",
+              maxHeight: "600px",
+            }}
+          >
+            {threads.map((t) => {
+              const last = t.messages[t.messages.length - 1];
+              const isActive = active?.key === t.key;
+              return (
+                <button
+                  key={t.key}
+                  onClick={() => {
+                    setActive(t);
+                    setMessages(t.messages);
+                  }}
+                  className={`flex items-start gap-3 p-3 rounded-xl text-left transition-all ${isActive ? "bg-primary/10 border border-primary/25" : "hover:bg-border/30 border border-transparent"}`}
+                >
+                  <div className="w-10 h-10 rounded-full bg-primary/15 text-primary flex items-center justify-center text-sm font-black shrink-0 border-2 border-primary/20">
+                    {(t.buyerName?.[0] || "B").toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-bold text-foreground truncate">
+                        {t.buyerName}
+                      </p>
+                      {t.unread > 0 && (
+                        <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center shrink-0 ml-1">
+                          {t.unread}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-foreground/40 truncate">
+                      {t.listingName}
+                    </p>
+                    <p className="text-[10px] truncate mt-0.5 text-foreground/50">
+                      {last?.text}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {active ? (
+            <div
+              className="flex flex-col rounded-2xl overflow-hidden"
+              style={{
+                border: "1.5px solid hsl(var(--border))",
+                maxHeight: "600px",
+              }}
+            >
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0 bg-card">
+                <div className="w-9 h-9 rounded-full bg-primary/15 text-primary flex items-center justify-center text-sm font-black border-2 border-primary/20 shrink-0">
+                  {(active.buyerName?.[0] || "B").toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-foreground truncate">
+                    {active.buyerName}
+                  </p>
+                  <p className="text-[10px] text-foreground/40 truncate">
+                    Re: {active.listingName}
+                  </p>
+                </div>
+              </div>
+              <div
+                className="flex-1 overflow-y-auto px-4 py-4 space-y-2 bg-background/30"
+                style={{ minHeight: "280px" }}
+              >
+                {messages.map((m) => (
+                  <div
+                    key={m.id}
+                    className={`flex ${m.from === "seller" ? "justify-end" : "justify-start"}`}
+                  >
+                    {m.from === "buyer" && (
+                      <div className="w-7 h-7 rounded-full bg-primary/15 text-primary border border-primary/20 flex items-center justify-center text-[9px] font-black shrink-0 mr-2 mt-1">
+                        {(active.buyerName?.[0] || "B").toUpperCase()}
+                      </div>
+                    )}
+                    <div
+                      className={`max-w-[75%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed shadow-sm ${m.from === "seller" ? "bg-primary text-primary-foreground rounded-br-sm" : "bg-card text-foreground rounded-bl-sm border border-border"}`}
+                    >
+                      <p>{m.text}</p>
+                      <p
+                        className={`text-[10px] mt-1 ${m.from === "seller" ? "text-primary-foreground/55 text-right" : "text-foreground/35"}`}
+                      >
+                        {m.createdAt?.toDate
+                          ? new Date(m.createdAt.toDate()).toLocaleTimeString(
+                              [],
+                              { hour: "2-digit", minute: "2-digit" },
+                            )
+                          : "just now"}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                <div ref={bottomRef} />
+              </div>
+              <div className="flex gap-2 px-3 py-3 border-t border-border bg-card shrink-0">
+                <input
+                  value={reply}
+                  onChange={(e) => setReply(e.target.value)}
+                  onKeyDown={(e) =>
+                    e.key === "Enter" && !e.shiftKey && sendReply()
+                  }
+                  placeholder="Type a reply…"
+                  className="flex-1 px-4 py-2.5 rounded-xl text-sm bg-background border border-border focus:outline-none focus:border-primary/50 transition-all text-foreground placeholder:text-foreground/30"
+                />
+                <button
+                  onClick={sendReply}
+                  disabled={sending || !reply.trim()}
+                  className="w-10 h-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 hover:bg-primary/90 transition-colors"
+                >
+                  {sending ? (
+                    <svg
+                      className="animate-spin"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                    </svg>
+                  ) : (
+                    <svg
+                      width="15"
+                      height="15"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                    >
+                      <path d="m22 2-7 20-4-9-9-4Z" />
+                      <path d="M22 2 11 13" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div
+              className="flex items-center justify-center text-foreground/30 text-sm rounded-2xl"
+              style={{
+                border: "1.5px dashed hsl(var(--border))",
+                minHeight: "400px",
+              }}
+            >
+              <div className="text-center space-y-2">
+                <svg
+                  width="32"
+                  height="32"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  className="mx-auto text-foreground/15"
+                >
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                <p>Select a conversation</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ── Main SellerDashboard ──────────────────────────────────────────────────────
 const SellerDashboard = () => {
   const { user, profile, logout } = useAuth();
@@ -1769,7 +2264,6 @@ const SellerDashboard = () => {
         query(collection(db, "listings"), where("sellerUid", "==", uid)),
       );
       let results = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      // Fallback for old listings saved by sellerName only
       if (results.length === 0 && profile?.name) {
         const snap2 = await getDocs(
           query(
@@ -1861,8 +2355,9 @@ const SellerDashboard = () => {
           </button>
         ))}
       </nav>
+      {/* Footer pinned to bottom */}
       <div
-        className="shrink-0 px-3 pb-5 space-y-2"
+        className="shrink-0 px-3 pb-5 space-y-2 mt-auto"
         style={{ borderTop: "1px solid hsl(var(--border)/0.4)" }}
       >
         <div className="flex items-center gap-3 px-3 py-3 mt-3">
@@ -1897,9 +2392,9 @@ const SellerDashboard = () => {
       style={{ paddingTop: `${NAVBAR_H}px` }}
     >
       <div className="flex flex-1">
-        {/* ✅ Sidebar — sticky, stops at content height so footer shows below */}
+        {/* Sidebar — full height from navbar to footer */}
         <aside
-          className="hidden md:block w-64 xl:w-72 shrink-0"
+          className="hidden md:flex md:flex-col w-64 xl:w-72 shrink-0"
           style={{
             position: "sticky",
             top: `${NAVBAR_H}px`,
@@ -1907,7 +2402,6 @@ const SellerDashboard = () => {
             overflowY: "auto",
             borderRight: "1px solid hsl(var(--border)/0.35)",
             background: "hsl(var(--card))",
-            alignSelf: "flex-start",
           }}
         >
           <SidebarContent />
@@ -1996,6 +2490,7 @@ const SellerDashboard = () => {
             {tab === "rewards" && <RewardsPanel profile={profile} />}
             {tab === "referrals" && <ReferralsPanel profile={profile} />}
             {tab === "profile" && <ProfilePanel profile={profile} />}
+            {tab === "messages" && <MessagesPanel sellerUid={user?.uid} />}
           </div>
         </main>
       </div>

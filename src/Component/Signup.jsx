@@ -292,7 +292,7 @@ const Signup = () => {
         }}
       />
       <div
-        className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full pointer-events-none"
+        className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-150 h-150 rounded-full pointer-events-none"
         style={{
           background:
             "radial-gradient(circle, hsl(var(--primary)/0.1) 0%, transparent 65%)",
@@ -300,13 +300,13 @@ const Signup = () => {
       />
 
       {/* Card ─ logo + subtitle INSIDE */}
-      <div className="relative z-10 w-full max-w-[420px]">
+      <div className="relative z-10 w-full max-w-105">
         <div
           className="bg-card rounded-3xl shadow-2xl overflow-hidden"
           style={{ border: "2px solid hsl(var(--border))" }}
         >
           {/* Card header */}
-          <div className="px-6 sm:px-8 pt-8 pb-6 border-b-[2px] border-border text-center">
+          <div className="px-6 sm:px-8 pt-8 pb-6 border-b-2 border-border text-center">
             <Link to="/">
               <DecluttLogo />
             </Link>
@@ -388,7 +388,7 @@ const Signup = () => {
                 <svg
                   width="16"
                   height="16"
-                  className="flex-shrink-0 mt-0.5"
+                  className="shrink-0 mt-0.5"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -507,7 +507,7 @@ const Signup = () => {
           </div>
 
           {/* Footer */}
-          <div className="px-6 sm:px-8 py-4 border-t-[2px] border-border text-center">
+          <div className="px-6 sm:px-8 py-4 border-t-2 border-border text-center">
             <p className="text-xs text-foreground/35">
               By creating an account, you agree to our{" "}
               <span className="text-primary cursor-pointer hover:underline">

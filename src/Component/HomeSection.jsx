@@ -227,7 +227,7 @@ const OrbitRing = () => {
     SIZE = R * 2 + 56;
   return (
     <div
-      className="relative flex items-center justify-center flex-shrink-0 "
+      className="relative flex items-center justify-center shrink-0 "
       style={{ width: SIZE, height: SIZE }}
     >
       <svg
@@ -344,7 +344,7 @@ const TypewriterWord = () => {
     <span className="text-primary inline-block min-w-[6ch]">
       {displayed}
       <span
-        className="inline-block w-[2px] h-[1em] bg-primary ml-0.5 align-middle"
+        className="inline-block w-0.5 h-[1em] bg-primary ml-0.5 align-middle"
         style={{ animation: "blink-cursor 0.75s step-end infinite" }}
       />
     </span>
@@ -367,16 +367,16 @@ const StackedCards = () => {
               key={i}
               className="rounded-xl sm:rounded-2xl overflow-hidden bg-card border border-border flex flex-col"
             >
-              <div className="flex items-center justify-between px-2 sm:px-3 py-2 sm:py-2.5 border-b border-border flex-shrink-0 bg-card gap-1">
+              <div className="flex items-center justify-between px-2 sm:px-3 py-2 sm:py-2.5 border-b border-border shrink-0 bg-card gap-1">
                 <span className="text-[7px] sm:text-[8px] font-bold uppercase tracking-wide text-foreground/50 leading-tight truncate">
                   {step.label}
                 </span>
-                <span className="text-primary flex-shrink-0">
+                <span className="text-primary shrink-0">
                   <step.Icon />
                 </span>
               </div>
               <div
-                className="relative overflow-hidden flex-shrink-0"
+                className="relative overflow-hidden shrink-0"
                 style={{ height: "clamp(120px, 28vw, 160px)" }}
               >
                 <img
@@ -385,7 +385,7 @@ const StackedCards = () => {
                   className="absolute inset-0 w-full h-full object-cover object-top"
                 />
               </div>
-              <div className="px-2 sm:px-3 pt-1.5 sm:pt-2 flex-shrink-0">
+              <div className="px-2 sm:px-3 pt-1.5 sm:pt-2 shrink-0">
                 <span className="inline-block text-[7px] sm:text-[8px] font-bold uppercase tracking-wider text-primary bg-primary/10 border border-primary/20 rounded-full px-1.5 sm:px-2 py-0.5">
                   {step.badge}
                 </span>
@@ -439,16 +439,16 @@ const StackedCards = () => {
                 boxShadow: `0 ${6 + (1 - adjustedP) * 6}px ${20 + (1 - adjustedP) * 12}px rgba(0,0,0,${shadowOpacity})`,
               }}
             >
-              <div className="flex items-center justify-between px-3 xl:px-4 py-2.5 border-b border-border flex-shrink-0 bg-card gap-1">
+              <div className="flex items-center justify-between px-3 xl:px-4 py-2.5 border-b border-border shrink-0 bg-card gap-1">
                 <span className="text-[9px] xl:text-[10px] font-bold uppercase tracking-widest text-foreground/50 leading-tight truncate">
                   {step.label}
                 </span>
-                <span className="text-primary flex-shrink-0 ml-1">
+                <span className="text-primary shrink-0 ml-1">
                   <step.Icon />
                 </span>
               </div>
               <div
-                className="relative overflow-hidden flex-shrink-0"
+                className="relative overflow-hidden shrink-0"
                 style={{ flex: 1, minHeight: 0 }}
               >
                 <img
@@ -457,13 +457,13 @@ const StackedCards = () => {
                   className="absolute inset-0 w-full h-full object-cover object-center"
                 />
               </div>
-              <div className="px-3 xl:px-4 pt-2 flex-shrink-0 bg-card">
+              <div className="px-3 xl:px-4 pt-2 shrink-0 bg-card">
                 <span className="inline-block text-[9px] font-bold uppercase tracking-wider text-primary bg-primary/10 border border-primary/20 rounded-full px-2 py-0.5">
                   {step.badge}
                 </span>
               </div>
               <div
-                className="flex-shrink-0 px-3 xl:px-4 bg-card text-center flex flex-col justify-center"
+                className="shrink-0 px-3 xl:px-4 bg-card text-center flex flex-col justify-center"
                 style={{
                   height: TEXT_H,
                   opacity: contentOpacity,
@@ -583,7 +583,7 @@ const Section4 = () => {
               <br />
               to <span className="text-primary">sell smarter</span>
             </h3>
-            <p className="mt-2 text-xs sm:text-sm text-white/75 max-w-[240px] sm:max-w-xs drop-shadow">
+            <p className="mt-2 text-xs sm:text-sm text-white/75 max-w-60 sm:max-w-xs drop-shadow">
               Built for you. Fast, safe, and completely free to start.
             </p>
             <button className="mt-3 sm:mt-4 main-button text-xs sm:text-sm px-4 sm:px-5 py-1.5 sm:py-2">
@@ -710,7 +710,7 @@ const FAQItem = ({ q, a, i, open, setOpen }) => {
           {q}
         </span>
         <span
-          className="flex-shrink-0 text-foreground/40 group-hover:text-primary transition-all duration-300"
+          className="shrink-0 text-foreground/40 group-hover:text-primary transition-all duration-300"
           style={{ transform: open === i ? "rotate(45deg)" : "rotate(0deg)" }}
         >
           <svg
@@ -1091,7 +1091,7 @@ const ReviewsSection = () => {
         </div>
         <div className="flex flex-col lg:grid lg:grid-cols-2 gap-5 sm:gap-6">
           <div
-            className="relative rounded-2xl sm:rounded-3xl p-6 sm:p-8 lg:p-10 flex flex-col justify-between min-h-[280px] sm:min-h-[340px] lg:min-h-[420px] overflow-hidden order-1"
+            className="relative rounded-2xl sm:rounded-3xl p-6 sm:p-8 lg:p-10 flex flex-col justify-between min-h-70 sm:min-h-85 lg:min-h-105 overflow-hidden order-1"
             style={{
               background: "rgba(255,255,255,0.09)",
               backdropFilter: "blur(24px)",
@@ -1130,7 +1130,7 @@ const ReviewsSection = () => {
             </p>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center text-xs font-bold border border-white/20 flex-shrink-0">
+                <div className="w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center text-xs font-bold border border-white/20 shrink-0">
                   {featured.initials}
                 </div>
                 <div>
@@ -1187,7 +1187,7 @@ const ReviewsSection = () => {
                       "rgba(255,255,255,0.08)";
                   }}
                 >
-                  <div className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0 border border-white/15 mt-0.5">
+                  <div className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center text-[10px] font-bold shrink-0 border border-white/15 mt-0.5">
                     {r.initials}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -1249,7 +1249,7 @@ const CTASection = () => {
         </div>
 
         {/* Right — actions */}
-        <div className="flex flex-col sm:flex-row items-center gap-3 flex-shrink-0">
+        <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0">
           <button
             onClick={handleLoginClick}
             className="group flex items-center gap-2 text-sm font-semibold text-foreground/60 hover:text-primary transition-colors duration-200"
@@ -1440,16 +1440,16 @@ export const HomeSection = () => {
             className="flex-1 flex flex-col items-center w-full opacity-0"
             style={{ animation: "fade-in 0.8s ease-out 0.2s forwards" }}
           >
-            <div className="relative w-full max-w-sm sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl 2xl:max-w-3xl h-[320px] sm:h-[370px] md:h-[420px] lg:h-[480px] xl:h-[540px] 2xl:h-[640px]">
+            <div className="relative w-full max-w-sm sm:max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl 2xl:max-w-3xl h-80 sm:h-92.5 md:h-105 lg:h-120 xl:h-135 2xl:h-160">
               <img
                 src={activeImage === 0 ? heroImage2 : heroImage}
                 alt="living space"
-                className="absolute right-0 top-5 sm:top-6 lg:top-8 w-[88%] sm:w-[85%] h-[270px] sm:h-[315px] md:h-[365px] lg:h-[415px] xl:h-[465px] 2xl:h-[560px] object-cover rounded-xl sm:rounded-2xl shadow-lg transition-all duration-700"
+                className="absolute right-0 top-5 sm:top-6 lg:top-8 w-[88%] sm:w-[85%] h-67.5 sm:h-78.75 md:h-91.25 lg:h-103.75 xl:h-116.25 2xl:h-140 object-cover rounded-xl sm:rounded-2xl shadow-lg transition-all duration-700"
               />
               <img
                 src={activeImage === 0 ? heroImage : heroImage2}
                 alt="organised space"
-                className="absolute top-0 -left-1 sm:-left-3 md:-left-5 w-[88%] sm:w-[85%] h-[270px] sm:h-[315px] md:h-[365px] lg:h-[415px] xl:h-[465px] 2xl:h-[560px] object-cover rounded-xl sm:rounded-2xl shadow-xl border border-background transition-all duration-700"
+                className="absolute top-0 -left-1 sm:-left-3 md:-left-5 w-[88%] sm:w-[85%] h-67.5 sm:h-78.75 md:h-91.25 lg:h-103.75 xl:h-116.25 2xl:h-140 object-cover rounded-xl sm:rounded-2xl shadow-xl border border-background transition-all duration-700"
               />
             </div>
             <div className="flex gap-2 items-center mt-6">
@@ -1582,7 +1582,7 @@ export const HomeSection = () => {
       {toastVisible &&
         createPortal(
           <div
-            className="fixed bottom-4 sm:bottom-6 left-3 sm:left-4 lg:left-6 flex items-center gap-2 sm:gap-3 bg-card border border-border/50 rounded-xl sm:rounded-2xl shadow-xl px-3 sm:px-4 py-2 sm:py-3 w-[230px] sm:w-[260px] lg:w-[270px]"
+            className="fixed bottom-4 sm:bottom-6 left-3 sm:left-4 lg:left-6 flex items-center gap-2 sm:gap-3 bg-card border border-border/50 rounded-xl sm:rounded-2xl shadow-xl px-3 sm:px-4 py-2 sm:py-3 w-57.5 sm:w-65 lg:w-67.5"
             style={{
               zIndex: 99999,
               transform: toastAnimating
@@ -1593,7 +1593,7 @@ export const HomeSection = () => {
                 "transform 0.4s cubic-bezier(0.34,1.56,0.64,1), opacity 0.35s ease",
             }}
           >
-            <div className="flex-shrink-0 w-8 sm:w-9 h-8 sm:h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] sm:text-xs font-bold">
+            <div className="shrink-0 w-8 sm:w-9 h-8 sm:h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] sm:text-xs font-bold">
               {n.avatar}
             </div>
             <div className="flex flex-col min-w-0 flex-1">
@@ -1607,7 +1607,7 @@ export const HomeSection = () => {
                 {n.item}
               </p>
             </div>
-            <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
+            <div className="flex flex-col items-center gap-1.5 shrink-0">
               <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
               <button
                 onClick={dismissToast}

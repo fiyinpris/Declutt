@@ -161,7 +161,7 @@ const ListingModal = ({ onClose, onSaved, existing = null }) => {
       }}
     >
       <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border flex-shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
           <h2 className="text-base font-bold text-foreground">
             {existing ? "Edit listing" : "Add new listing"}
           </h2>
@@ -340,7 +340,7 @@ const ListingModal = ({ onClose, onSaved, existing = null }) => {
           </Field>
         </form>
 
-        <div className="flex gap-3 px-6 py-4 border-t border-border flex-shrink-0">
+        <div className="flex gap-3 px-6 py-4 border-t border-border shrink-0">
           <button
             type="button"
             onClick={onClose}
@@ -373,7 +373,7 @@ const ListingModal = ({ onClose, onSaved, existing = null }) => {
 // ── Listing Row / Card ───────────────────────────────────────────────────────
 const ListingRow = ({ listing, onEdit, onDelete }) => (
   <div className="flex items-center gap-4 px-4 py-3.5 rounded-xl bg-card border border-border hover:border-primary/30 transition-all duration-200">
-    <div className="w-14 h-14 rounded-xl overflow-hidden flex-shrink-0 bg-border/30">
+    <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-border/30">
       {listing.imageUrl ? (
         <img
           src={listing.imageUrl}
@@ -401,10 +401,10 @@ const ListingRow = ({ listing, onEdit, onDelete }) => (
         {listing.category} · {listing.location} · {listing.condition}
       </p>
     </div>
-    <p className="text-sm font-bold text-primary flex-shrink-0">
+    <p className="text-sm font-bold text-primary shrink-0">
       ₦{Number(listing.price).toLocaleString()}
     </p>
-    <div className="flex gap-1.5 flex-shrink-0">
+    <div className="flex gap-1.5 shrink-0">
       <button
         onClick={() => onEdit(listing)}
         className="w-8 h-8 flex items-center justify-center rounded-lg border border-border text-foreground/50 hover:text-primary hover:border-primary/40 transition-colors"
@@ -601,7 +601,7 @@ const AdminDashboard = () => {
               setEditTarget(null);
               setShowModal(true);
             }}
-            className="main-button text-sm px-5 py-2.5 flex items-center gap-2 whitespace-nowrap flex-shrink-0"
+            className="main-button text-sm px-5 py-2.5 flex items-center gap-2 whitespace-nowrap shrink-0"
           >
             <svg
               width="15"

@@ -107,6 +107,8 @@ const friendlyError = (code) => {
       "Too many attempts. Please wait a moment and try again.",
     "auth/network-request-failed":
       "Network error. Check your connection and try again.",
+    "auth/unauthorized-domain":
+      "This deployed domain is not authorized in Firebase Auth. Add your site domain under Firebase Authentication > Authorized domains.",
     "auth/popup-closed-by-user":
       "Google sign-in was cancelled. Please try again.",
     "auth/popup-blocked":

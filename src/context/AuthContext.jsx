@@ -70,9 +70,9 @@ export const AuthProvider = ({ children }) => {
     const actionCodeSettings = {
       url:
         typeof window !== "undefined"
-          ? `${window.location.origin}/login?reset=true`
+          ? `${window.location.origin}/reset-password`
           : undefined,
-      handleCodeInApp: false,
+      handleCodeInApp: true,
     };
     return sendPasswordResetEmail(auth, email, actionCodeSettings);
   };

@@ -169,13 +169,14 @@
 
 @layer base {
   :root {
-    --background: 30 25% 96%;
+    --background: 30 14% 80%;
     --foreground: 30 30% 14%;
-    --card: 0 0% 100%;
+    --card: 30 14% 88%;
     --primary: 32 48% 48%;
     --primary-foreground: 38 80% 96%;
-    --border: 36 38% 82%;
+    --border: 30 16% 70%;
   }
+
   .dark {
     --background: 30 28% 8%;
     --foreground: 36 55% 88%;

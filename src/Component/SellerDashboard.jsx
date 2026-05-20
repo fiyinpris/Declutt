@@ -950,7 +950,7 @@ const ItemCard = ({ listing, onEdit, onDelete, showActions = true }) => (
                 e.stopPropagation();
                 onEdit(listing);
               }}
-              className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-white text-foreground text-xs font-bold hover:bg-primary hover:text-primary-foreground transition-colors shadow-sm"
+              className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/95 transition-colors shadow-sm"
             >
               <svg
                 width="12"
@@ -1998,6 +1998,12 @@ const MessagesPanel = ({ sellerUid }) => {
         );
         setThreads(threadList);
         setLoading(false);
+
+        if (!active && threadList.length > 0) {
+          setActive(threadList[0]);
+          setMessages(threadList[0].messages);
+          return;
+        }
 
         if (active) {
           const updated = threadList.find((t) => t.key === active.key);

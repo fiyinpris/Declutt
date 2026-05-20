@@ -18,6 +18,7 @@ const Messages = ({ sellerUid }) => {
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
   const bottomRef = useRef();
+  const activeKey = active?.key;
 
   // ── 1. Real-time Subscription ─────────────────────────────────────────────
   useEffect(() => {
@@ -71,8 +72,14 @@ const Messages = ({ sellerUid }) => {
         setThreads(threadList);
         setLoading(false);
 
-        if (active) {
-          const currentThread = threadList.find((t) => t.key === active.key);
+        if (!activeKey && threadList.length > 0) {
+          setActive(threadList[0]);
+          setMessages(threadList[0].messages);
+          return;
+        }
+
+        if (activeKey) {
+          const currentThread = threadList.find((t) => t.key === activeKey);
           if (currentThread) setMessages(currentThread.messages);
         }
       },
@@ -84,7 +91,7 @@ const Messages = ({ sellerUid }) => {
     );
 
     return () => unsub();
-  }, [sellerUid, active?.key]);
+  }, [sellerUid, activeKey]);
 
   // ── 2. Sync Active Thread ──────────────────────────────────────────────────
   useLayoutEffect(() => {

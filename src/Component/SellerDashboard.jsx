@@ -10,6 +10,9 @@ import {
   addDoc,
   deleteDoc,
   serverTimestamp,
+  onSnapshot,
+  orderBy,
+  limit,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
@@ -68,7 +71,7 @@ const NAV_ITEMS = [
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        <path d="M21 15a2 2 0 0 1 -2 2H7l-4 4V5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2z" />
       </svg>
     ),
   },
@@ -86,7 +89,7 @@ const NAV_ITEMS = [
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1 -2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
         <line x1="7" y1="7" x2="7.01" y2="7" />
       </svg>
     ),
@@ -107,7 +110,7 @@ const NAV_ITEMS = [
       >
         <circle cx="9" cy="21" r="1" />
         <circle cx="20" cy="21" r="1" />
-        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2 -1.61L23 6H6" />
       </svg>
     ),
   },
@@ -143,9 +146,9 @@ const NAV_ITEMS = [
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+        <path d="M17 21v-2a4 4 0 0 0 -4 -4H5a4 4 0 0 0 -4 4v2" />
         <circle cx="9" cy="7" r="4" />
-        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M23 21v-2a4 4 0 0 0 -3 -3.87" />
         <path d="M16 3.13a4 4 0 0 1 0 7.75" />
       </svg>
     ),
@@ -164,7 +167,7 @@ const NAV_ITEMS = [
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+        <path d="M20 21v-2a4 4 0 0 0 -4 -4H8a4 4 0 0 0 -4 4v2" />
         <circle cx="12" cy="7" r="4" />
       </svg>
     ),
@@ -217,7 +220,7 @@ const LogoutButton = ({ onLogout, state }) => (
         stroke="currentColor"
         strokeWidth="2"
       >
-        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+        <path d="M21 12a9 9 0 1 1 -6.219 -8.56" />
       </svg>
     )}
     {state === "success" && (
@@ -247,7 +250,7 @@ const LogoutButton = ({ onLogout, state }) => (
         strokeLinejoin="round"
         className="shrink-0"
       >
-        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+        <path d="M9 21H5a2 2 0 0 1 -2 -2V5a2 2 0 0 1 2 -2h4" />
         <polyline points="16 17 21 12 16 7" />
         <line x1="21" y1="12" x2="9" y2="12" />
       </svg>
@@ -274,7 +277,7 @@ const LocationPicker = ({ coords, onCapture, loading, onClear }) => {
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+          <path d="M20 10c0 6 -8 12 -8 12s-8 -6 -8 -12a8 8 0 0 1 16 0Z" />
           <circle cx="12" cy="10" r="3" />
         </svg>
         <span className="font-semibold text-xs flex-1">
@@ -307,7 +310,7 @@ const LocationPicker = ({ coords, onCapture, loading, onClear }) => {
           stroke="currentColor"
           strokeWidth="2"
         >
-          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+          <path d="M21 12a9 9 0 1 1 -6.219 -8.56" />
         </svg>
       ) : (
         <svg
@@ -320,7 +323,7 @@ const LocationPicker = ({ coords, onCapture, loading, onClear }) => {
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+          <path d="M20 10c0 6 -8 12 -8 12s-8 -6 -8 -12a8 8 0 0 1 16 0Z" />
           <circle cx="12" cy="10" r="3" />
         </svg>
       )}
@@ -376,7 +379,7 @@ const compressToBase64 = (file) =>
     img.src = url;
   });
 
-// ── Listing Modal with multiple thumbnail support ─────────────────────────────
+// ── Listing Modal ─────────────────────────────────────────────────────────────
 const ListingModal = ({
   onClose,
   onSaved,
@@ -399,12 +402,10 @@ const ListingModal = ({
     existing?.lat ? { lat: existing.lat, lng: existing.lng } : null,
   );
   const [gpsLoading, setGpsLoading] = useState(false);
-  // Main image
   const [mainImageFile, setMainImageFile] = useState(null);
   const [mainImagePreview, setMainImagePreview] = useState(
     existing?.imageUrl || null,
   );
-  // Additional thumbnails (up to 3 extra)
   const [additionalImages, setAdditionalImages] = useState(
     existing?.additionalImages || [],
   );
@@ -452,25 +453,17 @@ const ListingModal = ({
     const newImages = [];
     for (const file of toProcess) {
       if (file.size > 10 * 1024 * 1024) continue;
-      const preview = URL.createObjectURL(file);
-      newImages.push({ file, preview });
+      newImages.push(URL.createObjectURL(file));
     }
-    setAdditionalImages((prev) => [
-      ...prev,
-      ...newImages.map((n) => n.preview),
-    ]);
-    // Store files for later compression
-    e.target._pendingFiles = newImages.map((n) => n.file);
+    setAdditionalImages((prev) => [...prev, ...newImages]);
   };
 
-  const removeAdditionalImage = (idx) => {
+  const removeAdditionalImage = (idx) =>
     setAdditionalImages((prev) => prev.filter((_, i) => i !== idx));
-  };
 
   const handleSave = async (e) => {
     e.preventDefault();
     setError("");
-
     if (!form.name.trim()) {
       setError("Product name is required.");
       return;
@@ -496,23 +489,18 @@ const ListingModal = ({
     setSaving(true);
     try {
       let imageUrl = existing?.imageUrl || "";
-      if (mainImageFile) {
-        imageUrl = await compressToBase64(mainImageFile);
-      }
+      if (mainImageFile) imageUrl = await compressToBase64(mainImageFile);
 
-      // Compress additional images that are blob URLs (new uploads)
       const compressedAdditional = [];
       for (const img of additionalImages) {
         if (img.startsWith("blob:")) {
-          // fetch the blob and compress
           try {
             const resp = await fetch(img);
             const blob = await resp.blob();
             const file = new File([blob], "thumb.jpg", { type: blob.type });
-            const b64 = await compressToBase64(file);
-            compressedAdditional.push(b64);
+            compressedAdditional.push(await compressToBase64(file));
           } catch {
-            // skip if failed
+            /* skip */
           }
         } else {
           compressedAdditional.push(img);
@@ -543,16 +531,15 @@ const ListingModal = ({
           createdAt: serverTimestamp(),
         });
       }
-
       onSaved();
       onClose();
     } catch (err) {
-      console.error("❌ Save error:", err);
-      if (err.code === "permission-denied") {
+      console.error("Save error:", err);
+      if (err.code === "permission-denied")
         setError("Permission denied — check your Firestore rules.");
-      } else {
-        setError(`Save failed: ${err.message}`);
-      }
+      else if (err.code === "resource-exhausted")
+        setError("Database busy. Please wait a moment and try again.");
+      else setError(`Save failed: ${err.message}`);
     } finally {
       setSaving(false);
     }
@@ -601,7 +588,6 @@ const ListingModal = ({
             </div>
           )}
 
-          {/* Main product image */}
           <Field label="Main product image" htmlFor="listing-image">
             <div
               onClick={() => mainFileRef.current?.click()}
@@ -625,7 +611,7 @@ const ListingModal = ({
                   >
                     <rect x="3" y="3" width="18" height="18" rx="2" />
                     <circle cx="8.5" cy="8.5" r="1.5" />
-                    <path d="m21 15-5-5L5 21" />
+                    <path d="m21 15 -5 -5L5 21" />
                   </svg>
                   <span className="text-xs font-medium">
                     Click to upload main photo
@@ -653,7 +639,6 @@ const ListingModal = ({
             />
           </Field>
 
-          {/* Additional thumbnail images */}
           <Field label={`Additional photos (${additionalImages.length}/3)`}>
             <div className="flex gap-2 flex-wrap">
               {additionalImages.map((src, idx) => (
@@ -829,7 +814,7 @@ const ListingModal = ({
                 stroke="currentColor"
                 strokeWidth="2"
               >
-                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                <path d="M21 12a9 9 0 1 1 -6.219 -8.56" />
               </svg>
             )}
             {saving
@@ -863,7 +848,7 @@ const DeleteModal = ({ onConfirm, onCancel }) => (
           className="text-red-500"
         >
           <polyline points="3 6 5 6 21 6" />
-          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+          <path d="M19 6v14a2 2 0 0 1 -2 2H7a2 2 0 0 1 -2 -2V6m3 0V4a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v2" />
         </svg>
       </div>
       <p className="text-base font-bold text-foreground mb-2">
@@ -933,12 +918,12 @@ const StatCard = ({ label, value, icon, accent, sub }) => (
 );
 
 // ── Item Card ─────────────────────────────────────────────────────────────────
-const ItemCard = ({ listing, onEdit, onDelete }) => (
+const ItemCard = ({ listing, onEdit, onDelete, showActions = true }) => (
   <div
     className="bg-card rounded-2xl overflow-hidden group transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5"
     style={{ border: "1.5px solid hsl(var(--border))" }}
   >
-    <div className="aspect-4/3 relative overflow-hidden bg-border/20">
+    <div className="aspect-[4/3] relative overflow-hidden bg-border/20">
       {listing.imageUrl ? (
         <img
           src={listing.imageUrl}
@@ -957,37 +942,43 @@ const ItemCard = ({ listing, onEdit, onDelete }) => (
           {listing.available ? "Live" : "Sold"}
         </span>
       </div>
-      {(onEdit || onDelete) && (
-        <div className="absolute bottom-0 left-0 right-0 p-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-t from-black/50 to-transparent">
+      {showActions && (onEdit || onDelete) && (
+        <div className="absolute bottom-0 left-0 right-0 p-2 flex gap-1.5 bg-gradient-to-t from-black/70 via-black/40 to-transparent">
           {onEdit && (
             <button
-              onClick={() => onEdit(listing)}
-              className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-white/90 text-foreground text-xs font-semibold hover:bg-white transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(listing);
+              }}
+              className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-white text-foreground text-xs font-bold hover:bg-primary hover:text-primary-foreground transition-colors shadow-sm"
             >
               <svg
-                width="11"
-                height="11"
+                width="12"
+                height="12"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="2"
+                strokeWidth="2.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                <path d="M11 4H4a2 2 0 0 0 -2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2 -2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1 -4 9.5 -9.5z" />
               </svg>
               Edit
             </button>
           )}
           {onDelete && (
             <button
-              onClick={() => onDelete(listing.id)}
-              className="flex items-center justify-center w-8 rounded-lg bg-red-500/90 text-white hover:bg-red-500 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(listing.id);
+              }}
+              className="flex items-center justify-center w-8 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors shadow-sm"
             >
               <svg
-                width="11"
-                height="11"
+                width="12"
+                height="12"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
@@ -996,7 +987,7 @@ const ItemCard = ({ listing, onEdit, onDelete }) => (
                 strokeLinejoin="round"
               >
                 <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                <path d="M19 6v14a2 2 0 0 1 -2 2H7a2 2 0 0 1 -2 -2V6m3 0V4a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v2" />
               </svg>
             </button>
           )}
@@ -1026,7 +1017,7 @@ const ItemCard = ({ listing, onEdit, onDelete }) => (
               strokeLinecap="round"
               strokeLinejoin="round"
             >
-              <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+              <path d="M20 10c0 6 -8 12 -8 12s-8 -6 -8 -12a8 8 0 0 1 16 0Z" />
               <circle cx="12" cy="10" r="3" />
             </svg>
             GPS
@@ -1088,7 +1079,7 @@ const Pagination = ({ total, perPage, current, onChange }) => {
           stroke="currentColor"
           strokeWidth="2.5"
         >
-          <path d="m15 18-6-6 6-6" />
+          <path d="m15 18 -6 -6 6 -6" />
         </svg>
       </button>
       {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
@@ -1113,28 +1104,23 @@ const Pagination = ({ total, perPage, current, onChange }) => {
           stroke="currentColor"
           strokeWidth="2.5"
         >
-          <path d="m9 18 6-6-6-6" />
+          <path d="m9 18 6 -6 -6 -6" />
         </svg>
       </button>
     </div>
   );
 };
 
-// ── Overview Panel — 2 rows × 3 cols = 6 items with pagination ────────────────
+// ── Overview Panel ────────────────────────────────────────────────────────────
 const OverviewPanel = ({ profile, listings, setTab, onAddNew }) => {
-  const [page, setPage] = useState(1);
-  const ITEMS_PER_PAGE = 6; // 2 rows × 3 cols
   const active = listings.filter((l) => l.available).length;
   const sold = listings.filter((l) => !l.available).length;
   const earned = listings
     .filter((l) => !l.available)
     .reduce((s, l) => s + Number(l.price || 0), 0);
   const firstName = profile?.name?.trim().split(/\s+/)[0] ?? "there";
-
-  const paginated = listings.slice(
-    (page - 1) * ITEMS_PER_PAGE,
-    page * ITEMS_PER_PAGE,
-  );
+  const DASHBOARD_PREVIEW_COUNT = 3;
+  const previewItems = listings.slice(0, DASHBOARD_PREVIEW_COUNT);
 
   return (
     <div className="space-y-6">
@@ -1158,7 +1144,7 @@ const OverviewPanel = ({ profile, listings, setTab, onAddNew }) => {
           </p>
           <p className="text-2xl font-black text-white">{firstName}</p>
           <p className="text-white/60 text-sm mt-1">
-            Here's your seller activity at a glance.
+            Here&apos;s your seller activity at a glance.
           </p>
         </div>
         <button
@@ -1185,7 +1171,7 @@ const OverviewPanel = ({ profile, listings, setTab, onAddNew }) => {
         <StatCard
           label="Total items"
           value={listings.length}
-          icon={NAV_ITEMS[1].icon}
+          icon={NAV_ITEMS[2].icon}
         />
         <StatCard
           label="Currently live"
@@ -1193,11 +1179,11 @@ const OverviewPanel = ({ profile, listings, setTab, onAddNew }) => {
           sub="visible in Browse"
           icon={NAV_ITEMS[0].icon}
         />
-        <StatCard label="Items sold" value={sold} icon={NAV_ITEMS[2].icon} />
+        <StatCard label="Items sold" value={sold} icon={NAV_ITEMS[3].icon} />
         <StatCard
           label="Est. earned"
           value={`₦${earned.toLocaleString()}`}
-          icon={NAV_ITEMS[3].icon}
+          icon={NAV_ITEMS[4].icon}
           accent
         />
       </div>
@@ -1247,7 +1233,7 @@ const OverviewPanel = ({ profile, listings, setTab, onAddNew }) => {
               strokeLinejoin="round"
               className="text-foreground/25 shrink-0"
             >
-              <path d="m9 18 6-6-6-6" />
+              <path d="m9 18 6 -6 -6 -6" />
             </svg>
           </button>
         ))}
@@ -1256,28 +1242,27 @@ const OverviewPanel = ({ profile, listings, setTab, onAddNew }) => {
       <div>
         <div className="flex items-center justify-between mb-4">
           <p className="text-sm font-bold text-foreground">Your recent items</p>
-          <button
-            onClick={() => setTab("listings")}
-            className="text-xs text-primary font-semibold hover:underline underline-offset-4"
-          >
-            See all →
-          </button>
+          {listings.length > DASHBOARD_PREVIEW_COUNT && (
+            <button
+              onClick={() => setTab("listings")}
+              className="text-xs text-primary font-semibold hover:underline underline-offset-4 shrink-0"
+            >
+              See all ({listings.length}) →
+            </button>
+          )}
         </div>
         {listings.length > 0 ? (
-          <>
-            {/* 2 rows × 3 cols = 6 items */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {paginated.map((l) => (
-                <ItemCard key={l.id} listing={l} />
-              ))}
-            </div>
-            <Pagination
-              total={listings.length}
-              perPage={ITEMS_PER_PAGE}
-              current={page}
-              onChange={setPage}
-            />
-          </>
+          <div className="grid grid-cols-3 gap-3">
+            {previewItems.map((l) => (
+              <ItemCard
+                key={l.id}
+                listing={l}
+                onEdit={null}
+                onDelete={null}
+                showActions={false}
+              />
+            ))}
+          </div>
         ) : (
           <Empty
             msg="No items yet. Add your first product to get started."
@@ -1290,10 +1275,10 @@ const OverviewPanel = ({ profile, listings, setTab, onAddNew }) => {
   );
 };
 
-// ── Items Panel — 3 rows × 3 cols = 9 items with pagination ──────────────────
+// ── Items Panel ───────────────────────────────────────────────────────────────
 const ItemsPanel = ({ listings, onAddNew, onEdit, onDelete }) => {
   const [page, setPage] = useState(1);
-  const ITEMS_PER_PAGE = 9; // 3 rows × 3 cols
+  const ITEMS_PER_PAGE = 9;
   const paginated = listings.slice(
     (page - 1) * ITEMS_PER_PAGE,
     page * ITEMS_PER_PAGE,
@@ -1305,8 +1290,8 @@ const ItemsPanel = ({ listings, onAddNew, onEdit, onDelete }) => {
         <div>
           <p className="text-xl font-black text-foreground">My Items</p>
           <p className="text-xs text-foreground/40 mt-0.5">
-            {listings.length} listing{listings.length !== 1 ? "s" : ""} · hover
-            a card to edit or delete
+            {listings.length} listing{listings.length !== 1 ? "s" : ""} · click
+            Edit to modify
           </p>
         </div>
         <button
@@ -1330,13 +1315,14 @@ const ItemsPanel = ({ listings, onAddNew, onEdit, onDelete }) => {
       </div>
       {listings.length > 0 ? (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             {paginated.map((l) => (
               <ItemCard
                 key={l.id}
                 listing={l}
                 onEdit={onEdit}
                 onDelete={onDelete}
+                showActions={true}
               />
             ))}
           </div>
@@ -1549,7 +1535,7 @@ const ReferralsPanel = ({ profile }) => {
   );
 };
 
-// ── Profile Panel ─────────────────────────────────────────────────────────────
+// ── Nigerian States ───────────────────────────────────────────────────────────
 const NIGERIAN_STATES = [
   "Abia",
   "Adamawa",
@@ -1590,6 +1576,7 @@ const NIGERIAN_STATES = [
   "Zamfara",
 ];
 
+// ── Profile Panel — CENTERED ──────────────────────────────────────────────────
 const ProfilePanel = ({ profile }) => {
   const photoRef = useRef();
   const [photoPreview, setPhotoPreview] = useState(profile?.photoURL || null);
@@ -1675,6 +1662,7 @@ const ProfilePanel = ({ profile }) => {
 
   const inputCls =
     "w-full px-3.5 py-2.5 rounded-xl border bg-background text-sm text-foreground placeholder:text-foreground/30 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all";
+
   const PField = ({ label, error, children, hint, htmlFor }) => (
     <div className="flex flex-col gap-1.5">
       <label
@@ -1694,269 +1682,267 @@ const ProfilePanel = ({ profile }) => {
   const initials = getInitials(profile?.name);
 
   return (
-    <div className="space-y-6 max-w-xl">
-      <div>
-        <p className="text-xl font-black text-foreground">My Profile</p>
-        <p className="text-sm text-foreground/50 mt-0.5">
-          Keep your info up to date so buyers can reach you.
-        </p>
-      </div>
+    <div className="flex flex-col items-center w-full">
+      <div className="w-full max-w-xl space-y-6">
+        <div className="text-center">
+          <p className="text-xl font-black text-foreground">My Profile</p>
+          <p className="text-sm text-foreground/50 mt-0.5">
+            Keep your info up to date so buyers can reach you.
+          </p>
+        </div>
 
-      <div
-        className="p-5 rounded-2xl bg-card space-y-4"
-        style={{ border: "1.5px solid hsl(var(--border))" }}
-      >
-        <p className="text-sm font-bold text-foreground">Profile Photo</p>
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="relative shrink-0">
-            <div className="w-20 h-20 rounded-full overflow-hidden bg-primary/15 text-primary flex items-center justify-center text-xl font-black border-2 border-primary/25">
-              {photoPreview ? (
-                <img
-                  src={photoPreview}
-                  alt="avatar"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                initials
-              )}
-            </div>
-            <button
-              onClick={() => photoRef.current?.click()}
-              className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md hover:bg-primary/90 transition-colors"
-            >
-              <svg
-                width="11"
-                height="11"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-            </button>
-          </div>
-          <div className="flex flex-col gap-2">
-            <p className="text-xs text-foreground/50">
-              JPG, PNG, WEBP · Any size
-            </p>
-            <div className="flex gap-2 flex-wrap">
+        <div
+          className="p-5 rounded-2xl bg-card space-y-4"
+          style={{ border: "1.5px solid hsl(var(--border))" }}
+        >
+          <p className="text-sm font-bold text-foreground text-center">
+            Profile Photo
+          </p>
+          <div className="flex flex-col items-center gap-4">
+            <div className="relative">
+              <div className="w-24 h-24 rounded-full overflow-hidden bg-primary/15 text-primary flex items-center justify-center text-2xl font-black border-2 border-primary/25">
+                {photoPreview ? (
+                  <img
+                    src={photoPreview}
+                    alt="avatar"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  initials
+                )}
+              </div>
               <button
                 onClick={() => photoRef.current?.click()}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-foreground/70 hover:text-foreground transition-all"
-                style={{ border: "1.5px solid hsl(var(--border))" }}
+                className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md hover:bg-primary/90 transition-colors"
               >
-                Choose photo
-              </button>
-              {photoFile && (
-                <button
-                  onClick={uploadPhoto}
-                  disabled={uploading}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${uploadDone ? "bg-green-500 text-white" : "main-button"}`}
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 >
-                  {uploading && (
-                    <svg
-                      className="animate-spin"
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                    </svg>
-                  )}
-                  {uploadDone
-                    ? "Saved!"
-                    : uploading
-                      ? "Uploading…"
-                      : "Save photo"}
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex flex-col items-center gap-2">
+              <p className="text-xs text-foreground/50">
+                JPG, PNG, WEBP · Any size
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => photoRef.current?.click()}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-foreground/70 hover:text-foreground transition-all"
+                  style={{ border: "1.5px solid hsl(var(--border))" }}
+                >
+                  Choose photo
                 </button>
-              )}
+                {photoFile && (
+                  <button
+                    onClick={uploadPhoto}
+                    disabled={uploading}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${uploadDone ? "bg-green-500 text-white" : "main-button"}`}
+                  >
+                    {uploading && (
+                      <svg
+                        className="animate-spin"
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <path d="M21 12a9 9 0 1 1 -6.219 -8.56" />
+                      </svg>
+                    )}
+                    {uploadDone
+                      ? "Saved!"
+                      : uploading
+                        ? "Uploading…"
+                        : "Save photo"}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
+          <input
+            ref={photoRef}
+            type="file"
+            accept="image/*"
+            onChange={handlePhoto}
+            className="hidden"
+          />
         </div>
-        <input
-          ref={photoRef}
-          type="file"
-          accept="image/*"
-          onChange={handlePhoto}
-          className="hidden"
-        />
-      </div>
 
-      <div
-        className="p-5 rounded-2xl bg-card space-y-4"
-        style={{ border: "1.5px solid hsl(var(--border))" }}
-      >
-        <div className="flex items-center gap-2 mb-1">
-          <p className="text-sm font-bold text-foreground">
-            Seller Verification
-          </p>
-          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 border border-amber-500/25">
-            Required
-          </span>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <PField
-            label="Phone number"
-            error={errors.phone}
-            hint="e.g. 08012345678"
-            htmlFor="prof-phone"
-          >
-            <input
-              id="prof-phone"
-              className={`${inputCls} ${errors.phone ? "border-red-500/60" : "border-border"}`}
-              value={form.phone}
-              onChange={(e) => set("phone", e.target.value)}
-              placeholder="08012345678"
-              type="tel"
-            />
-          </PField>
-          <PField
-            label="WhatsApp number"
-            error={errors.whatsapp}
-            hint="Leave blank if same as phone"
-            htmlFor="prof-wa"
-          >
-            <input
-              id="prof-wa"
-              className={`${inputCls} ${errors.whatsapp ? "border-red-500/60" : "border-border"}`}
-              value={form.whatsapp}
-              onChange={(e) => set("whatsapp", e.target.value)}
-              placeholder="08012345678 (optional)"
-              type="tel"
-            />
-          </PField>
-          <PField
-            label="State of residence"
-            error={errors.state}
-            htmlFor="prof-state"
-          >
-            <select
-              id="prof-state"
-              className={`${inputCls} ${errors.state ? "border-red-500/60" : "border-border"}`}
-              value={form.state}
-              onChange={(e) => set("state", e.target.value)}
-            >
-              <option value="">Select state…</option>
-              {NIGERIAN_STATES.map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-          </PField>
-          <PField
-            label="Full address"
-            error={errors.address}
-            hint="Street, area, city"
-            htmlFor="prof-addr"
-          >
-            <input
-              id="prof-addr"
-              className={`${inputCls} ${errors.address ? "border-red-500/60" : "border-border"}`}
-              value={form.address}
-              onChange={(e) => set("address", e.target.value)}
-              placeholder="12 Akin Street, Ile-Ife"
-            />
-          </PField>
-        </div>
-        <div className="pt-2 border-t border-border/50">
-          <p className="text-xs font-bold text-foreground/50 uppercase tracking-wide mb-3">
-            Identity verification{" "}
-            <span className="text-foreground/30 normal-case font-normal">
-              (optional but recommended)
+        <div
+          className="p-5 rounded-2xl bg-card space-y-4"
+          style={{ border: "1.5px solid hsl(var(--border))" }}
+        >
+          <div className="flex items-center gap-2 mb-1">
+            <p className="text-sm font-bold text-foreground">
+              Seller Verification
+            </p>
+            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 border border-amber-500/25">
+              Required
             </span>
-          </p>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <PField
-              label="NIN"
-              error={errors.nin}
-              hint="11-digit number on your NIN slip"
-              htmlFor="prof-nin"
+              label="Phone number"
+              error={errors.phone}
+              hint="e.g. 08012345678"
+              htmlFor="prof-phone"
             >
               <input
-                id="prof-nin"
-                className={`${inputCls} ${errors.nin ? "border-red-500/60" : "border-border"}`}
-                value={form.nin}
-                onChange={(e) =>
-                  set("nin", e.target.value.replace(/\D/g, "").slice(0, 11))
-                }
-                placeholder="12345678901"
-                maxLength={11}
+                id="prof-phone"
+                className={`${inputCls} ${errors.phone ? "border-red-500/60" : "border-border"}`}
+                value={form.phone}
+                onChange={(e) => set("phone", e.target.value)}
+                placeholder="08012345678"
+                type="tel"
               />
             </PField>
             <PField
-              label="BVN"
-              error={errors.bvn}
-              hint="11-digit number from your bank"
-              htmlFor="prof-bvn"
+              label="WhatsApp number"
+              error={errors.whatsapp}
+              hint="Leave blank if same as phone"
+              htmlFor="prof-wa"
             >
               <input
-                id="prof-bvn"
-                className={`${inputCls} ${errors.bvn ? "border-red-500/60" : "border-border"}`}
-                value={form.bvn}
-                onChange={(e) =>
-                  set("bvn", e.target.value.replace(/\D/g, "").slice(0, 11))
-                }
-                placeholder="12345678901"
-                maxLength={11}
+                id="prof-wa"
+                className={`${inputCls} ${errors.whatsapp ? "border-red-500/60" : "border-border"}`}
+                value={form.whatsapp}
+                onChange={(e) => set("whatsapp", e.target.value)}
+                placeholder="08012345678 (optional)"
+                type="tel"
+              />
+            </PField>
+            <PField
+              label="State of residence"
+              error={errors.state}
+              htmlFor="prof-state"
+            >
+              <select
+                id="prof-state"
+                className={`${inputCls} ${errors.state ? "border-red-500/60" : "border-border"}`}
+                value={form.state}
+                onChange={(e) => set("state", e.target.value)}
+              >
+                <option value="">Select state…</option>
+                {NIGERIAN_STATES.map((s) => (
+                  <option key={s}>{s}</option>
+                ))}
+              </select>
+            </PField>
+            <PField
+              label="Full address"
+              error={errors.address}
+              hint="Street, area, city"
+              htmlFor="prof-addr"
+            >
+              <input
+                id="prof-addr"
+                className={`${inputCls} ${errors.address ? "border-red-500/60" : "border-border"}`}
+                value={form.address}
+                onChange={(e) => set("address", e.target.value)}
+                placeholder="12 Akin Street, Ile-Ife"
               />
             </PField>
           </div>
+
+          <div className="pt-2 border-t border-border/50">
+            <p className="text-xs font-bold text-foreground/50 uppercase tracking-wide mb-3">
+              Identity verification{" "}
+              <span className="text-foreground/30 normal-case font-normal">
+                (optional but recommended)
+              </span>
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <PField
+                label="NIN"
+                error={errors.nin}
+                hint="11-digit number on your NIN slip"
+                htmlFor="prof-nin"
+              >
+                <input
+                  id="prof-nin"
+                  className={`${inputCls} ${errors.nin ? "border-red-500/60" : "border-border"}`}
+                  value={form.nin}
+                  onChange={(e) =>
+                    set("nin", e.target.value.replace(/\D/g, "").slice(0, 11))
+                  }
+                  placeholder="12345678901"
+                  maxLength={11}
+                />
+              </PField>
+              <PField
+                label="BVN"
+                error={errors.bvn}
+                hint="11-digit number from your bank"
+                htmlFor="prof-bvn"
+              >
+                <input
+                  id="prof-bvn"
+                  className={`${inputCls} ${errors.bvn ? "border-red-500/60" : "border-border"}`}
+                  value={form.bvn}
+                  onChange={(e) =>
+                    set("bvn", e.target.value.replace(/\D/g, "").slice(0, 11))
+                  }
+                  placeholder="12345678901"
+                  maxLength={11}
+                />
+              </PField>
+            </div>
+          </div>
+
+          <div className="flex justify-center pt-2">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className={`main-button px-10 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-all ${saved ? "!bg-green-500" : ""}`}
+            >
+              {saving && (
+                <svg
+                  className="animate-spin"
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path d="M21 12a9 9 0 1 1 -6.219 -8.56" />
+                </svg>
+              )}
+              {saved && (
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              )}
+              {saving ? "Saving…" : saved ? "Saved!" : "Save profile"}
+            </button>
+          </div>
         </div>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className={`main-button w-full sm:w-auto px-8 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-all ${saved ? "!bg-green-500" : ""}`}
-        >
-          {saving && (
-            <svg
-              className="animate-spin"
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-            </svg>
-          )}
-          {saved && (
-            <svg
-              width="15"
-              height="15"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-          )}
-          {saving ? "Saving…" : saved ? "Saved!" : "Save profile"}
-        </button>
       </div>
     </div>
   );
 };
 
-// ── Messages Panel (real-time) ────────────────────────────────────────────────
-import {
-  query as fsQuery,
-  collection as fsCol,
-  where as fsWhere,
-  orderBy,
-  onSnapshot,
-  addDoc as fsAddDoc,
-  serverTimestamp as fsST,
-} from "firebase/firestore";
-
+// ── Messages Panel ────────────────────────────────────────────────────────────
 const MessagesPanel = ({ sellerUid }) => {
   const [threads, setThreads] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1964,46 +1950,78 @@ const MessagesPanel = ({ sellerUid }) => {
   const [messages, setMessages] = useState([]);
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState(null);
   const bottomRef = useRef();
 
   useEffect(() => {
-    if (!sellerUid) return;
+    if (!sellerUid) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+
     const q = query(
       collection(db, "messages"),
       where("sellerUid", "==", sellerUid),
-      orderBy("createdAt", "asc"),
+      orderBy("createdAt", "desc"),
+      limit(100),
     );
-    const unsub = onSnapshot(q, (snap) => {
-      const msgs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      const grouped = {};
-      msgs.forEach((m) => {
-        const key = `${m.listingId}_${m.buyerUid}`;
-        if (!grouped[key])
-          grouped[key] = {
-            key,
-            listingName: m.listingName,
-            listingImage: m.listingImageUrl,
-            buyerName: m.buyerName || "Buyer",
-            buyerUid: m.buyerUid,
-            listingId: m.listingId,
-            messages: [],
-            lastText: "",
-            unread: 0,
-          };
-        grouped[key].messages.push(m);
-        grouped[key].lastText = m.text;
-        if (m.from === "buyer" && !m.read) grouped[key].unread++;
-      });
-      const threadList = Object.values(grouped);
-      setThreads(threadList);
-      setLoading(false);
-      if (active) {
-        const updated = grouped[active.key];
-        if (updated) setMessages(updated.messages);
-      }
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const msgs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const grouped = {};
+        msgs.forEach((m) => {
+          const key = `${m.listingId}_${m.buyerUid}`;
+          if (!grouped[key]) {
+            grouped[key] = {
+              key,
+              listingName: m.listingName || "Unknown item",
+              listingImage: m.listingImageUrl || "",
+              buyerName: m.buyerName || "Buyer",
+              buyerUid: m.buyerUid,
+              listingId: m.listingId,
+              messages: [],
+              lastText: "",
+              unread: 0,
+              lastAt: m.createdAt,
+            };
+          }
+          grouped[key].messages.unshift(m);
+          grouped[key].lastText = m.text || "";
+          if (m.from === "buyer" && !m.read) grouped[key].unread++;
+        });
+
+        const threadList = Object.values(grouped).sort(
+          (a, b) => (b.lastAt?.seconds || 0) - (a.lastAt?.seconds || 0),
+        );
+        setThreads(threadList);
+        setLoading(false);
+
+        if (active) {
+          const updated = threadList.find((t) => t.key === active.key);
+          if (updated) {
+            setMessages(updated.messages);
+            setActive(updated);
+          }
+        }
+      },
+      (err) => {
+        console.error("Messages listener error:", err);
+        if (err.code === "permission-denied")
+          setError(
+            "Permission denied. Check Firestore rules for messages collection.",
+          );
+        else if (err.code === "resource-exhausted") {
+          setError("Database busy. Retrying...");
+          setTimeout(() => setError(null), 3000);
+        } else setError(`Error loading messages: ${err.message}`);
+        setLoading(false);
+      },
+    );
     return () => unsub();
-  }, [sellerUid, active]);
+  }, [sellerUid]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -2028,26 +2046,39 @@ const MessagesPanel = ({ sellerUid }) => {
       });
     } catch (e) {
       console.error(e);
+      setError("Failed to send message. Please try again.");
     }
     setSending(false);
   };
 
-  if (loading)
+  if (loading) {
     return (
-      <div className="flex justify-center py-20 text-foreground/40">
-        <svg
-          className="animate-spin"
-          width="22"
-          height="22"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-        </svg>
+      <div className="space-y-4">
+        <div>
+          <p className="text-xl font-black text-foreground">Messages</p>
+          <p className="text-xs text-foreground/40 mt-0.5">
+            Real-time conversations from buyers
+          </p>
+        </div>
+        <div className="flex justify-center py-20 text-foreground/40">
+          <div className="flex flex-col items-center gap-3">
+            <svg
+              className="animate-spin"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M21 12a9 9 0 1 1 -6.219 -8.56" />
+            </svg>
+            <span className="text-sm">Loading conversations…</span>
+          </div>
+        </div>
       </div>
     );
+  }
 
   return (
     <div className="space-y-4">
@@ -2057,16 +2088,20 @@ const MessagesPanel = ({ sellerUid }) => {
           Real-time conversations from buyers
         </p>
       </div>
-
+      {error && (
+        <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/25 text-red-500 text-sm">
+          {error}
+        </div>
+      )}
       {threads.length === 0 ? (
         <Empty msg="No messages yet. When buyers contact you, they'll appear here." />
       ) : (
         <div
-          className="grid grid-cols-1 sm:grid-cols-[260px_1fr] gap-4"
+          className="grid grid-cols-1 sm:grid-cols-[280px_1fr] gap-4"
           style={{ minHeight: "500px" }}
         >
           <div
-            className="flex flex-col gap-1 overflow-y-auto rounded-2xl"
+            className="flex flex-col gap-1 overflow-y-auto rounded-2xl bg-card"
             style={{
               border: "1.5px solid hsl(var(--border))",
               padding: "8px",
@@ -2074,7 +2109,6 @@ const MessagesPanel = ({ sellerUid }) => {
             }}
           >
             {threads.map((t) => {
-              const last = t.messages[t.messages.length - 1];
               const isActive = active?.key === t.key;
               return (
                 <button
@@ -2103,7 +2137,7 @@ const MessagesPanel = ({ sellerUid }) => {
                       {t.listingName}
                     </p>
                     <p className="text-[10px] truncate mt-0.5 text-foreground/50">
-                      {last?.text}
+                      {t.lastText}
                     </p>
                   </div>
                 </button>
@@ -2113,13 +2147,13 @@ const MessagesPanel = ({ sellerUid }) => {
 
           {active ? (
             <div
-              className="flex flex-col rounded-2xl overflow-hidden"
+              className="flex flex-col rounded-2xl overflow-hidden bg-card"
               style={{
                 border: "1.5px solid hsl(var(--border))",
                 maxHeight: "600px",
               }}
             >
-              <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0 bg-card">
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
                 <div className="w-9 h-9 rounded-full bg-primary/15 text-primary flex items-center justify-center text-sm font-black border-2 border-primary/20 shrink-0">
                   {(active.buyerName?.[0] || "B").toUpperCase()}
                 </div>
@@ -2165,7 +2199,7 @@ const MessagesPanel = ({ sellerUid }) => {
                 ))}
                 <div ref={bottomRef} />
               </div>
-              <div className="flex gap-2 px-3 py-3 border-t border-border bg-card shrink-0">
+              <div className="flex gap-2 px-3 py-3 border-t border-border shrink-0">
                 <input
                   value={reply}
                   onChange={(e) => setReply(e.target.value)}
@@ -2190,7 +2224,7 @@ const MessagesPanel = ({ sellerUid }) => {
                       stroke="currentColor"
                       strokeWidth="2"
                     >
-                      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                      <path d="M21 12a9 9 0 1 1 -6.219 -8.56" />
                     </svg>
                   ) : (
                     <svg
@@ -2201,7 +2235,7 @@ const MessagesPanel = ({ sellerUid }) => {
                       stroke="currentColor"
                       strokeWidth="2.5"
                     >
-                      <path d="m22 2-7 20-4-9-9-4Z" />
+                      <path d="m22 2 -7 20 -4 -9 -9 -4Z" />
                       <path d="M22 2 11 13" />
                     </svg>
                   )}
@@ -2210,7 +2244,7 @@ const MessagesPanel = ({ sellerUid }) => {
             </div>
           ) : (
             <div
-              className="flex items-center justify-center text-foreground/30 text-sm rounded-2xl"
+              className="flex items-center justify-center text-foreground/30 text-sm rounded-2xl bg-card"
               style={{
                 border: "1.5px dashed hsl(var(--border))",
                 minHeight: "400px",
@@ -2226,7 +2260,7 @@ const MessagesPanel = ({ sellerUid }) => {
                   strokeWidth="1.5"
                   className="mx-auto text-foreground/15"
                 >
-                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  <path d="M21 15a2 2 0 0 1 -2 2H7l-4 4V5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2z" />
                 </svg>
                 <p>Select a conversation</p>
               </div>
@@ -2245,7 +2279,6 @@ const SellerDashboard = () => {
   const location = useLocation();
   const [tab, setTab] = useState("overview");
   const [listings, setListings] = useState([]);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
@@ -2261,7 +2294,11 @@ const SellerDashboard = () => {
     const uid = user.uid;
     try {
       const snap = await getDocs(
-        query(collection(db, "listings"), where("sellerUid", "==", uid)),
+        query(
+          collection(db, "listings"),
+          where("sellerUid", "==", uid),
+          orderBy("createdAt", "desc"),
+        ),
       );
       let results = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       if (results.length === 0 && profile?.name) {
@@ -2279,6 +2316,8 @@ const SellerDashboard = () => {
       setListings(results);
     } catch (err) {
       console.error("fetchListings:", err);
+      if (err.code === "resource-exhausted")
+        setTimeout(() => fetchListings(), 5000);
     }
   };
 
@@ -2288,9 +2327,15 @@ const SellerDashboard = () => {
 
   const handleDelete = async () => {
     if (!deleteConfirm) return;
-    await deleteDoc(doc(db, "listings", deleteConfirm));
-    setDeleteConfirm(null);
-    fetchListings();
+    try {
+      await deleteDoc(doc(db, "listings", deleteConfirm));
+      setDeleteConfirm(null);
+      fetchListings();
+    } catch (err) {
+      console.error("Delete error:", err);
+      if (err.code === "permission-denied")
+        alert("Permission denied. Cannot delete this item.");
+    }
   };
 
   const openAdd = () => {
@@ -2304,172 +2349,77 @@ const SellerDashboard = () => {
   const initials = getInitials(profile?.name);
   const displayName = formatDisplayName(profile?.name);
 
-  const SidebarContent = ({ mobile = false }) => (
-    <div className="flex flex-col h-full">
-      {mobile && (
-        <div
-          className="px-5 py-4 shrink-0 flex items-center justify-between"
-          style={{ borderBottom: "1px solid hsl(var(--border)/0.4)" }}
-        >
-          <Link to="/" onClick={() => setSidebarOpen(false)}>
-            <DecluttLogo />
-          </Link>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="text-foreground/50 hover:text-foreground"
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-      )}
-      <div className="px-4 pt-5 pb-2">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-foreground/25">
-          Menu
-        </p>
-      </div>
-      <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto pb-4">
-        {NAV_ITEMS.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => {
-              setTab(item.id);
-              if (mobile) setSidebarOpen(false);
-            }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold text-left transition-all duration-150 ${tab === item.id ? "bg-primary text-primary-foreground shadow-sm" : "text-foreground/55 hover:text-foreground hover:bg-border/40"}`}
-          >
-            <span className={tab === item.id ? "opacity-90" : "opacity-55"}>
-              {item.icon}
-            </span>
-            {item.label}
-          </button>
-        ))}
-      </nav>
-      {/* Footer pinned to bottom */}
-      <div
-        className="shrink-0 px-3 pb-5 space-y-2 mt-auto"
-        style={{ borderTop: "1px solid hsl(var(--border)/0.4)" }}
-      >
-        <div className="flex items-center gap-3 px-3 py-3 mt-3">
-          <div className="w-9 h-9 rounded-full overflow-hidden bg-primary/15 text-primary flex items-center justify-center text-sm font-black border-2 border-primary/20 shrink-0">
-            {profile?.photoURL ? (
-              <img
-                src={profile.photoURL}
-                alt=""
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              initials
-            )}
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs font-bold text-foreground truncate">
-              {displayName}
-            </p>
-            <p className="text-[10px] text-foreground/40 truncate">
-              {profile?.email}
-            </p>
-          </div>
-        </div>
-        <LogoutButton onLogout={handleLogout} state={logoutState} />
-      </div>
-    </div>
-  );
-
   return (
     <div
-      className="bg-background flex flex-col min-h-screen"
+      className="flex-1 min-h-[calc(100vh-64px)] bg-background flex flex-col"
       style={{ paddingTop: `${NAVBAR_H}px` }}
     >
-      <div className="flex flex-1">
-        {/* Sidebar — full height from navbar to footer */}
+      <div className="flex flex-1 min-h-0 items-stretch h-full min-h-full">
+        {/* ── Desktop Sidebar — sticky, full height, touches footer ── */}
         <aside
-          className="hidden md:flex md:flex-col w-64 xl:w-72 shrink-0"
+          className="hidden md:flex md:flex-col w-64 xl:w-72 shrink-0 bg-card h-full min-h-full"
           style={{
             position: "sticky",
             top: `${NAVBAR_H}px`,
-            height: `calc(100vh - ${NAVBAR_H}px)`,
-            overflowY: "auto",
+            bottom: 0,
             borderRight: "1px solid hsl(var(--border)/0.35)",
-            background: "hsl(var(--card))",
+            alignSelf: "flex-start",
           }}
         >
-          <SidebarContent />
+          {/* Nav items */}
+          <div className="px-4 pt-5 pb-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-foreground/35">
+              Menu
+            </p>
+          </div>
+          <nav className="flex-1 px-3 pt-2 space-y-1 pb-4">
+            {NAV_ITEMS.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setTab(item.id)}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-semibold text-left transition-all duration-150 ${tab === item.id ? "bg-primary text-primary-foreground shadow-sm" : "text-foreground/70 hover:text-foreground hover:bg-border/40"}`}
+              >
+                <span className={tab === item.id ? "opacity-90" : "opacity-70"}>
+                  {item.icon}
+                </span>
+                {item.label}
+              </button>
+            ))}
+          </nav>
+
+          {/* Sidebar footer */}
+          <div
+            className="shrink-0 px-3 pb-5 space-y-2 mt-auto"
+            style={{ borderTop: "1px solid hsl(var(--border)/0.4)" }}
+          >
+            <div className="flex items-center gap-3 px-3 py-3 mt-3">
+              <div className="w-9 h-9 rounded-full overflow-hidden bg-primary/15 text-primary flex items-center justify-center text-sm font-black border-2 border-primary/20 shrink-0">
+                {profile?.photoURL ? (
+                  <img
+                    src={profile.photoURL}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  initials
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-foreground truncate">
+                  {displayName}
+                </p>
+                <p className="text-[10px] text-foreground/40 truncate">
+                  {profile?.email}
+                </p>
+              </div>
+            </div>
+            <LogoutButton onLogout={handleLogout} state={logoutState} />
+          </div>
         </aside>
 
-        {/* Mobile sidebar overlay */}
-        {sidebarOpen && (
-          <div
-            className="md:hidden fixed inset-0 z-40 bg-black/45 backdrop-blur-sm"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
-        <div
-          className="md:hidden fixed left-0 bottom-0 z-50 w-72 flex flex-col"
-          style={{
-            top: `${NAVBAR_H}px`,
-            background: "hsl(var(--card))",
-            transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
-            transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
-            boxShadow: sidebarOpen ? "4px 0 24px rgba(0,0,0,0.12)" : "none",
-            borderRight: "1px solid hsl(var(--border)/0.4)",
-          }}
-        >
-          <SidebarContent mobile />
-        </div>
-
-        <main className="flex-1 min-w-0 flex flex-col">
-          {/* Mobile top bar */}
-          <div
-            className="md:hidden sticky z-30 bg-background/90 backdrop-blur-md px-4 h-12 flex items-center justify-between gap-3"
-            style={{
-              top: `${NAVBAR_H}px`,
-              borderBottom: "1px solid hsl(var(--border)/0.4)",
-            }}
-          >
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="flex items-center justify-center w-8 h-8 rounded-xl text-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-              style={{ border: "1.5px solid hsl(var(--border))" }}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <line x1="3" y1="12" x2="21" y2="12" />
-                <line x1="3" y1="18" x2="21" y2="18" />
-              </svg>
-            </button>
-            <span className="text-sm font-bold text-foreground">
-              {NAV_ITEMS.find((n) => n.id === tab)?.label}
-            </span>
-            <Link
-              to="/listings"
-              className="text-xs font-semibold text-primary px-3 py-1.5 rounded-xl"
-              style={{ border: "1.5px solid hsl(var(--primary)/0.3)" }}
-            >
-              Browse
-            </Link>
-          </div>
-
-          <div className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-5xl w-full mx-auto">
+        {/* ── Main content ── */}
+        <main className="flex-1 min-w-0 flex flex-col h-full min-h-full">
+          <div className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl w-full mx-auto h-full">
             {tab === "overview" && (
               <OverviewPanel
                 profile={profile}
@@ -2495,16 +2445,17 @@ const SellerDashboard = () => {
         </main>
       </div>
 
+      {/* ── Modals ── */}
       {showModal && (
         <ListingModal
           existing={editTarget}
-          sellerProfile={profile}
-          currentUserUid={user?.uid}
           onClose={() => {
             setShowModal(false);
             setEditTarget(null);
           }}
           onSaved={fetchListings}
+          sellerProfile={profile}
+          currentUserUid={user?.uid}
         />
       )}
       {deleteConfirm && (

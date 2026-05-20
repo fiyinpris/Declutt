@@ -1,11 +1,32 @@
-import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef, useMemo } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
 import { db } from "../firebase";
 
 import image6 from "../images/image3.avif";
 import step3 from "../images/image1.avif";
 import step4 from "../images/image4.avif";
+
+/* ── Animation keyframes injected once ── */
+const STYLES = `
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes arrowPulse {
+  0%   { opacity: 0;   transform: translateX(-4px); }
+  30%  { opacity: 1;   transform: translateX(0px);  }
+  60%  { opacity: 1;   transform: translateX(4px);  }
+  100% { opacity: 0;   transform: translateX(8px);  }
+}
+.card-enter {
+  opacity: 0;
+  animation: fadeSlideUp 0.45s ease forwards;
+}
+.arrow-pulse {
+  animation: arrowPulse 2.4s ease-in-out infinite;
+}
+`;
 
 /* ── Cart helpers ── */
 const cartHelpers = {
@@ -37,20 +58,6 @@ const cartHelpers = {
   },
 };
 
-const CATEGORIES = [
-  { id: "All", label: "All Items", emoji: "🏷️" },
-  { id: "Electronics", label: "Electronics", emoji: "📱" },
-  { id: "Furniture", label: "Furniture", emoji: "🛋️" },
-  { id: "Clothing", label: "Clothing", emoji: "👗" },
-  { id: "Books", label: "Books", emoji: "📚" },
-  { id: "Appliances", label: "Appliances", emoji: "🏠" },
-  { id: "Bikes & Vehicles", label: "Bikes & Vehicles", emoji: "🚲" },
-  { id: "Sports", label: "Sports", emoji: "⚽" },
-  { id: "Music", label: "Music", emoji: "🎵" },
-  { id: "Kitchen", label: "Kitchen", emoji: "🍳" },
-  { id: "Other", label: "Other", emoji: "✨" },
-];
-
 function getDistanceKm(lat1, lon1, lat2, lon2) {
   const R = 6371,
     dLat = ((lat2 - lat1) * Math.PI) / 180,
@@ -80,7 +87,6 @@ const Spinner = ({ size = 22 }) => (
   </svg>
 );
 
-/* ── Toast ── */
 const Toast = ({ msg, show }) => (
   <div
     className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[9999] px-5 py-3 rounded-2xl text-sm font-bold shadow-2xl whitespace-nowrap bg-primary text-primary-foreground transition-all duration-300 pointer-events-none ${show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}`}
@@ -89,30 +95,167 @@ const Toast = ({ msg, show }) => (
   </div>
 );
 
+/* ── Hardcoded furniture category list ── */
+const FURNITURE_CATEGORIES = [
+  "All",
+  "Beds",
+  "Chairs",
+  "Tables",
+  "Sofas",
+  "Fans",
+  "Wardrobes",
+  "Shelves",
+  "Desks",
+  "Window Blinds",
+  "Shoe Racks",
+  "Frames",
+  "Drawers",
+  "Ottomans",
+  "Mirrors",
+  "Lamps",
+  "Rugs",
+  "Cabinets",
+];
+
+/* ── Search Bar ── */
+const TopSearchBar = ({
+  search,
+  setSearch,
+  selectedCategory,
+  setSelectedCategory,
+  hasFilters,
+  clearFilters,
+}) => (
+  <div id="listings-search" className="flex flex-col gap-2">
+    {/* Search input row */}
+    <div className="flex gap-2 items-center">
+      <div className="relative flex-1">
+        <svg
+          className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/35"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.3-4.3" />
+        </svg>
+        <input
+          id="listings-search-input"
+          type="text"
+          placeholder="Search items, categories, sellers..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full pl-10 pr-4 py-2.5 text-sm rounded-full border border-border bg-card focus:border-primary/50 outline-none transition-all text-foreground placeholder:text-foreground/35 shadow-sm"
+        />
+      </div>
+      {hasFilters && (
+        <button
+          onClick={clearFilters}
+          className="shrink-0 text-xs font-bold text-foreground/40 hover:text-red-500 transition-colors flex items-center gap-1 px-2.5 py-2 rounded-full border border-border hover:border-red-500/30"
+        >
+          <svg
+            className="w-3 h-3"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <path d="M18 6 6 18M6 6l12 12" />
+          </svg>
+          Clear
+        </button>
+      )}
+    </div>
+
+    {/* Category chips with left/right fade edges */}
+    <div className="relative">
+      {/* Left fade - matches the sticky bar bg */}
+      <div
+        className="pointer-events-none absolute left-0 top-0 bottom-0 w-10 z-10"
+        style={{
+          background:
+            "linear-gradient(to right, hsl(var(--background)), transparent)",
+        }}
+      />
+      {/* Right fade */}
+      <div
+        className="pointer-events-none absolute right-0 top-0 bottom-0 w-10 z-10"
+        style={{
+          background:
+            "linear-gradient(to left, hsl(var(--background)), transparent)",
+        }}
+      />
+
+      <div
+        className="flex gap-3 overflow-x-auto px-1"
+        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+      >
+        {FURNITURE_CATEGORIES.map((cat) => {
+          const isAll = cat === "All";
+          const active = isAll ? !selectedCategory : selectedCategory === cat;
+          return (
+            <button
+              key={cat}
+              onClick={() =>
+                setSelectedCategory(
+                  isAll ? "" : selectedCategory === cat ? "" : cat,
+                )
+              }
+              className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold border transition-all whitespace-nowrap ${
+                active
+                  ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                  : "bg-card text-foreground/55 border-border hover:border-primary/40 hover:text-foreground"
+              }`}
+            >
+              {cat}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  </div>
+);
+
 /* ── Listing Card ── */
-const ListingCard = ({ listing, userCoords, onSelect }) => {
-  const [hovered, setHovered] = useState(false);
+const ListingCard = ({
+  listing,
+  userCoords,
+  onSelect,
+  onAddToCart,
+  animDelay = 0,
+}) => {
+  const [qty, setQty] = useState(0);
   const dist =
     userCoords && listing.lat && listing.lng
       ? getDistanceKm(userCoords.lat, userCoords.lng, listing.lat, listing.lng)
       : null;
 
-  const handleCart = (e) => {
+  const handleAddFirst = (e) => {
     e.stopPropagation();
+    setQty(1);
     cartHelpers.add(listing, 1);
-    // brief visual feedback handled by parent
+    onAddToCart?.();
+  };
+  const handleInc = (e) => {
+    e.stopPropagation();
+    setQty((q) => Math.min(q + 1, 99));
+    cartHelpers.add(listing, 1);
+    onAddToCart?.();
+  };
+  const handleDec = (e) => {
+    e.stopPropagation();
+    setQty((q) => Math.max(q - 1, 0));
   };
 
   return (
     <div
       onClick={() => onSelect(listing)}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      className="bg-card rounded-xl overflow-hidden cursor-pointer group transition-all duration-300 hover:shadow-xl flex flex-col border border-border hover:border-primary/20 relative"
+      className="card-enter bg-card rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-lg flex flex-col border border-border/60 relative group"
+      style={{ animationDelay: `${animDelay}ms` }}
     >
-      {/* Image area */}
       <div
-        className="relative overflow-hidden bg-border/20"
+        className="relative overflow-hidden bg-muted"
         style={{ aspectRatio: "1/1" }}
       >
         {listing.imageUrl ? (
@@ -137,19 +280,15 @@ const ListingCard = ({ listing, userCoords, onSelect }) => {
             </svg>
           </div>
         )}
-
-        {/* Status badge — top left */}
-        <div className="absolute top-2 left-2 z-10">
+        <div className="absolute top-2.5 left-2.5 z-10">
           <span
             className={`text-[9px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 ${listing.available ? "bg-green-500 text-white" : "bg-red-500/80 text-white"}`}
           >
             {listing.available ? "Available" : "Sold"}
           </span>
         </div>
-
-        {/* Distance badge — bottom left */}
         {dist !== null && (
-          <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1 px-2 py-1 rounded-full bg-black/55 backdrop-blur-sm text-white text-[10px] font-bold">
+          <div className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1 px-2 py-1 rounded-full bg-black/50 backdrop-blur-sm text-white text-[10px] font-bold">
             <svg
               width="9"
               height="9"
@@ -164,201 +303,260 @@ const ListingCard = ({ listing, userCoords, onSelect }) => {
             {formatDist(dist)}
           </div>
         )}
-
-        {/* Cart icon — bottom right, always visible on hover */}
-        <button
-          onClick={handleCart}
-          className={`absolute bottom-2 right-2 z-10 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg transition-all duration-200 ${hovered ? "opacity-100 scale-100" : "opacity-0 scale-75"}`}
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <circle cx="9" cy="21" r="1" />
-            <circle cx="20" cy="21" r="1" />
-            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-          </svg>
-        </button>
-
-        {/* Hover overlay — "See Preview" button */}
         <div
-          className={`absolute inset-0 bg-black/35 flex flex-col items-center justify-center transition-opacity duration-200 ${hovered ? "opacity-100" : "opacity-0"}`}
+          className="absolute bottom-2.5 left-1/2 -translate-x-1/2 z-10"
+          onClick={(e) => e.stopPropagation()}
         >
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onSelect(listing);
-            }}
-            className="px-4 py-2 bg-white text-foreground text-xs font-bold rounded-xl hover:bg-white/90 transition-colors shadow-md flex items-center gap-2"
-          >
-            <svg
-              width="13"
-              height="13"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
+          {qty === 0 ? (
+            <button
+              onClick={handleAddFirst}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-primary text-primary-foreground text-[11px] font-bold shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap"
             >
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
-            See Preview
-          </button>
+              <svg
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="9" cy="21" r="1" />
+                <circle cx="20" cy="21" r="1" />
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+              </svg>
+              Add to cart
+            </button>
+          ) : (
+            <div className="flex items-center rounded-full bg-primary shadow-lg overflow-hidden">
+              <button
+                onClick={handleDec}
+                className="w-7 h-7 flex items-center justify-center text-primary-foreground font-bold text-base hover:bg-black/10 transition-colors"
+              >
+                −
+              </button>
+              <span className="text-primary-foreground text-xs font-bold min-w-[20px] text-center">
+                {qty}
+              </span>
+              <button
+                onClick={handleInc}
+                className="w-7 h-7 flex items-center justify-center text-primary-foreground font-bold text-base hover:bg-black/10 transition-colors"
+              >
+                +
+              </button>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Info — LEFT aligned, condition badge at RIGHT */}
       <div className="p-3 flex flex-col gap-1">
         <div className="flex items-start justify-between gap-2">
-          <h3 className="text-sm font-bold text-foreground leading-snug line-clamp-2 text-left flex-1">
+          <h3 className="text-xs font-bold text-foreground leading-snug line-clamp-2 text-left flex-1">
             {listing.name}
           </h3>
           {listing.condition && (
-            <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 whitespace-nowrap">
+            <span className="shrink-0 text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 whitespace-nowrap">
               {listing.condition}
             </span>
           )}
         </div>
-        <p className="text-base font-black text-primary text-left">
-          &#8358;{Number(listing.price).toLocaleString()}
-        </p>
-        <p className="text-[10px] text-foreground/40 truncate text-left">
-          {listing.category}
+        {listing.sku && (
+          <p className="text-[9px] text-foreground/35 truncate">
+            SKU: {listing.sku}
+          </p>
+        )}
+        <p className="text-sm font-black text-foreground text-left">
+          &#8358;{Number(listing.price).toLocaleString()}.00
         </p>
       </div>
     </div>
   );
 };
 
-/* ── Fresh Sellers Widget ── */
-const FreshSellersWidget = ({ listings, onSelect }) => {
-  const items = listings.filter((l) => l.available && l.imageUrl).slice(0, 5);
-  const [currentIdx, setCurrentIdx] = useState(0);
+/* ── Popular Collections ── */
+const DESKTOP_SLOTS = 4;
+const MOBILE_SLOTS = 10;
+
+const PopularCollections = ({ listings }) => {
+  const pool = listings.filter((l) => l.available && l.imageUrl);
+  const [slotIndices, setSlotIndices] = useState(() =>
+    Array.from(
+      { length: MOBILE_SLOTS },
+      (_, i) => i % Math.max(pool.length, 1),
+    ),
+  );
+  // Track whether left/right scroll-hint arrows should show
+  const [showRight, setShowRight] = useState(true);
+  const [showLeft, setShowLeft] = useState(false);
+  const scrollRef = useRef(null);
 
   useEffect(() => {
-    if (items.length < 2) return;
-    const t = setInterval(
-      () => setCurrentIdx((i) => (i + 1) % items.length),
-      4000,
+    if (pool.length < 2) return;
+    const timers = Array.from({ length: MOBILE_SLOTS }, (_, slot) =>
+      setInterval(
+        () => {
+          setSlotIndices((prev) => {
+            const next = [...prev];
+            next[slot] = (prev[slot] + 1) % pool.length;
+            return next;
+          });
+        },
+        4000 + slot * 800,
+      ),
     );
-    return () => clearInterval(t);
-  }, [items.length]);
+    return () => timers.forEach(clearInterval);
+  }, [pool.length]);
 
-  if (items.length === 0) {
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const { scrollLeft, scrollWidth, clientWidth } = el;
+      setShowLeft(scrollLeft > 20);
+      setShowRight(scrollLeft < scrollWidth - clientWidth - 20);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    // Run once on mount so initial state is correct
+    onScroll();
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+
+  if (pool.length === 0) return null;
+
+  const getItem = (slot) =>
+    pool[slotIndices[slot % MOBILE_SLOTS] % pool.length];
+
+  /* Non-clickable display tile */
+  const CollectionTile = ({ slot, className, style }) => {
+    const item = getItem(slot);
     return (
-      <div className="hidden lg:flex flex-col rounded-xl border border-border bg-card h-full">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
-          <h3 className="text-sm font-bold text-foreground">Fresh Arrivals</h3>
-          <span className="flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded-full bg-green-500/10 text-green-600 border border-green-500/20">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-            Live
+      <div
+        className={`relative rounded-2xl overflow-hidden select-none pointer-events-none ${className}`}
+        style={style}
+      >
+        <img
+          src={item.imageUrl}
+          alt={item.name}
+          className="w-full h-full object-cover transition-all duration-700 ease-in-out"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/5 to-transparent" />
+        <div className="absolute bottom-3 left-3 right-3">
+          <span className="inline-flex items-center bg-primary text-primary-foreground text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg">
+            {item.category || item.name}
           </span>
-        </div>
-        <div className="flex-1 flex items-center justify-center p-6 text-xs text-foreground/40">
-          No new listings yet
+          <p className="text-white text-[10px] mt-1 truncate opacity-75 font-medium">
+            {item.name}
+          </p>
         </div>
       </div>
     );
-  }
+  };
 
-  const featured = items[currentIdx];
-  return (
-    <div className="hidden lg:flex flex-col rounded-xl border border-border bg-card h-full overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border/60 shrink-0">
-        <div>
-          <h3 className="text-sm font-bold text-foreground">Fresh Arrivals</h3>
-          <p className="text-[10px] text-foreground/40">New this week</p>
-        </div>
-        <span className="flex items-center gap-1.5 text-[10px] font-bold px-2 py-1 rounded-full bg-green-500/10 text-green-600 border border-green-500/20">
-          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-          Live
-        </span>
-      </div>
-      <div className="relative shrink-0">
-        <div
-          className="relative h-44 cursor-pointer overflow-hidden group"
-          onClick={() => onSelect(featured)}
-        >
-          <img
-            src={featured.imageUrl}
-            alt={featured.name}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-          <div className="absolute bottom-0 left-0 right-0 p-4">
-            <p className="text-white text-sm font-bold truncate mb-1">
-              {featured.name}
-            </p>
-            <div className="flex items-center justify-between">
-              <p className="text-primary text-lg font-black">
-                &#8358;{Number(featured.price).toLocaleString()}
-              </p>
-              <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-sm rounded-full px-2 py-1">
-                <div className="w-5 h-5 rounded-full bg-primary/60 flex items-center justify-center text-[8px] font-bold text-white">
-                  {(featured.sellerName?.[0] || "?").toUpperCase()}
-                </div>
-                <p className="text-white/80 text-[10px] truncate max-w-[70px]">
-                  {featured.sellerName}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-        {items.length > 1 && (
-          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
-            {items.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => setCurrentIdx(i)}
-                className={`h-1 rounded-full transition-all ${i === currentIdx ? "w-4 bg-white" : "w-1 bg-white/40"}`}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+  /* Arrow hint — purely visual, pointer-events none */
+  const ArrowHint = ({ direction, visible }) => (
+    <div
+      className="absolute top-0 bottom-0 flex items-center"
+      style={{
+        [direction === "right" ? "right" : "left"]: 0,
+        zIndex: 10,
+        pointerEvents: "none",
+        opacity: visible ? 1 : 0,
+        transition: "opacity 0.3s ease",
+      }}
+    >
+      {/* Edge gradient fade */}
       <div
-        className="flex-1 overflow-y-auto px-3 py-2 space-y-1"
-        style={{ scrollbarWidth: "none" }}
+        className="absolute top-0 bottom-0 w-20"
+        style={{
+          [direction === "right" ? "right" : "left"]: 0,
+          background:
+            direction === "right"
+              ? "linear-gradient(to left, hsl(var(--background)), transparent)"
+              : "linear-gradient(to right, hsl(var(--background)), transparent)",
+        }}
+      />
+      {/* Pulsing arrow dot */}
+      <div
+        className="arrow-pulse relative z-10 flex items-center justify-center w-8 h-8 rounded-full bg-primary/90 text-primary-foreground shadow-lg"
+        style={{
+          [direction === "right" ? "marginRight" : "marginLeft"]: "6px",
+        }}
       >
-        {items.map((item, i) => (
-          <div
-            key={item.id}
-            onClick={() => onSelect(item)}
-            className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-all duration-200 group ${i === currentIdx ? "bg-primary/5 border border-primary/20" : "hover:bg-border/30 border border-transparent"}`}
-          >
-            <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-border/20">
-              <img
-                src={item.imageUrl}
-                alt={item.name}
-                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-              />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-foreground truncate">
-                {item.name}
-              </p>
-              <p className="text-[10px] text-foreground/40 truncate">
-                {item.sellerName}
-              </p>
-            </div>
-            <p className="text-xs font-black text-primary shrink-0">
-              &#8358;{Number(item.price).toLocaleString()}
-            </p>
-          </div>
-        ))}
+        <svg
+          width="15"
+          height="15"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{ transform: direction === "left" ? "scaleX(-1)" : "none" }}
+        >
+          <path d="M5 12h14M13 6l6 6-6 6" />
+        </svg>
       </div>
     </div>
+  );
+
+  return (
+    <section className="py-2">
+      <div className="text-center mb-5">
+        <h2 className="text-xl sm:text-2xl font-black text-foreground tracking-tight">
+          Popular Collections
+        </h2>
+        <div className="w-8 h-0.5 bg-primary mx-auto mt-2 mb-2.5 rounded-full" />
+      </div>
+
+      {/* Desktop: 4-tile grid — not clickable */}
+      <div
+        className="hidden sm:flex gap-3 pointer-events-none select-none"
+        style={{ height: "360px" }}
+      >
+        <CollectionTile slot={0} className="flex-1 h-full" />
+        <div className="flex flex-col gap-3 flex-1 h-full">
+          <CollectionTile
+            slot={1}
+            className="w-full"
+            style={{ flex: "1 1 0", minHeight: 0 }}
+          />
+          <CollectionTile
+            slot={2}
+            className="w-full"
+            style={{ flex: "1 1 0", minHeight: 0 }}
+          />
+        </div>
+        <CollectionTile slot={3} className="flex-1 h-full" />
+      </div>
+
+      {/* Mobile: horizontal scroll with left + right hint arrows */}
+      <div className="sm:hidden relative">
+        <div
+          ref={scrollRef}
+          className="flex gap-3 overflow-x-auto pb-1"
+          style={{ scrollbarWidth: "none" }}
+        >
+          {Array.from({ length: MOBILE_SLOTS }, (_, slot) => (
+            <CollectionTile
+              key={slot}
+              slot={slot}
+              className="flex-shrink-0"
+              style={{ width: "168px", height: "224px" }}
+            />
+          ))}
+        </div>
+
+        {/* Left hint — appears once user has scrolled right */}
+        <ArrowHint direction="left" visible={showLeft} />
+        {/* Right hint — appears on load, hides when at the end */}
+        <ArrowHint direction="right" visible={showRight} />
+      </div>
+    </section>
   );
 };
 
 /* ── Hero Section ── */
-const HeroSection = ({ listings, onSelect }) => {
+const HeroSection = () => {
   const slides = [
     {
       src: image6,
@@ -387,334 +585,87 @@ const HeroSection = ({ listings, onSelect }) => {
 
   return (
     <div
-      className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4"
-      style={{ height: "clamp(280px, 45vw, 400px)" }}
+      className="relative rounded-2xl overflow-hidden border border-border group"
+      style={{ height: "clamp(240px, 40vw, 380px)" }}
     >
-      <div className="relative rounded-2xl overflow-hidden border border-border group h-full">
-        {slides.map((s, i) => (
-          <div
-            key={i}
-            className={`absolute inset-0 transition-opacity duration-700 ${i === idx ? "opacity-100" : "opacity-0"}`}
-          >
-            <img
-              src={s.src}
-              alt={s.title}
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
-            <div className="absolute bottom-5 left-5 sm:bottom-8 sm:left-8 lg:bottom-10 lg:left-10">
-              <span className="text-[10px] font-bold text-white/60 tracking-widest uppercase">
-                {s.tag}
-              </span>
-              <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-white mt-1 leading-tight max-w-xs sm:max-w-sm">
-                {s.title}
-              </h2>
-              <p className="text-white/70 mt-1.5 text-xs sm:text-sm max-w-xs">
-                {s.sub}
-              </p>
-              <button className="mt-3 px-4 sm:px-5 py-2 sm:py-2.5 bg-primary text-primary-foreground rounded-full text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity">
-                Shop Now
-              </button>
-            </div>
-          </div>
-        ))}
-        <button
-          onClick={() => setIdx((i) => (i - 1 + slides.length) % slides.length)}
-          className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/15 backdrop-blur text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/25"
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-          >
-            <path d="m15 18-6-6 6-6" />
-          </svg>
-        </button>
-        <button
-          onClick={() => setIdx((i) => (i + 1) % slides.length)}
-          className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/15 backdrop-blur text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/25"
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-          >
-            <path d="m9 18 6-6-6-6" />
-          </svg>
-        </button>
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-          {slides.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => setIdx(i)}
-              className={`h-1.5 rounded-full transition-all ${i === idx ? "w-5 bg-white" : "w-1.5 bg-white/40"}`}
-            />
-          ))}
-        </div>
-      </div>
-      <FreshSellersWidget listings={listings} onSelect={onSelect} />
-    </div>
-  );
-};
-
-/* ── Category Bar — FIXED: reliable horizontal scroll ── */
-const CategoryBar = ({ active, onChange }) => {
-  const [showAll, setShowAll] = useState(false);
-  const scrollRef = useRef(null);
-
-  // Scroll to active pill whenever it changes
-  useEffect(() => {
-    if (!scrollRef.current) return;
-    const activeEl = scrollRef.current.querySelector("[data-active='true']");
-    if (activeEl) {
-      activeEl.scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-        inline: "center",
-      });
-    }
-  }, [active]);
-
-  return (
-    <>
-      <div className="relative">
-        {/* Scrollable row */}
+      {slides.map((s, i) => (
         <div
-          ref={scrollRef}
-          style={{
-            display: "flex",
-            flexWrap: "nowrap",
-            gap: "8px",
-            overflowX: "scroll",
-            overflowY: "hidden",
-            WebkitOverflowScrolling: "touch",
-            scrollbarWidth: "none",
-            msOverflowStyle: "none",
-            paddingBottom: "8px",
-            paddingLeft: "4px",
-            paddingRight: "4px",
-          }}
+          key={i}
+          className={`absolute inset-0 transition-opacity duration-700 ${i === idx ? "opacity-100" : "opacity-0"}`}
         >
-          {CATEGORIES.map((cat) => (
-            <button
-              key={cat.id}
-              data-active={active === cat.id ? "true" : "false"}
-              onClick={() => onChange(cat.id)}
-              style={{ flexShrink: 0, whiteSpace: "nowrap" }}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold border transition-all duration-200 ${
-                active === cat.id
-                  ? "bg-primary text-primary-foreground border-primary shadow-md shadow-primary/25"
-                  : "bg-card text-foreground/60 border-border hover:border-primary/40 hover:text-foreground"
-              }`}
-            >
-              <span>{cat.emoji}</span>
-              {cat.label}
+          <img
+            src={s.src}
+            alt={s.title}
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
+          <div className="absolute bottom-5 left-5 sm:bottom-8 sm:left-8 lg:bottom-10 lg:left-10">
+            <span className="text-[10px] font-bold text-white/60 tracking-widest uppercase">
+              {s.tag}
+            </span>
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-white mt-1 leading-tight max-w-xs sm:max-w-sm">
+              {s.title}
+            </h2>
+            <p className="text-white/70 mt-1.5 text-xs sm:text-sm max-w-xs">
+              {s.sub}
+            </p>
+            <button className="mt-3 px-4 sm:px-5 py-2 sm:py-2.5 bg-primary text-primary-foreground rounded-full text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity">
+              Shop Now
             </button>
-          ))}
-        </div>
-        {/* Hide scrollbar */}
-        <style>{`.cat-scroll::-webkit-scrollbar{display:none}`}</style>
-      </div>
-
-      <div className="flex justify-end mt-1">
-        <button
-          onClick={() => setShowAll(true)}
-          className="text-xs font-semibold text-foreground/40 hover:text-primary transition-colors flex items-center gap-0.5"
-        >
-          See All{" "}
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-          >
-            <path d="m9 18 6-6-6-6" />
-          </svg>
-        </button>
-      </div>
-
-      {showAll && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-          onClick={() => setShowAll(false)}
-        >
-          <div
-            className="bg-card rounded-2xl p-5 max-w-md w-full border border-border shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-base font-bold text-foreground">
-                All Categories
-              </h3>
-              <button
-                onClick={() => setShowAll(false)}
-                className="w-8 h-8 rounded-full hover:bg-border flex items-center justify-center"
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {CATEGORIES.map((cat) => (
-                <button
-                  key={cat.id}
-                  onClick={() => {
-                    onChange(cat.id);
-                    setShowAll(false);
-                  }}
-                  className={`flex items-center gap-2.5 p-3 rounded-xl border transition-all text-left ${active === cat.id ? "bg-primary/10 border-primary/30 text-primary" : "bg-background border-border hover:border-primary/30 hover:bg-primary/5"}`}
-                >
-                  <span className="text-xl">{cat.emoji}</span>
-                  <span className="text-xs font-bold">{cat.label}</span>
-                </button>
-              ))}
-            </div>
           </div>
         </div>
-      )}
-    </>
-  );
-};
-
-/* ── Filter Bar ── */
-const FilterBar = ({
-  search,
-  setSearch,
-  showAvailable,
-  setShowAvailable,
-  minPrice,
-  setMinPrice,
-  maxPrice,
-  setMaxPrice,
-  userCoords,
-  itemCount,
-  hasFilters,
-  clearFilters,
-}) => (
-  <div className="flex flex-wrap gap-2 items-center py-3 border-b border-border/60">
-    <div className="relative flex-1 min-w-[160px]">
-      <svg
-        className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-foreground/35"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
+      ))}
+      <button
+        onClick={() => setIdx((i) => (i - 1 + slides.length) % slides.length)}
+        className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/15 backdrop-blur text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/25"
       >
-        <circle cx="11" cy="11" r="8" />
-        <path d="m21 21-4.3-4.3" />
-      </svg>
-      <input
-        type="text"
-        placeholder="Search items..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="w-full pl-8 pr-3 py-2 text-xs rounded-full border border-border bg-card focus:border-primary/50 outline-none transition-all text-foreground placeholder:text-foreground/30"
-      />
-    </div>
-    <button
-      onClick={() => setShowAvailable(!showAvailable)}
-      className={`flex items-center gap-1.5 px-3 py-2 rounded-full border text-xs font-bold transition-all ${showAvailable ? "bg-primary/10 border-primary/30 text-primary" : "bg-card border-border text-foreground/50"}`}
-    >
-      <span
-        className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition-all ${showAvailable ? "bg-primary border-primary text-primary-foreground" : "border-border"}`}
-      >
-        {showAvailable && (
-          <svg
-            width="8"
-            height="8"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="3"
-          >
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-        )}
-      </span>
-      Available
-    </button>
-    <div className="flex items-center gap-1">
-      <span className="text-xs font-bold text-foreground/35">&#8358;</span>
-      <input
-        type="number"
-        placeholder="Min"
-        value={minPrice}
-        onChange={(e) => setMinPrice(e.target.value)}
-        className="w-16 px-2.5 py-2 text-xs rounded-full border border-border bg-card outline-none focus:border-primary/50 transition-all"
-      />
-      <span className="text-foreground/25 text-xs">—</span>
-      <input
-        type="number"
-        placeholder="Max"
-        value={maxPrice}
-        onChange={(e) => setMaxPrice(e.target.value)}
-        className="w-16 px-2.5 py-2 text-xs rounded-full border border-border bg-card outline-none focus:border-primary/50 transition-all"
-      />
-    </div>
-    {userCoords && (
-      <span className="flex items-center gap-1 text-[10px] font-bold text-blue-500 bg-blue-500/10 px-2.5 py-1.5 rounded-full border border-blue-500/20">
         <svg
-          className="w-2.5 h-2.5"
+          width="16"
+          height="16"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
           strokeWidth="2.5"
         >
-          <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
-          <circle cx="12" cy="10" r="3" />
+          <path d="m15 18-6-6 6-6" />
         </svg>
-        GPS on
-      </span>
-    )}
-    <span className="text-xs text-foreground/35 font-medium ml-auto">
-      {itemCount} items
-    </span>
-    {hasFilters && (
+      </button>
       <button
-        onClick={clearFilters}
-        className="text-xs font-bold text-foreground/40 hover:text-red-500 transition-colors flex items-center gap-1 px-2.5 py-1.5 rounded-full border border-border hover:border-red-500/30"
+        onClick={() => setIdx((i) => (i + 1) % slides.length)}
+        className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/15 backdrop-blur text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/25"
       >
         <svg
-          className="w-3 h-3"
+          width="16"
+          height="16"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
-          strokeWidth="2"
+          strokeWidth="2.5"
         >
-          <path d="M18 6 6 18M6 6l12 12" />
+          <path d="m9 18 6-6-6-6" />
         </svg>
-        Clear
       </button>
-    )}
-  </div>
-);
+      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+        {slides.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => setIdx(i)}
+            className={`h-1.5 rounded-full transition-all ${i === idx ? "w-5 bg-white" : "w-1.5 bg-white/40"}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
 
 /* ── Main Listings Page ── */
 const Listings = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [cat, setCat] = useState("All");
-  const [min, setMin] = useState("");
-  const [max, setMax] = useState("");
-  const [avail, setAvail] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState("");
   const [gps, setGps] = useState(null);
   const [toast, setToast] = useState({ show: false, msg: "" });
 
@@ -722,6 +673,26 @@ const Listings = () => {
     setToast({ show: true, msg });
     setTimeout(() => setToast({ show: false, msg: "" }), 2000);
   };
+
+  useEffect(() => {
+    if (document.getElementById("listings-anim-styles")) return;
+    const tag = document.createElement("style");
+    tag.id = "listings-anim-styles";
+    tag.textContent = STYLES;
+    document.head.appendChild(tag);
+  }, []);
+
+  useEffect(() => {
+    if (location.state?.scrollToSearch) {
+      setTimeout(() => {
+        const el = document.getElementById("listings-search-input");
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.focus();
+        }
+      }, 120);
+    }
+  }, [location.state]);
 
   useEffect(() => {
     if (navigator.geolocation) {
@@ -741,6 +712,10 @@ const Listings = () => {
       .finally(() => setLoading(false));
   }, []);
 
+  const categories = useMemo(() => {
+    return [...new Set(listings.map((l) => l.category).filter(Boolean))].sort();
+  }, [listings]);
+
   const filtered = listings.filter((l) => {
     const q = search.toLowerCase();
     return (
@@ -748,102 +723,104 @@ const Listings = () => {
         [l.name, l.description, l.category, l.sellerName].some((f) =>
           f?.toLowerCase().includes(q),
         )) &&
-      (cat === "All" || l.category === cat) &&
-      (!avail || l.available === true) &&
-      (!min || Number(l.price || 0) >= Number(min)) &&
-      (!max || Number(l.price || 0) <= Number(max))
+      (!selectedCategory || l.category === selectedCategory)
     );
   });
 
-  const hasF = search || cat !== "All" || min || max || avail;
+  const hasF = !!(search || selectedCategory);
   const clear = () => {
     setSearch("");
-    setCat("All");
-    setMin("");
-    setMax("");
-    setAvail(false);
+    setSelectedCategory("");
   };
 
-  // Navigate to product page — this is what restores Navbar + Footer
-  const handleSelect = (listing) => navigate(`/product/${listing.id}`);
+  const handleSelect = (listing) => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+    navigate(`/product/${listing.id}`);
+  };
 
   return (
     <div className="min-h-screen bg-background">
-      <main className="max-w-7xl mx-auto px-3 sm:px-5 lg:px-8 pt-20 sm:pt-24 pb-10 space-y-5">
-        <HeroSection listings={listings} onSelect={handleSelect} />
-
-        <section>
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-base font-bold text-foreground">
-              Shop by Category
-            </h2>
-          </div>
-          <CategoryBar active={cat} onChange={setCat} />
-        </section>
-
-        <FilterBar
-          search={search}
-          setSearch={setSearch}
-          showAvailable={avail}
-          setShowAvailable={setAvail}
-          minPrice={min}
-          setMinPrice={setMin}
-          maxPrice={max}
-          setMaxPrice={setMax}
-          userCoords={gps}
-          itemCount={filtered.length}
-          hasFilters={hasF}
-          clearFilters={clear}
-        />
-
-        <div className="flex items-center gap-3">
-          <div className="flex-1 h-px bg-border/60" />
-          <span className="text-[10px] uppercase tracking-[0.2em] text-foreground/35 font-bold">
-            All Listings
-          </span>
-          <div className="flex-1 h-px bg-border/60" />
+      {/* STICKY SEARCH + CHIPS - outside <main> so sticky works full-width */}
+      <div
+        className="sticky top-14 sm:top-16 z-40 w-full border-b border-border/40"
+        style={{
+          background: "hsl(var(--background) / 1)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+        }}
+      >
+        <div className="max-w-7xl mx-auto px-3 sm:px-5 lg:px-8 py-3">
+          <TopSearchBar
+            search={search}
+            setSearch={setSearch}
+            selectedCategory={selectedCategory}
+            setSelectedCategory={setSelectedCategory}
+            hasFilters={hasF}
+            clearFilters={clear}
+          />
         </div>
+      </div>
 
-        {loading ? (
-          <div className="flex justify-center py-20 gap-2 text-foreground/40">
-            <Spinner />
-            <span className="text-sm">Loading items...</span>
+      <main className="max-w-7xl mx-auto px-3 sm:px-5 lg:px-8 pb-10">
+        <div className="space-y-5 pt-5">
+          <HeroSection />
+
+          {!loading && listings.length > 0 && (
+            <PopularCollections listings={listings} />
+          )}
+
+          <div className="flex items-center gap-3 pt-1">
+            <div className="flex-1 h-px bg-border/60" />
+            <span className="text-[10px] uppercase tracking-[0.2em] text-foreground/35 font-bold">
+              All Listings
+            </span>
+            <div className="flex-1 h-px bg-border/60" />
           </div>
-        ) : filtered.length === 0 ? (
-          <div className="py-20 text-center">
-            <div className="w-16 h-16 rounded-full bg-border/30 flex items-center justify-center text-2xl mx-auto mb-3">
-              🛋️
+
+          {loading ? (
+            <div className="flex justify-center py-20 gap-2 text-foreground/40">
+              <Spinner />
+              <span className="text-sm">Loading items...</span>
             </div>
-            <p className="text-foreground/50 font-bold text-base mb-1">
-              No listings found
-            </p>
-            <p className="text-sm text-foreground/35 mb-4">
-              {listings.length === 0
-                ? "No items listed yet."
-                : "Try adjusting your filters"}
-            </p>
-            {hasF && (
-              <button
-                onClick={clear}
-                className="text-primary text-sm font-bold hover:underline"
-              >
-                Clear all filters
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {filtered.map((l) => (
-              <ListingCard
-                key={l.id}
-                listing={l}
-                userCoords={gps}
-                onSelect={handleSelect}
-              />
-            ))}
-          </div>
-        )}
+          ) : filtered.length === 0 ? (
+            <div className="py-20 text-center">
+              <div className="w-16 h-16 rounded-full bg-border/30 flex items-center justify-center text-2xl mx-auto mb-3">
+                🛋️
+              </div>
+              <p className="text-foreground/50 font-bold text-base mb-1">
+                No listings found
+              </p>
+              <p className="text-sm text-foreground/35 mb-4">
+                {listings.length === 0
+                  ? "No items listed yet."
+                  : "Try adjusting your search or category"}
+              </p>
+              {hasF && (
+                <button
+                  onClick={clear}
+                  className="text-primary text-sm font-bold hover:underline"
+                >
+                  Clear all filters
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 mb-10">
+              {filtered.map((l, i) => (
+                <ListingCard
+                  key={l.id}
+                  listing={l}
+                  userCoords={gps}
+                  onSelect={handleSelect}
+                  onAddToCart={() => showToast("Added to cart!")}
+                  animDelay={Math.min(i * 60, 600)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </main>
+
       <Toast msg={toast.msg} show={toast.show} />
     </div>
   );

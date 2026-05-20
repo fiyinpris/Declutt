@@ -18,7 +18,6 @@ import Navbar from "./Navbar";
 import Footer from "./Footer";
 
 // ── Cart helpers (PER-USER, keyed by uid) ────────────────────────────────────
-// FIX: Cart is now stored per-user so different accounts don't share cart items
 export const cartHelpers = {
   _key: (uid) => (uid ? `declutt_cart_${uid}` : "declutt_cart_guest"),
   get: (uid) => {
@@ -75,28 +74,19 @@ const Toast = ({ msg, show }) => (
   </div>
 );
 
-/* ── Image Gallery — vertical thumbs LEFT, main image RIGHT with arrows ──────
-   FIX: Thumbnails returned to left side, arrow navigation inside main image,
-   clicking thumbnail changes main image. Proper margin from navbar.           */
+/* ── Image Gallery ── */
 const ImageGallery = ({ images, productName }) => {
   const [selected, setSelected] = useState(0);
-
-  // Keep max of 3 slots
   const slots = [0, 1, 2];
-
-  // Normalize images (can be less than 3)
   const realImages = (images || []).filter(Boolean);
-
   const hasImages = realImages.length > 0;
 
   const prev = () =>
     setSelected((i) => (i - 1 + realImages.length) % realImages.length);
-
   const next = () => setSelected((i) => (i + 1) % realImages.length);
 
   return (
     <div className="w-full max-w-[380px] mx-auto space-y-3">
-      {/* ── MAIN IMAGE ── */}
       <div
         className="relative w-full rounded-2xl overflow-hidden bg-border/20 border border-border/60 group"
         style={{ aspectRatio: "1/1" }}
@@ -112,8 +102,6 @@ const ImageGallery = ({ images, productName }) => {
             No Image
           </div>
         )}
-
-        {/* Arrows (only if multiple images) */}
         {realImages.length > 1 && (
           <>
             <button
@@ -137,22 +125,18 @@ const ImageGallery = ({ images, productName }) => {
           </>
         )}
       </div>
-
-      {/* ── THUMBNAILS UNDER ── */}
       <div className="flex gap-3 justify-center">
         {slots.map((i) => {
-          const img = realImages[i]; // may be undefined
-
+          const img = realImages[i];
           return (
             <button
               key={i}
               onClick={() => img && setSelected(i)}
-              className={`w-20 h-20 rounded-xl overflow-hidden border-2 transition-all
-                ${
-                  selected === i && img
-                    ? "border-primary scale-105"
-                    : "border-border opacity-70 hover:opacity-100"
-                }`}
+              className={`w-20 h-20 rounded-xl overflow-hidden border-2 transition-all ${
+                selected === i && img
+                  ? "border-primary scale-105"
+                  : "border-border opacity-70 hover:opacity-100"
+              }`}
             >
               {img ? (
                 <img
@@ -161,7 +145,6 @@ const ImageGallery = ({ images, productName }) => {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                // EMPTY SLOT (not uploaded yet)
                 <div className="w-full h-full flex items-center justify-center bg-border/30 text-foreground/30 text-xs font-bold">
                   +
                 </div>
@@ -583,9 +566,7 @@ const SellerInfo = ({ listing, onMsg }) => (
   </div>
 );
 
-/* ── Saved Items — stored in localStorage per user ───────────────────────────
-   FIX: Saved items are now stored in Firestore-ready state and reflected
-   in the buyer dashboard "Saved Items" tab.                                   */
+/* ── Saved Items helpers ── */
 const savedHelpers = {
   _key: (uid) => (uid ? `declutt_saved_${uid}` : "declutt_saved_guest"),
   get: (uid) => {
@@ -615,24 +596,38 @@ const savedHelpers = {
     }
     localStorage.setItem(savedHelpers._key(uid), JSON.stringify(next));
     window.dispatchEvent(new CustomEvent("saved-updated", { detail: { uid } }));
-    return idx === -1; // true = now saved
+    return idx === -1;
   },
   has: (uid, id) => savedHelpers.get(uid).some((i) => i.id === id),
 };
 
-/* ── Related Items ── */
+/* ── Related Items — FIXED: only same category ── */
 const RelatedItems = ({ currentId, category }) => {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
+
   useEffect(() => {
     getDocs(collection(db, "listings"))
       .then((snap) => {
         const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        const others = all.filter((l) => l.id !== currentId);
-        const same = others.filter((l) => l.category === category);
-        const rest = others.filter((l) => l.category !== category);
-        let result = [...same, ...rest];
-        if (result.length === 0) result = all;
+        // FIX: Only show items from the SAME category, exclude current item
+        const sameCategory = all.filter(
+          (l) =>
+            l.id !== currentId &&
+            l.category === category &&
+            l.available === true,
+        );
+        // If not enough same-category items, fill with other available items
+        let result = sameCategory;
+        if (result.length < 8) {
+          const others = all.filter(
+            (l) =>
+              l.id !== currentId &&
+              l.category !== category &&
+              l.available === true,
+          );
+          result = [...result, ...others];
+        }
         setItems(result.slice(0, 8));
       })
       .catch(console.error);
@@ -642,12 +637,16 @@ const RelatedItems = ({ currentId, category }) => {
     return (
       <p className="text-sm text-foreground/35 py-4">No related items yet.</p>
     );
+
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
       {items.map((item) => (
         <div
           key={item.id}
-          onClick={() => navigate(`/product/${item.id}`)}
+          onClick={() => {
+            navigate(`/product/${item.id}`);
+            window.scrollTo({ top: 0, behavior: "instant" });
+          }}
           className="bg-card border border-border rounded-xl overflow-hidden cursor-pointer hover:border-primary/30 hover:shadow-lg transition-all duration-200 group"
         >
           <div className="aspect-square overflow-hidden bg-border/20">
@@ -688,11 +687,14 @@ const ProductDetails = () => {
   const [loading, setLoading] = useState(true);
   const [qty, setQty] = useState(1);
   const [showMsg, setShowMsg] = useState(false);
-  // FIX: Saved state is per-user
   const [isSaved, setIsSaved] = useState(false);
   const [toast, setToast] = useState({ show: false, msg: "" });
 
-  // Load saved state for this user
+  // FIX: Scroll to top when component mounts or id changes
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [id]);
+
   useEffect(() => {
     if (id) setIsSaved(savedHelpers.has(uid, id));
   }, [uid, id]);
@@ -735,13 +737,11 @@ const ProductDetails = () => {
     }
   };
 
-  // FIX: Cart add is per-user
   const handleCart = () => {
     cartHelpers.add(uid, listing, qty);
     showToast("Added to cart ✓");
   };
 
-  // FIX: Save is per-user and reflects in dashboard
   const handleSave = () => {
     const nowSaved = savedHelpers.toggle(uid, listing);
     setIsSaved(nowSaved);
@@ -792,14 +792,12 @@ const ProductDetails = () => {
       </div>
     );
 
-  // Build images array: main + additional thumbnails
   const images = listing.imageUrl
     ? [listing.imageUrl, ...(listing.additionalImages || [])]
     : [];
   const hasReviews = (listing.reviewCount || 0) > 0;
   const soldCount = listing.soldCount || 0;
 
-  /* ── Purchase actions section ── */
   const PurchaseActions = () => (
     <div className="space-y-3 pt-4 border-t border-border">
       <QtySelector
@@ -862,7 +860,7 @@ const ProductDetails = () => {
     <div className="min-h-screen bg-background flex flex-col">
       <Navbar />
 
-      {/* Breadcrumb — FIX: see all / back to top behavior, scroll to top on click */}
+      {/* Breadcrumb */}
       <div className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-14 sm:top-16 z-30">
         <div className="mt-4 mx-auto px-3 sm:px-5 lg:px-6 h-10 flex items-center gap-3 text-xs text-foreground/50">
           <button
@@ -891,20 +889,12 @@ const ProductDetails = () => {
         </div>
       </div>
 
-      {/*
-        FIX: Reduced max-width and reduced horizontal padding so product is
-        not pushed too far from left edge, and top margin doesn't interfere
-        with navbar. Also added proper mt for spacing.
-        Layout: [gallery] [info] [sidebar on desktop]
-      */}
       <main className="flex-1 w-full mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 pb-24 sm:pb-8 mt-15">
         <div className="grid grid-cols-1 lg:grid-cols-[480px_1fr_330px] gap-4 lg:gap-6 items-start">
-          {/* ── Gallery — FIX: thumbnails on left side, margin from top ── */}
           <div className="w-full lg:sticky lg:top-28 mt-1">
             <ImageGallery images={images} productName={listing.name} />
           </div>
 
-          {/* ── Main Info ── */}
           <div className="space-y-4 text-left">
             <span
               className={`inline-flex text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full border ${listing.available ? "bg-green-500/10 text-green-600 border-green-500/25" : "bg-red-500/10 text-red-500 border-red-500/20"}`}
@@ -1029,22 +1019,17 @@ const ProductDetails = () => {
               </div>
             )}
 
-            {/* Mobile/tablet: actions after description */}
             <div className="lg:hidden">
               <PurchaseActions />
             </div>
 
-            {/* Seller info on mobile/tablet */}
             <div className="lg:hidden pt-2 border-t border-border">
-              {/* FIX: Larger border/padding for sold by on mobile */}
               <div className="p-4 rounded-2xl border-2 border-border/60">
                 <SellerInfo listing={listing} onMsg={openMsg} />
               </div>
             </div>
           </div>
 
-          {/* ── STICKY right sidebar — desktop only ── */}
-          {/* FIX: Larger border, more padding for sold by section */}
           <div className="hidden lg:block sticky top-28">
             <div className="bg-card border-2 border-border rounded-2xl p-5 space-y-4">
               <SellerInfo listing={listing} onMsg={openMsg} />
@@ -1062,7 +1047,7 @@ const ProductDetails = () => {
         </div>
       </main>
 
-      <Footer />
+      {/* FIX: Removed duplicate Footer - only one Footer at the bottom */}
 
       {/* Mobile sticky bottom bar */}
       <div className="sm:hidden fixed bottom-0 inset-x-0 z-30 bg-card/95 backdrop-blur-md border-t border-border px-4 py-3 flex gap-2.5">

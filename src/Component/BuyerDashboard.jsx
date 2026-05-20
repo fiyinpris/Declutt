@@ -628,27 +628,22 @@ const BuyerDashboard = () => {
   );
 
   return (
-    /*
-      KEY FIX: The outer wrapper uses min-h-screen and flex.
-      The sidebar uses alignSelf:"stretch" (not flex-start) so its border
-      extends all the way down to match the content height → touches footer.
-    */
     <div
-      className="min-h-screen bg-background flex flex-col"
+      className="flex-1 min-h-0 bg-background flex flex-col"
       style={{ paddingTop: `${NAVBAR_H}px` }}
     >
-      <div className="flex flex-1">
+      <div className="flex flex-1 items-stretch">
         {/* Desktop sidebar — FULL HEIGHT (stretches with content) */}
         <aside
           className="hidden md:flex flex-col w-64 xl:w-72 shrink-0"
           style={{
             position: "sticky",
             top: `${NAVBAR_H}px`,
-            height: `calc(100vh - ${NAVBAR_H}px)`,
+            minHeight: `calc(100vh - ${NAVBAR_H}px)`,
             overflowY: "auto",
             borderRight: "1px solid hsl(var(--border)/0.35)",
             background: "hsl(var(--card))",
-            // alignSelf: stretch (default) — sidebar border reaches footer
+            alignSelf: "flex-start",
           }}
         >
           <SidebarInner />

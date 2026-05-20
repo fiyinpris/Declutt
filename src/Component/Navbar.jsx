@@ -1,6 +1,8 @@
 // src/Component/Navbar.jsx
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
 
 const MenuIcon = () => (
@@ -14,6 +16,7 @@ const MenuIcon = () => (
     strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"
+    style={{ pointerEvents: "none" }}
   >
     <line x1="4" y1="6" x2="20" y2="6" />
     <line x1="4" y1="12" x2="20" y2="12" />
@@ -32,6 +35,7 @@ const CloseIcon = () => (
     strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"
+    style={{ pointerEvents: "none" }}
   >
     <path d="M18 6 6 18M6 6l12 12" />
   </svg>
@@ -51,6 +55,29 @@ const AccountIcon = () => (
     <circle cx="12" cy="8" r="4" />
     <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
   </svg>
+);
+
+/* ── Reusable search button ── */
+const SearchNavButton = ({ onClick, className = "" }) => (
+  <button
+    onClick={onClick}
+    aria-label="Search listings"
+    className={`flex items-center justify-center w-9 h-9 rounded-xl text-foreground/60 hover:text-primary hover:bg-primary/10 transition-all duration-200 ${className}`}
+  >
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  </button>
 );
 
 export const DecluttLogo = ({ className = "" }) => (
@@ -206,7 +233,13 @@ const LogoutButton = ({ onLogout, state, fullWidth = true }) => (
   <button
     onClick={onLogout}
     disabled={state !== "idle"}
-    className={`${fullWidth ? "w-full" : ""} flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${state === "success" ? "bg-green-500 text-white" : state === "loading" ? "bg-red-400 text-white" : "text-red-500/80 hover:text-red-500 hover:bg-red-500/8"} disabled:cursor-not-allowed`}
+    className={`${fullWidth ? "w-full" : ""} flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+      state === "success"
+        ? "bg-green-500 text-white"
+        : state === "loading"
+          ? "bg-red-400 text-white"
+          : "text-red-500/80 hover:text-red-500 hover:bg-red-500/8"
+    } disabled:cursor-not-allowed`}
   >
     {state === "loading" && (
       <svg
@@ -422,7 +455,7 @@ const AccountDropdown = ({ profile, logoutState, onLogout }) => {
   );
 };
 
-/* ── Cart Drawer — FIX: per-user cart key ─────────────────────────────────── */
+/* ── Cart Drawer ── */
 const CartDrawer = ({ open, onClose, cartItems = [], onRemove }) => {
   const total = cartItems.reduce(
     (sum, item) => sum + Number(item.price || 0) * (item.quantity || 1),
@@ -433,12 +466,12 @@ const CartDrawer = ({ open, onClose, cartItems = [], onRemove }) => {
     <>
       {open && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm"
+          className="fixed inset-0 z-60 bg-black/40 backdrop-blur-sm"
           onClick={onClose}
         />
       )}
       <div
-        className="fixed right-0 top-0 bottom-0 z-50 flex flex-col bg-background"
+        className="fixed right-0 top-0 bottom-0 z-70 flex flex-col bg-background"
         style={{
           width: "min(400px, 92vw)",
           borderLeft: "1px solid hsl(var(--border)/0.5)",
@@ -611,7 +644,6 @@ const CartDrawer = ({ open, onClose, cartItems = [], onRemove }) => {
   );
 };
 
-// ── Helper to get cart key per user ──────────────────────────────────────────
 const getCartKey = (uid) =>
   uid ? `declutt_cart_${uid}` : "declutt_cart_guest";
 
@@ -626,7 +658,11 @@ const Navbar = () => {
 
   const uid = user?.uid || null;
 
-  // FIX: Cart is now keyed by user uid — different accounts don't share cart
+  // Mobile search icon only on /listings
+  const isOnListings =
+    location.pathname === "/listings" ||
+    location.pathname.startsWith("/listings/");
+
   const [cartItems, setCartItems] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem(getCartKey(uid)) || "[]");
@@ -635,7 +671,6 @@ const Navbar = () => {
     }
   });
 
-  // Reload cart when user changes (login/logout)
   useEffect(() => {
     try {
       setCartItems(JSON.parse(localStorage.getItem(getCartKey(uid)) || "[]"));
@@ -646,7 +681,6 @@ const Navbar = () => {
 
   useEffect(() => {
     const sync = (e) => {
-      // Only sync if the cart-updated event is for the current user
       if (e.detail?.uid !== uid && e.detail?.uid !== undefined) return;
       try {
         setCartItems(JSON.parse(localStorage.getItem(getCartKey(uid)) || "[]"));
@@ -654,7 +688,6 @@ const Navbar = () => {
         setCartItems([]);
       }
     };
-    // Also handle generic storage events (cross-tab)
     const storageSync = () => {
       try {
         setCartItems(JSON.parse(localStorage.getItem(getCartKey(uid)) || "[]"));
@@ -684,15 +717,32 @@ const Navbar = () => {
   }, []);
 
   useEffect(() => {
-    document.body.style.overflow = menuOpen || cartOpen ? "hidden" : "";
+    const overflow = menuOpen || cartOpen ? "hidden" : "";
+    document.body.style.overflow = overflow;
+    document.documentElement.style.overflow = overflow;
     return () => {
       document.body.style.overflow = "";
+      document.documentElement.style.overflow = "";
     };
   }, [menuOpen, cartOpen]);
 
   useLayoutEffect(() => {
-    if (menuOpen) setMenuOpen(false);
-  }, [location.pathname, menuOpen]);
+    setMenuOpen(false);
+  }, [location.pathname]);
+
+  /* ── Search click: focus input if on /listings, else navigate with state ── */
+  const handleSearchClick = () => {
+    if (isOnListings) {
+      const el = document.getElementById("listings-search-input");
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.focus();
+      }
+    } else {
+      navigate("/listings", { state: { scrollToSearch: true } });
+    }
+    setMenuOpen(false);
+  };
 
   const NAV_LINKS = [
     { label: "Home", to: "/" },
@@ -704,34 +754,55 @@ const Navbar = () => {
   const isActive = (to) =>
     to === "/" ? location.pathname === "/" : location.pathname.startsWith(to);
 
-  const initials =
-    profile?.name
-      ?.split(" ")
-      .map((n) => n[0])
-      .slice(0, 2)
-      .join("")
-      .toUpperCase() ?? "?";
-  const dashPath =
-    profile?.role === "seller"
-      ? "/seller"
-      : profile?.role === "admin"
-        ? "/admin"
-        : "/buyer";
+  const [messageCount, setMessageCount] = useState(0);
+
+  useEffect(() => {
+    if (!user || !profile?.role) return;
+
+    let q;
+    if (profile.role === "seller") {
+      q = query(
+        collection(db, "messages"),
+        where("sellerUid", "==", user.uid),
+        where("from", "==", "buyer"),
+        where("read", "==", false),
+      );
+    } else {
+      q = query(
+        collection(db, "messages"),
+        where("buyerUid", "==", user.uid),
+        where("from", "==", "seller"),
+        where("read", "==", false),
+      );
+    }
+
+    const unsub = onSnapshot(q, (snap) => {
+      setMessageCount(snap.size);
+    }, (error) => {
+      console.error("Message badge listener error:", error);
+    });
+
+    return () => unsub();
+  }, [user, profile?.role]);
 
   return (
     <>
       <header
-        className={`fixed top-0 left-0 right-0 z-50 h-14 sm:h-16 transition-all duration-300 ${scrolled ? "bg-background/95 backdrop-blur-md" : "bg-transparent"}`}
+        className={`fixed top-0 left-0 right-0 z-50 h-14 sm:h-16 transition-all duration-300 ${scrolled ? "bg-background backdrop-blur-md" : "bg-transparent"}`}
         style={{
           borderBottom: scrolled ? "1px solid hsl(var(--border)/0.4)" : "none",
           boxShadow: scrolled ? "0 1px 12px rgba(0,0,0,0.06)" : "none",
         }}
       >
-        <div className="w-full max-w-350 mx-auto px-4 sm:px-5 md:px-8 lg:px-12 xl:px-16 h-full flex items-center justify-between gap-4">
+        <div
+          className="w-full mx-auto px-4 sm:px-5 md:px-8 lg:px-12 xl:px-16 h-full flex items-center justify-between gap-4"
+          style={{ maxWidth: "1400px" }}
+        >
           <Link to="/" className="text-xl sm:text-2xl shrink-0">
             <DecluttLogo />
           </Link>
 
+          {/* Desktop nav links */}
           <nav className="hidden md:flex items-center gap-5 lg:gap-8">
             {NAV_LINKS.map((l) => (
               <Link
@@ -747,9 +818,36 @@ const Navbar = () => {
             ))}
           </nav>
 
+          {/* Desktop right actions */}
           <div className="hidden md:flex items-center gap-1.5">
             {user && profile ? (
               <>
+                <SearchNavButton onClick={handleSearchClick} />
+
+                <button
+                  onClick={() => navigate("/messages")}
+                  aria-label="Messages"
+                  className="relative flex items-center justify-center w-9 h-9 rounded-xl text-foreground/60 hover:text-primary hover:bg-primary/10 transition-all duration-200"
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                  {messageCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-4 rounded-full bg-primary text-primary-foreground text-[9px] font-black flex items-center justify-center px-1">
+                      {messageCount > 9 ? "9+" : messageCount}
+                    </span>
+                  )}
+                </button>
+
                 <button
                   onClick={() => setCartOpen(true)}
                   aria-label="Cart"
@@ -783,6 +881,8 @@ const Navbar = () => {
               </>
             ) : (
               <>
+                <SearchNavButton onClick={handleSearchClick} />
+
                 <Link
                   to="/login"
                   className="px-4 py-2 text-sm font-semibold text-foreground/65 hover:text-primary rounded-xl transition-all"
@@ -800,11 +900,24 @@ const Navbar = () => {
             )}
           </div>
 
-          <div className="md:hidden flex items-center">
+          {/* Mobile right side: search + account + hamburger */}
+          <div className="md:hidden flex items-center gap-1">
+            {isOnListings && <SearchNavButton onClick={handleSearchClick} />}
+            {user && profile && (
+              <AccountDropdown
+                profile={profile}
+                logoutState={logoutState}
+                onLogout={handleLogout}
+              />
+            )}
             <button
-              onClick={() => setMenuOpen(!menuOpen)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setMenuOpen(!menuOpen);
+              }}
               aria-label="Menu"
-              className="flex items-center justify-center w-9 h-9 rounded-xl text-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+              className="flex items-center justify-center w-10 h-10 rounded-xl text-foreground hover:text-primary hover:bg-primary/10 transition-colors z-100"
+              type="button"
             >
               {menuOpen ? <CloseIcon /> : <MenuIcon />}
             </button>
@@ -819,16 +932,18 @@ const Navbar = () => {
         onRemove={removeFromCart}
       />
 
+      {/* Mobile menu overlay - only covers content below header */}
       {menuOpen && (
         <div
-          className="fixed z-40 bg-black/45 backdrop-blur-sm md:hidden"
-          style={{ top: "56px", left: 0, right: 0, bottom: 0 }}
+          className="fixed left-0 right-0 bottom-0 z-40 bg-black/45 backdrop-blur-sm md:hidden"
+          style={{ top: "56px" }}
           onClick={() => setMenuOpen(false)}
         />
       )}
 
+      {/* Mobile menu drawer */}
       <div
-        className="md:hidden fixed right-0 bottom-0 z-50 flex flex-col bg-background"
+        className="md:hidden fixed right-0 bottom-0 z-60 flex flex-col bg-background"
         style={{
           top: "56px",
           width: "78vw",
@@ -860,103 +975,11 @@ const Navbar = () => {
           ))}
         </nav>
 
-        {user && profile && (
-          <div
-            className="flex-1 overflow-y-auto"
-            style={{ borderTop: "1px solid hsl(var(--border)/0.5)" }}
-          >
-            <nav className="px-3 py-3 space-y-0.5">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-foreground/30 px-4 pb-1">
-                My Account
-              </p>
-              <button
-                onClick={() => {
-                  setMenuOpen(false);
-                  setCartOpen(true);
-                }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-foreground/60 hover:text-primary hover:bg-primary/8 transition-all duration-150 group text-left"
-              >
-                <span className="text-foreground/35 group-hover:text-primary transition-colors shrink-0">
-                  <svg
-                    width="17"
-                    height="17"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
-                    <line x1="3" y1="6" x2="21" y2="6" />
-                    <path d="M16 10a4 4 0 0 1-8 0" />
-                  </svg>
-                </span>
-                Cart{" "}
-                {cartItems.length > 0 && (
-                  <span className="ml-auto bg-primary text-primary-foreground text-[9px] font-black px-1.5 py-0.5 rounded-full">
-                    {cartItems.length}
-                  </span>
-                )}
-              </button>
-              {SIDEBAR_ITEMS.filter((item) => {
-                if (profile?.role === "seller") return item.id !== "favourites";
-                if (profile?.role === "admin") return item.id === "dashboard";
-                return true;
-              }).map((item) => {
-                const tab = item.id === "dashboard" ? "" : item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      navigate(`${dashPath}${tab ? `?tab=${tab}` : ""}`);
-                      setMenuOpen(false);
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-foreground/60 hover:text-primary hover:bg-primary/8 transition-all duration-150 group text-left"
-                  >
-                    <span className="text-foreground/35 group-hover:text-primary transition-colors shrink-0">
-                      {item.icon}
-                    </span>
-                    {item.label}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
-        )}
-
         <div
           className="shrink-0"
           style={{ borderTop: "1px solid hsl(var(--border)/0.5)" }}
         >
-          {user && profile ? (
-            <>
-              <div className="flex items-center gap-3 px-5 py-4">
-                {profile?.photoURL ? (
-                  <img
-                    src={profile.photoURL}
-                    alt={profile.name}
-                    className="w-10 h-10 rounded-full object-cover border-2 border-primary/30 shrink-0"
-                  />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-primary/15 text-primary flex items-center justify-center text-sm font-black border-2 border-primary/25 shrink-0">
-                    {initials}
-                  </div>
-                )}
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-foreground truncate">
-                    {profile?.name}
-                  </p>
-                  <p className="text-xs text-foreground/40 truncate">
-                    {profile?.email}
-                  </p>
-                </div>
-              </div>
-              <div className="px-4 pb-4">
-                <LogoutButton onLogout={handleLogout} state={logoutState} />
-              </div>
-            </>
-          ) : (
+          {!user || !profile ? (
             <div className="px-4 py-4 space-y-2">
               <Link
                 to="/login"
@@ -974,7 +997,7 @@ const Navbar = () => {
                 Get Started
               </Link>
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </>

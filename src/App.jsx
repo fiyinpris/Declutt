@@ -19,10 +19,11 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Navbar />
+        <div className="min-h-screen flex flex-col">
+          <Navbar />
 
-        <main className="pt-4">
-          <Routes>
+          <main className="flex-1 pt-4">
+            <Routes>
             <Route path="/" element={<HomeSection />} />
             <Route path="/listings" element={<Listings />} />
 
@@ -77,6 +78,7 @@ function App() {
         </main>
 
         <Footer />
+      </div>
       </BrowserRouter>
     </AuthProvider>
   );

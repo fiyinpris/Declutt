@@ -263,7 +263,7 @@ const LogoutButton = ({ onLogout, state }) => (
   </button>
 );
 
-const LocationPicker = ({ coords, onCapture, loading, onClear }) => {
+const LocationPicker = ({ coords, onCapture, loading, onClear, allowClear = true }) => {
   if (coords) {
     return (
       <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-green-500/30 bg-green-500/8 text-green-700 text-sm">
@@ -283,13 +283,19 @@ const LocationPicker = ({ coords, onCapture, loading, onClear }) => {
         <span className="font-semibold text-xs flex-1">
           Location captured · {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
         </span>
-        <button
-          type="button"
-          onClick={onClear}
-          className="text-green-600/60 hover:text-red-500 transition-colors text-xs underline"
-        >
-          Remove
-        </button>
+        {allowClear ? (
+          <button
+            type="button"
+            onClick={onClear}
+            className="text-green-600/60 hover:text-red-500 transition-colors text-xs underline"
+          >
+            Remove
+          </button>
+        ) : (
+          <span className="text-[11px] text-green-700/80">
+            Location required
+          </span>
+        )}
       </div>
     );
   }
@@ -394,7 +400,7 @@ const ListingModal = ({
     name: existing?.name || "",
     description: existing?.description || "",
     price: existing?.price || "",
-    category: existing?.category || CATEGORIES[0],
+    category: existing?.category || "",
     condition: existing?.condition || CONDITIONS[0],
     available: existing?.available ?? true,
   });
@@ -470,6 +476,16 @@ const ListingModal = ({
     }
     if (!form.price || isNaN(form.price) || Number(form.price) <= 0) {
       setError("Enter a valid price.");
+      return;
+    }
+    if (!form.category.trim()) {
+      setError("Please enter a category for your item.");
+      return;
+    }
+    if (!gpsCoords) {
+      setError(
+        "Please share your location so buyers can see how far away your item is."
+      );
       return;
     }
     if (!existing && !mainImageFile) {
@@ -739,16 +755,14 @@ const ListingModal = ({
 
           <div className="grid grid-cols-2 gap-3">
             <Field label="Category" htmlFor="listing-cat">
-              <select
+              <input
                 id="listing-cat"
-                className={selectCls}
+                type="text"
                 value={form.category}
                 onChange={(e) => set("category", e.target.value)}
-              >
-                {CATEGORIES.map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
+                placeholder="e.g. Electronics, Furniture, Sports"
+                className={inputCls}
+              />
             </Field>
             <Field label="Condition" htmlFor="listing-cond">
               <select
@@ -764,12 +778,16 @@ const ListingModal = ({
             </Field>
           </div>
 
-          <Field label="Your location (for buyer distance)">
+          <Field
+            label="Your location (required for buyer distance)"
+            hint="This will show buyers how far away your item is."
+          >
             <LocationPicker
               coords={gpsCoords}
               onCapture={captureLocation}
               loading={gpsLoading}
               onClear={() => setGpsCoords(null)}
+              allowClear={false}
             />
           </Field>
 

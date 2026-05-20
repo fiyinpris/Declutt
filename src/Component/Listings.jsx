@@ -95,27 +95,8 @@ const Toast = ({ msg, show }) => (
   </div>
 );
 
-/* ── Hardcoded furniture category list ── */
-const FURNITURE_CATEGORIES = [
-  "All",
-  "Beds",
-  "Chairs",
-  "Tables",
-  "Sofas",
-  "Fans",
-  "Wardrobes",
-  "Shelves",
-  "Desks",
-  "Window Blinds",
-  "Shoe Racks",
-  "Frames",
-  "Drawers",
-  "Ottomans",
-  "Mirrors",
-  "Lamps",
-  "Rugs",
-  "Cabinets",
-];
+/* ── Category chips will use actual seller categories from listings ── */
+const DEFAULT_CATEGORIES = ["All"];
 
 /* ── Search Bar ── */
 const TopSearchBar = ({
@@ -125,6 +106,7 @@ const TopSearchBar = ({
   setSelectedCategory,
   hasFilters,
   clearFilters,
+  categories,
 }) => (
   <div id="listings-search" className="flex flex-col gap-2">
     {/* Search input row */}
@@ -191,7 +173,7 @@ const TopSearchBar = ({
         className="flex gap-3 overflow-x-auto px-1"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
-        {FURNITURE_CATEGORIES.map((cat) => {
+        {(categories.length ? ["All", ...categories] : ["All"]).map((cat) => {
           const isAll = cat === "All";
           const active = isAll ? !selectedCategory : selectedCategory === cat;
           return (
@@ -408,7 +390,7 @@ const PopularCollections = ({ listings }) => {
             return next;
           });
         },
-        4000 + slot * 800,
+        6000 + slot * 1200,
       ),
     );
     return () => timers.forEach(clearInterval);
@@ -436,17 +418,49 @@ const PopularCollections = ({ listings }) => {
   /* Non-clickable display tile */
   const CollectionTile = ({ slot, className, style }) => {
     const item = getItem(slot);
+    const [currentItem, setCurrentItem] = useState(item);
+    const [prevItem, setPrevItem] = useState(null);
+    const [showActive, setShowActive] = useState(true);
+
+    useEffect(() => {
+      if (!item) return;
+      if (!currentItem || currentItem.id !== item.id) {
+        setPrevItem(currentItem);
+        setCurrentItem(item);
+        setShowActive(false);
+        const fadeTimer = window.setTimeout(() => setShowActive(true), 50);
+        return () => window.clearTimeout(fadeTimer);
+      }
+    }, [item, currentItem]);
+
+    useEffect(() => {
+      if (!prevItem) return;
+      const removeTimer = window.setTimeout(() => setPrevItem(null), 1600);
+      return () => window.clearTimeout(removeTimer);
+    }, [prevItem]);
+
+    const activeItem = currentItem || item;
+
     return (
       <div
         className={`relative rounded-2xl overflow-hidden select-none pointer-events-none ${className}`}
         style={style}
       >
-        {item.imageUrl ? (
-          <img
-            src={item.imageUrl}
-            alt={item.name || "Popular item"}
-            className="w-full h-full object-cover transition-all duration-700 ease-in-out"
-          />
+        {activeItem?.imageUrl ? (
+          <div className="relative w-full h-full">
+            {prevItem?.imageUrl && (
+              <img
+                src={prevItem.imageUrl}
+                alt={prevItem.name || "Popular item"}
+                className={`absolute inset-0 w-full h-full object-cover transition-all duration-[1400ms] ease-in-out ${showActive ? "opacity-0 scale-105 blur-sm" : "opacity-100 scale-100 blur-0"}`}
+              />
+            )}
+            <img
+              src={activeItem.imageUrl}
+              alt={activeItem.name || "Popular item"}
+              className={`absolute inset-0 w-full h-full object-cover transition-all duration-[1400ms] ease-in-out delay-[180ms] ${showActive ? "opacity-100 scale-100 blur-0" : "opacity-0 scale-95 blur-sm"}`}
+            />
+          </div>
         ) : (
           <div className="w-full h-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-foreground/50 text-sm uppercase tracking-[0.2em]">
             No image
@@ -455,10 +469,10 @@ const PopularCollections = ({ listings }) => {
         <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/5 to-transparent" />
         <div className="absolute bottom-3 left-3 right-3">
           <span className="inline-flex items-center bg-primary text-primary-foreground text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg">
-            {item.category || item.name}
+            {activeItem?.category || activeItem?.name}
           </span>
           <p className="text-white text-[10px] mt-1 truncate opacity-75 font-medium">
-            {item.name}
+            {activeItem?.name}
           </p>
         </div>
       </div>
@@ -726,7 +740,15 @@ const Listings = () => {
   }, []);
 
   const categories = useMemo(() => {
-    return [...new Set(listings.map((l) => l.category).filter(Boolean))].sort();
+    const counts = listings.reduce((acc, listing) => {
+      const category = listing.category?.trim();
+      if (!category) return acc;
+      acc[category] = (acc[category] || 0) + 1;
+      return acc;
+    }, {});
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([category]) => category);
   }, [listings]);
 
   const filtered = listings.filter((l) => {
@@ -770,6 +792,7 @@ const Listings = () => {
             setSelectedCategory={setSelectedCategory}
             hasFilters={hasF}
             clearFilters={clear}
+            categories={categories}
           />
         </div>
       </div>

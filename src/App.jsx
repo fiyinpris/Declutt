@@ -12,6 +12,7 @@ import ProductDetails from "./Component/ProductDetails";
 import SellerDashboard from "./Component/SellerDashboard";
 import BuyerDashboard from "./Component/BuyerDashboard";
 import AdminDashboard from "./Component/AdminDashboard";
+import ResetPassword from "./Component/ResetPassword";
 import ProtectedRoute from "./Component/ProtectedRoute";
 import Messages from "./Component/Messages";
 
@@ -32,6 +33,7 @@ function App() {
 
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
             <Route
               path="/buyer"

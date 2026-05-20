@@ -6,6 +6,7 @@ import {
   onAuthStateChanged,
   GoogleAuthProvider,
   signInWithPopup,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
@@ -64,6 +65,18 @@ export const AuthProvider = ({ children }) => {
     return { cred, role: prof?.role };
   };
 
+  /* ── Password reset ── */
+  const resetPassword = async (email) => {
+    const actionCodeSettings = {
+      url:
+        typeof window !== "undefined"
+          ? `${window.location.origin}/login?reset=true`
+          : undefined,
+      handleCodeInApp: false,
+    };
+    return sendPasswordResetEmail(auth, email, actionCodeSettings);
+  };
+
   /* ── Google sign-in ── */
   const loginWithGoogle = async (roleIfNew = "buyer") => {
     const provider = new GoogleAuthProvider();
@@ -108,6 +121,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         register,
         login,
+        resetPassword,
         loginWithGoogle,
         logout,
       }}

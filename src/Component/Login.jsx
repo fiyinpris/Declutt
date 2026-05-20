@@ -286,12 +286,12 @@ const Login = () => {
                   <label className="text-xs font-bold text-foreground/55 uppercase tracking-widest">
                     Password
                   </label>
-                  <button
-                    type="button"
+                  <Link
+                    to="/reset-password"
                     className="text-xs text-primary font-medium hover:underline underline-offset-4"
                   >
                     Forgot password?
-                  </button>
+                  </Link>
                 </div>
                 <div className="relative">
                   <input

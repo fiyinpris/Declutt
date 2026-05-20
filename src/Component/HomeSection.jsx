@@ -341,7 +341,7 @@ const TypewriterWord = () => {
     return () => clearTimeout(t);
   }, [displayed, deleting, wordIndex]);
   return (
-    <span className="text-primary inline-block min-w-[6ch]">
+    <span className="text-primary inline-flex items-center justify-center min-w-[14ch] whitespace-nowrap">
       {displayed}
       <span
         className="inline-block w-0.5 h-[1em] bg-primary ml-0.5 align-middle"
@@ -1555,8 +1555,9 @@ export const HomeSection = () => {
           <p className="text-[15px] sm:text-xs font-semibold uppercase tracking-widest text-primary mb-2">
             How it works
           </p>
-          <h2 className="text-2xl sm:text-2xl lg:text-3xl xl:text-4xl 2xl:text-5xl font-bold text-foreground">
-            Less stuff. <TypewriterWord /> Better life.
+          <h2 className="text-2xl sm:text-2xl lg:text-3xl xl:text-4xl 2xl:text-5xl font-bold text-foreground min-h-[5rem] sm:min-h-[5.75rem]">
+            Less stuff. <TypewriterWord />
+            <span className="block sm:inline">Better life.</span>
           </h2>
           <p className="mt-2 sm:mt-3 text-xs sm:text-sm lg:text-base text-foreground/50 max-w-xs sm:max-w-sm mx-auto">
             Every item gathering dust is cash waiting to happen. Here's how easy

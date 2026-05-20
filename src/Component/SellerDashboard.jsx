@@ -2282,12 +2282,39 @@ const SellerDashboard = () => {
   const [showModal, setShowModal] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [messageCount, setMessageCount] = useState(0);
   const { state: logoutState, handleLogout } = useLogout(logout, navigate);
 
   useEffect(() => {
     const p = new URLSearchParams(location.search).get("tab");
     if (p && NAV_ITEMS.find((n) => n.id === p)) setTab(p);
   }, [location.search]);
+
+  useEffect(() => {
+    if (!user?.uid) {
+      setMessageCount(0);
+      return;
+    }
+
+    const messagesQuery = query(
+      collection(db, "messages"),
+      where("sellerUid", "==", user.uid),
+      where("from", "==", "buyer"),
+      where("read", "==", false),
+    );
+
+    const unsubscribe = onSnapshot(
+      messagesQuery,
+      (snap) => {
+        setMessageCount(snap.size);
+      },
+      (err) => {
+        console.error("Unread message badge listener error:", err);
+      },
+    );
+
+    return () => unsubscribe();
+  }, [user]);
 
   const fetchListings = async () => {
     if (!user) return;
@@ -2351,19 +2378,19 @@ const SellerDashboard = () => {
 
   return (
     <div
-      className="flex-1 min-h-[calc(100vh-64px)] bg-background flex flex-col"
+      className="flex-1 min-h-screen bg-background flex flex-col"
       style={{ paddingTop: `${NAVBAR_H}px` }}
     >
-      <div className="flex flex-1 min-h-0 items-stretch h-full min-h-full">
-        {/* ── Desktop Sidebar — sticky, full height, touches footer ── */}
+      <div className="flex flex-1 min-h-screen items-stretch">
+        {/* ── Desktop Sidebar — full height, scrolls with page (NOT sticky) ── */}
         <aside
-          className="hidden md:flex md:flex-col w-64 xl:w-72 shrink-0 bg-card h-full min-h-full"
+          className="hidden md:flex md:flex-col w-64 xl:w-72 shrink-0 bg-card"
           style={{
-            position: "sticky",
-            top: `${NAVBAR_H}px`,
-            bottom: 0,
+            minHeight: "100vh",
+            height: "auto",
+            overflowY: "auto",
             borderRight: "1px solid hsl(var(--border)/0.35)",
-            alignSelf: "flex-start",
+            alignSelf: "stretch",
           }}
         >
           {/* Nav items */}
@@ -2372,7 +2399,7 @@ const SellerDashboard = () => {
               Menu
             </p>
           </div>
-          <nav className="flex-1 px-3 pt-2 space-y-1 pb-4">
+          <nav className="flex-1 px-3 pt-2 space-y-3 pb-4 mb-auto">
             {NAV_ITEMS.map((item) => (
               <button
                 key={item.id}
@@ -2382,7 +2409,12 @@ const SellerDashboard = () => {
                 <span className={tab === item.id ? "opacity-90" : "opacity-70"}>
                   {item.icon}
                 </span>
-                {item.label}
+                <span className="flex-1 truncate">{item.label}</span>
+                {item.id === "messages" && messageCount > 0 && (
+                  <span className="min-w-[24px] h-6 rounded-full bg-primary text-primary-foreground text-[10px] font-black flex items-center justify-center px-2">
+                    {messageCount > 9 ? "9+" : messageCount}
+                  </span>
+                )}
               </button>
             ))}
           </nav>
@@ -2418,7 +2450,7 @@ const SellerDashboard = () => {
         </aside>
 
         {/* ── Main content ── */}
-        <main className="flex-1 min-w-0 flex flex-col h-full min-h-full">
+        <main className="flex-1 min-w-0 flex flex-col">
           <div className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl w-full mx-auto h-full">
             {tab === "overview" && (
               <OverviewPanel

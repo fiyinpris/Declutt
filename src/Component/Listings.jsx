@@ -349,7 +349,7 @@ const ListingCard = ({
           )}
         </div>
       </div>
-      <div className="p-3 flex flex-col gap-1">
+      <div className="p-3 flex flex-col gap-1 min-h-[110px]">
         <div className="flex items-start justify-between gap-2">
           <h3 className="text-xs font-bold text-foreground leading-snug line-clamp-2 text-left flex-1">
             {listing.name}
@@ -360,14 +360,21 @@ const ListingCard = ({
             </span>
           )}
         </div>
+        {listing.category && (
+          <p className="text-[10px] text-foreground/60 leading-snug uppercase tracking-wide">
+            {listing.category}
+          </p>
+        )}
         {listing.sku && (
           <p className="text-[9px] text-foreground/35 truncate">
             SKU: {listing.sku}
           </p>
         )}
-        <p className="text-sm font-black text-foreground text-left">
-          &#8358;{Number(listing.price).toLocaleString()}.00
-        </p>
+        <div className="mt-auto">
+          <p className="text-sm font-black text-foreground text-left">
+            &#8358;{Number(listing.price).toLocaleString()}.00
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -378,7 +385,7 @@ const DESKTOP_SLOTS = 4;
 const MOBILE_SLOTS = 10;
 
 const PopularCollections = ({ listings }) => {
-  const pool = listings.filter((l) => l.available && l.imageUrl);
+  const pool = listings.filter((l) => l.available);
   const [slotIndices, setSlotIndices] = useState(() =>
     Array.from(
       { length: MOBILE_SLOTS },
@@ -434,11 +441,17 @@ const PopularCollections = ({ listings }) => {
         className={`relative rounded-2xl overflow-hidden select-none pointer-events-none ${className}`}
         style={style}
       >
-        <img
-          src={item.imageUrl}
-          alt={item.name}
-          className="w-full h-full object-cover transition-all duration-700 ease-in-out"
-        />
+        {item.imageUrl ? (
+          <img
+            src={item.imageUrl}
+            alt={item.name || "Popular item"}
+            className="w-full h-full object-cover transition-all duration-700 ease-in-out"
+          />
+        ) : (
+          <div className="w-full h-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-foreground/50 text-sm uppercase tracking-[0.2em]">
+            No image
+          </div>
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/5 to-transparent" />
         <div className="absolute bottom-3 left-3 right-3">
           <span className="inline-flex items-center bg-primary text-primary-foreground text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg">
@@ -585,7 +598,7 @@ const HeroSection = () => {
 
   return (
     <div
-      className="relative rounded-2xl overflow-hidden border border-border group"
+      className="relative rounded-2xl overflow-hidden border border-border group mt-12"
       style={{ height: "clamp(240px, 40vw, 380px)" }}
     >
       {slides.map((s, i) => (
@@ -599,7 +612,7 @@ const HeroSection = () => {
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
-          <div className="absolute bottom-5 left-5 sm:bottom-8 sm:left-8 lg:bottom-10 lg:left-10">
+          <div className="absolute bottom-5 left-5 sm:bottom-8 sm:left-8 lg:bottom-10 lg:left-10 min-h-[9rem] sm:min-h-[10rem]">
             <span className="text-[10px] font-bold text-white/60 tracking-widest uppercase">
               {s.tag}
             </span>
@@ -739,7 +752,7 @@ const Listings = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background ">
       {/* STICKY SEARCH + CHIPS - outside <main> so sticky works full-width */}
       <div
         className="sticky top-14 sm:top-16 z-40 w-full border-b border-border/40"

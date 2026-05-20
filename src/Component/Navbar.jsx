@@ -754,6 +754,23 @@ const Navbar = () => {
   const isActive = (to) =>
     to === "/" ? location.pathname === "/" : location.pathname.startsWith(to);
 
+  const dashboardPath =
+    profile?.role === "seller"
+      ? "/seller"
+      : profile?.role === "admin"
+      ? "/admin"
+      : "/buyer";
+
+  const mobileAccountLinks = [
+    { id: "dashboard", label: "Dashboard", to: dashboardPath },
+    { id: "messages", label: "Messages", to: `${dashboardPath}?tab=messages` },
+    { id: "listings", label: "My Items", to: `${dashboardPath}?tab=listings` },
+    { id: "orders", label: "Orders", to: `${dashboardPath}?tab=orders` },
+    { id: "rewards", label: "Rewards", to: `${dashboardPath}?tab=rewards` },
+    { id: "referrals", label: "Referrals", to: `${dashboardPath}?tab=referrals` },
+    { id: "profile", label: "My Profile", to: `${dashboardPath}?tab=profile` },
+  ];
+
   const [messageCount, setMessageCount] = useState(0);
 
   useEffect(() => {
@@ -776,11 +793,15 @@ const Navbar = () => {
       );
     }
 
-    const unsub = onSnapshot(q, (snap) => {
-      setMessageCount(snap.size);
-    }, (error) => {
-      console.error("Message badge listener error:", error);
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setMessageCount(snap.size);
+      },
+      (error) => {
+        console.error("Message badge listener error:", error);
+      },
+    );
 
     return () => unsub();
   }, [user, profile?.role]);
@@ -823,30 +844,6 @@ const Navbar = () => {
             {user && profile ? (
               <>
                 <SearchNavButton onClick={handleSearchClick} />
-
-                <button
-                  onClick={() => navigate("/messages")}
-                  aria-label="Messages"
-                  className="relative flex items-center justify-center w-9 h-9 rounded-xl text-foreground/60 hover:text-primary hover:bg-primary/10 transition-all duration-200"
-                >
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                  </svg>
-                  {messageCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-4 rounded-full bg-primary text-primary-foreground text-[9px] font-black flex items-center justify-center px-1">
-                      {messageCount > 9 ? "9+" : messageCount}
-                    </span>
-                  )}
-                </button>
 
                 <button
                   onClick={() => setCartOpen(true)}
@@ -900,16 +897,9 @@ const Navbar = () => {
             )}
           </div>
 
-          {/* Mobile right side: search + account + hamburger */}
+          {/* Mobile right side: search + hamburger */}
           <div className="md:hidden flex items-center gap-1">
             {isOnListings && <SearchNavButton onClick={handleSearchClick} />}
-            {user && profile && (
-              <AccountDropdown
-                profile={profile}
-                logoutState={logoutState}
-                onLogout={handleLogout}
-              />
-            )}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -954,33 +944,96 @@ const Navbar = () => {
           boxShadow: menuOpen ? "-4px 0 28px rgba(0,0,0,0.13)" : "none",
         }}
       >
-        <nav className="flex flex-col px-4 py-4 gap-1">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-foreground/30 px-4 pb-1">
-            Navigation
-          </p>
-          {NAV_LINKS.map((l) => (
-            <Link
-              key={l.label}
-              to={l.to}
-              onClick={() => setMenuOpen(false)}
-              className={`flex items-center px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isActive(l.to) ? "text-primary bg-primary/8" : "text-foreground/65 hover:text-primary hover:bg-primary/8"}`}
-              style={{
-                border: isActive(l.to)
-                  ? "1.5px solid hsl(var(--primary)/0.2)"
-                  : "1.5px solid transparent",
-              }}
-            >
-              {l.label}
-            </Link>
-          ))}
-        </nav>
+        <div className="flex-1 overflow-y-auto">
+          <nav className="flex flex-col px-4 py-4 gap-1">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-foreground/30 px-4 pb-1">
+              Navigation
+            </p>
+            {NAV_LINKS.map((l) => (
+              <Link
+                key={l.label}
+                to={l.to}
+                onClick={() => setMenuOpen(false)}
+                className={`flex items-center px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isActive(l.to) ? "text-primary bg-primary/8" : "text-foreground/65 hover:text-primary hover:bg-primary/8"}`}
+                style={{
+                  border: isActive(l.to)
+                    ? "1.5px solid hsl(var(--primary)/0.2)"
+                    : "1.5px solid transparent",
+                }}
+              >
+                {l.label}
+              </Link>
+            ))}
+          </nav>
+
+          {user && profile && (
+            <div className="px-1 pb-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-foreground/30 px-4 pb-1">
+                Account
+              </p>
+              {mobileAccountLinks.map((item) => (
+                <Link
+                  key={item.id}
+                  to={item.to}
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center px-4 py-3 rounded-xl text-sm font-semibold text-foreground/65 hover:text-primary hover:bg-primary/8 transition-all"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div
-          className="shrink-0"
+          className="shrink-0 px-4 py-4"
           style={{ borderTop: "1px solid hsl(var(--border)/0.5)" }}
         >
-          {!user || !profile ? (
-            <div className="px-4 py-4 space-y-2">
+          {user && profile ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                {profile.photoURL ? (
+                  <img
+                    src={profile.photoURL}
+                    alt={profile.name}
+                    className="w-11 h-11 rounded-full object-cover border-2 border-primary/30 shrink-0"
+                  />
+                ) : (
+                  <div className="w-11 h-11 rounded-full bg-primary/15 text-primary flex items-center justify-center text-sm font-black border-2 border-primary/25 shrink-0">
+                    {profile.name
+                      ?.split(" ")
+                      .map((n) => n[0])
+                      .slice(0, 2)
+                      .join("")
+                      .toUpperCase()}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-foreground truncate">
+                    {profile.name}
+                  </p>
+                  <p className="text-xs text-foreground/40 truncate">
+                    {profile.email}
+                  </p>
+                </div>
+              </div>
+              <Link
+                to={
+                  profile.role === "seller"
+                    ? "/seller"
+                    : profile.role === "admin"
+                    ? "/admin"
+                    : "/buyer"
+                }
+                onClick={() => setMenuOpen(false)}
+                className="w-full inline-flex items-center justify-center px-4 py-3 text-sm font-semibold rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all"
+              >
+                My Dashboard
+              </Link>
+              <LogoutButton onLogout={handleLogout} state={logoutState} />
+            </div>
+          ) : (
+            <div className="space-y-2">
               <Link
                 to="/login"
                 onClick={() => setMenuOpen(false)}
@@ -997,7 +1050,7 @@ const Navbar = () => {
                 Get Started
               </Link>
             </div>
-          ) : null}
+          )}
         </div>
       </div>
     </>

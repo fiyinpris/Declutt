@@ -580,7 +580,7 @@ const BuyerDashboard = () => {
           </button>
         </div>
       )}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto mb-auto">
         {NAV_ITEMS.map((item) => (
           <button
             key={item.id}
@@ -629,21 +629,20 @@ const BuyerDashboard = () => {
 
   return (
     <div
-      className="flex-1 min-h-0 bg-background flex flex-col"
+      className="flex-1 min-h-screen bg-background flex flex-col"
       style={{ paddingTop: `${NAVBAR_H}px` }}
     >
-      <div className="flex flex-1 items-stretch">
-        {/* Desktop sidebar — FULL HEIGHT (stretches with content) */}
+      <div className="flex flex-1 min-h-screen items-stretch">
+        {/* Desktop sidebar — FULL HEIGHT, scrolls with page (NOT sticky) */}
         <aside
           className="hidden md:flex flex-col w-64 xl:w-72 shrink-0"
           style={{
-            position: "sticky",
-            top: `${NAVBAR_H}px`,
-            minHeight: `calc(100vh - ${NAVBAR_H}px)`,
+            minHeight: "100vh",
+            height: "auto",
             overflowY: "auto",
             borderRight: "1px solid hsl(var(--border)/0.35)",
             background: "hsl(var(--card))",
-            alignSelf: "flex-start",
+            alignSelf: "stretch",
           }}
         >
           <SidebarInner />

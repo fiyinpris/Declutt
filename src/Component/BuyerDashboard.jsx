@@ -165,7 +165,7 @@ const OverviewPanel = ({ profile, setTab }) => {
       >
         <div>
           <p className="text-lg font-black text-foreground">
-            {greeting}, {firstName} 👋
+            {greeting}, {firstName}
           </p>
           <p className="text-sm text-foreground/55 mt-0.5">
             Find great deals from sellers near you.
@@ -524,7 +524,7 @@ const LogoutButton = ({ onLogout, state }) => (
     {state === "loading"
       ? "Signing out..."
       : state === "success"
-        ? "Signed out! 👋"
+        ? "Signed out!"
         : "Log out"}
   </button>
 );

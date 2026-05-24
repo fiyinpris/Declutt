@@ -13,6 +13,7 @@ import {
   onSnapshot,
   orderBy,
   limit,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
@@ -258,12 +259,18 @@ const LogoutButton = ({ onLogout, state }) => (
     {state === "loading"
       ? "Signing out…"
       : state === "success"
-        ? "Signed out! 👋"
+        ? "Signed out!"
         : "Log out"}
   </button>
 );
 
-const LocationPicker = ({ coords, onCapture, loading, onClear, allowClear = true }) => {
+const LocationPicker = ({
+  coords,
+  onCapture,
+  loading,
+  onClear,
+  allowClear = true,
+}) => {
   if (coords) {
     return (
       <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-green-500/30 bg-green-500/8 text-green-700 text-sm">
@@ -484,7 +491,7 @@ const ListingModal = ({
     }
     if (!gpsCoords) {
       setError(
-        "Please share your location so buyers can see how far away your item is."
+        "Please share your location so buyers can see how far away your item is.",
       );
       return;
     }
@@ -1157,9 +1164,7 @@ const OverviewPanel = ({ profile, listings, setTab, onAddNew }) => {
           }}
         />
         <div className="relative z-10">
-          <p className="text-white/70 text-sm font-medium mb-1">
-            Welcome back 👋
-          </p>
+          <p className="text-white/70 text-sm font-medium mb-1">Welcome back</p>
           <p className="text-2xl font-black text-white">{firstName}</p>
           <p className="text-white/60 text-sm mt-1">
             Here&apos;s your seller activity at a glance.
@@ -1167,7 +1172,7 @@ const OverviewPanel = ({ profile, listings, setTab, onAddNew }) => {
         </div>
         <button
           onClick={onAddNew}
-          className="relative z-10 flex items-center gap-2 bg-white text-primary font-bold text-sm px-5 py-2.5 rounded-2xl hover:bg-white/90 transition-colors whitespace-nowrap self-start sm:self-auto shadow-lg"
+          className="relative z-10 flex items-center justify-center gap-2 bg-white text-primary font-bold text-sm px-5 py-2.5 rounded-2xl hover:bg-white/90 transition-colors whitespace-nowrap self-center sm:self-auto shadow-lg"
         >
           <svg
             width="14"
@@ -1212,19 +1217,19 @@ const OverviewPanel = ({ profile, listings, setTab, onAddNew }) => {
             label: "View your items",
             desc: "See & manage all your listings",
             tab: "listings",
-            emoji: "📦",
+            emoji: "",
           },
           {
             label: "Check orders",
             desc: "See who wants your items",
             tab: "orders",
-            emoji: "🛍️",
+            emoji: "",
           },
           {
             label: "Earn rewards",
             desc: "Points & referral bonuses",
             tab: "rewards",
-            emoji: "⭐",
+            emoji: "",
           },
         ].map((a) => (
           <button
@@ -1270,7 +1275,7 @@ const OverviewPanel = ({ profile, listings, setTab, onAddNew }) => {
           )}
         </div>
         {listings.length > 0 ? (
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {previewItems.map((l) => (
               <ItemCard
                 key={l.id}
@@ -1306,7 +1311,7 @@ const ItemsPanel = ({ listings, onAddNew, onEdit, onDelete }) => {
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xl font-black text-foreground">My Items</p>
+          <p className="text-2xl font-black text-foreground">My Items</p>
           <p className="text-xs text-foreground/40 mt-0.5">
             {listings.length} listing{listings.length !== 1 ? "s" : ""} · click
             Edit to modify
@@ -1333,7 +1338,7 @@ const ItemsPanel = ({ listings, onAddNew, onEdit, onDelete }) => {
       </div>
       {listings.length > 0 ? (
         <>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {paginated.map((l) => (
               <ItemCard
                 key={l.id}
@@ -1377,7 +1382,7 @@ const OrdersPanel = () => {
   return (
     <div className="space-y-5">
       <div>
-        <p className="text-xl font-black text-foreground">Orders Received</p>
+        <p className="text-2xl font-black text-foreground">Orders Received</p>
         <p className="text-xs text-foreground/40 mt-0.5">
           All incoming orders from buyers
         </p>
@@ -1412,7 +1417,7 @@ const RewardsPanel = ({ profile }) => {
   return (
     <div className="space-y-5">
       <div>
-        <p className="text-xl font-black text-foreground">My Points</p>
+        <p className="text-2xl font-black text-foreground">My Points</p>
         <p className="text-sm text-foreground/50 mt-0.5">
           Hello {profile?.name?.trim().split(/\s+/)[0]}
         </p>
@@ -1462,22 +1467,22 @@ const RewardsPanel = ({ profile }) => {
             {
               title: "Refer a seller",
               desc: "Invite friends to sell on Declutt.",
-              emoji: "👥",
+              emoji: "",
             },
             {
               title: "Close your first sale",
               desc: "Earn points on first successful sale.",
-              emoji: "🎉",
+              emoji: "",
             },
             {
               title: "Write a review",
               desc: "Get rewarded for sharing feedback.",
-              emoji: "✍️",
+              emoji: "",
             },
             {
               title: "Special events",
               desc: "Earn double points during promos.",
-              emoji: "🌟",
+              emoji: "",
             },
           ].map((r) => (
             <div
@@ -1516,7 +1521,7 @@ const ReferralsPanel = ({ profile }) => {
   return (
     <div className="space-y-5">
       <div>
-        <p className="text-xl font-black text-foreground">Refer &amp; Earn</p>
+        <p className="text-2xl font-black text-foreground">Refer &amp; Earn</p>
         <p className="text-sm text-foreground/50 mt-0.5">
           Invite friends, earn rewards together
         </p>
@@ -1703,7 +1708,7 @@ const ProfilePanel = ({ profile }) => {
     <div className="flex flex-col items-center w-full">
       <div className="w-full max-w-xl space-y-6">
         <div className="text-center">
-          <p className="text-xl font-black text-foreground">My Profile</p>
+          <p className="text-2xl font-black text-foreground">My Profile</p>
           <p className="text-sm text-foreground/50 mt-0.5">
             Keep your info up to date so buyers can reach you.
           </p>
@@ -1969,7 +1974,39 @@ const MessagesPanel = ({ sellerUid }) => {
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
+  const [isWideScreen, setIsWideScreen] = useState(
+    typeof window !== "undefined" ? window.innerWidth >= 640 : false,
+  );
+  const [mobileChatOpen, setMobileChatOpen] = useState(false);
+  const [viewedAt, setViewedAt] = useState({}); // threadKey → Date
   const bottomRef = useRef();
+  const chatAreaRef = useRef(null);
+  const prevMessagesLength = useRef(0);
+  const isInitialLoad = useRef(true);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(min-width: 640px)");
+    const updateScreen = () => setIsWideScreen(mediaQuery.matches);
+    updateScreen();
+    mediaQuery.addEventListener("change", updateScreen);
+    return () => mediaQuery.removeEventListener("change", updateScreen);
+  }, []);
+
+  useEffect(() => {
+    if (isWideScreen) setMobileChatOpen(false);
+  }, [isWideScreen]);
+
+  useEffect(() => {
+    if (!active) return;
+    if (!isWideScreen) {
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "auto" });
+      }
+      if (chatAreaRef.current) {
+        chatAreaRef.current.scrollTop = 0;
+      }
+    }
+  }, [active, isWideScreen]);
 
   useEffect(() => {
     if (!sellerUid) {
@@ -2020,6 +2057,7 @@ const MessagesPanel = ({ sellerUid }) => {
         if (!active && threadList.length > 0) {
           setActive(threadList[0]);
           setMessages(threadList[0].messages);
+          isInitialLoad.current = true;
           return;
         }
 
@@ -2047,9 +2085,74 @@ const MessagesPanel = ({ sellerUid }) => {
     return () => unsub();
   }, [sellerUid]);
 
+  // ── Smart auto-scroll ─────────────────────────────────────────────────────
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (!messages.length) return;
+
+    if (isInitialLoad.current) {
+      if (chatAreaRef.current) {
+        chatAreaRef.current.scrollTop = 0;
+      }
+      isInitialLoad.current = false;
+      prevMessagesLength.current = messages.length;
+      return;
+    }
+
+    if (messages.length > prevMessagesLength.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+
+    prevMessagesLength.current = messages.length;
   }, [messages]);
+
+  // ── Mark messages as read ───────────────────────────────────────────────────
+  useEffect(() => {
+    if (!active) return;
+    let cancelled = false;
+
+    const markRead = async () => {
+      try {
+        const q = query(
+          collection(db, "messages"),
+          where("listingId", "==", active.listingId),
+          where("buyerUid", "==", active.buyerUid),
+          where("from", "==", "buyer"),
+          where("read", "==", false),
+        );
+        const snap = await getDocs(q);
+        if (cancelled || snap.empty) return;
+        const batch = writeBatch(db);
+        snap.docs.forEach((d) => batch.update(d.ref, { read: true }));
+        await batch.commit();
+      } catch (e) {
+        console.error("Error marking messages read:", e);
+      }
+    };
+
+    markRead();
+    return () => {
+      cancelled = true;
+    };
+  }, [active]);
+
+  // ── Smart unread count ──────────────────────────────────────────────────────
+  const getUnread = (thread) => {
+    if (active?.key === thread.key) return 0;
+    const lastViewed = viewedAt[thread.key];
+    if (!lastViewed) return thread.unread;
+    return thread.messages.filter(
+      (m) =>
+        m.from === "buyer" && !m.read && m.createdAt?.toDate() > lastViewed,
+    ).length;
+  };
+
+  const openThread = (thread) => {
+    setActive(thread);
+    setMessages(thread.messages);
+    if (!isWideScreen) setMobileChatOpen(true);
+    isInitialLoad.current = true;
+    setViewedAt((prev) => ({ ...prev, [thread.key]: new Date() }));
+  };
 
   const sendReply = async () => {
     if (!reply.trim() || !active || sending) return;
@@ -2106,42 +2209,47 @@ const MessagesPanel = ({ sellerUid }) => {
 
   return (
     <div className="space-y-4">
-      <div>
-        <p className="text-xl font-black text-foreground">Messages</p>
+      {/* ── Desktop header only (hidden on mobile chat view) ── */}
+      <div
+        className={`${!isWideScreen && mobileChatOpen ? "hidden sm:block" : "block"}`}
+      >
+        <p className="text-2xl font-black text-foreground">Messages</p>
         <p className="text-xs text-foreground/40 mt-0.5">
           Real-time conversations from buyers
         </p>
       </div>
+
       {error && (
         <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/25 text-red-500 text-sm">
           {error}
         </div>
       )}
+
       {threads.length === 0 ? (
         <Empty msg="No messages yet. When buyers contact you, they'll appear here." />
       ) : (
         <div
-          className="grid grid-cols-1 sm:grid-cols-[280px_1fr] gap-4"
-          style={{ minHeight: "500px" }}
+          className="grid grid-cols-1 sm:grid-cols-[280px_1fr] gap-0 sm:gap-4 -mx-4 sm:mx-0"
+          style={{ minHeight: "calc(100dvh - 220px)" }}
         >
+          {/* ── Thread sidebar ── */}
           <div
-            className="flex flex-col gap-1 overflow-y-auto rounded-2xl bg-card"
+            className={`flex flex-col gap-1 overflow-y-auto rounded-none sm:rounded-2xl bg-card ${mobileChatOpen ? "hidden" : "block"} sm:block`}
             style={{
-              border: "1.5px solid hsl(var(--border))",
-              padding: "8px",
-              maxHeight: "600px",
+              border: "none",
+              padding: "8px 0",
+              minHeight: "100%",
+              maxHeight: "none",
             }}
           >
             {threads.map((t) => {
               const isActive = active?.key === t.key;
+              const unreadCount = getUnread(t);
               return (
                 <button
                   key={t.key}
-                  onClick={() => {
-                    setActive(t);
-                    setMessages(t.messages);
-                  }}
-                  className={`flex items-start gap-3 p-3 rounded-xl text-left transition-all ${isActive ? "bg-primary/10 border border-primary/25" : "hover:bg-border/30 border border-transparent"}`}
+                  onClick={() => openThread(t)}
+                  className={`flex items-start gap-3 p-3 px-4 sm:px-3 rounded-none sm:rounded-xl text-left transition-all ${isActive ? "bg-primary/10 border border-primary/25" : "hover:bg-border/30 border border-transparent"}`}
                 >
                   <div className="w-10 h-10 rounded-full bg-primary/15 text-primary flex items-center justify-center text-sm font-black shrink-0 border-2 border-primary/20">
                     {(t.buyerName?.[0] || "B").toUpperCase()}
@@ -2151,9 +2259,9 @@ const MessagesPanel = ({ sellerUid }) => {
                       <p className="text-xs font-bold text-foreground truncate">
                         {t.buyerName}
                       </p>
-                      {t.unread > 0 && (
+                      {unreadCount > 0 && (
                         <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center shrink-0 ml-1">
-                          {t.unread}
+                          {unreadCount}
                         </span>
                       )}
                     </div>
@@ -2169,30 +2277,63 @@ const MessagesPanel = ({ sellerUid }) => {
             })}
           </div>
 
+          {/* ── Chat panel ── */}
           {active ? (
             <div
-              className="flex flex-col rounded-2xl overflow-hidden bg-card"
+              className={`flex flex-col rounded-none sm:rounded-2xl overflow-hidden bg-card flex-1 ${isWideScreen || mobileChatOpen ? "block" : "hidden"}`}
               style={{
-                border: "1.5px solid hsl(var(--border))",
-                maxHeight: "600px",
+                border: isWideScreen
+                  ? "1.5px solid hsl(var(--border))"
+                  : "none",
+                minHeight: 0,
               }}
             >
-              <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
-                <div className="w-9 h-9 rounded-full bg-primary/15 text-primary flex items-center justify-center text-sm font-black border-2 border-primary/20 shrink-0">
+              {/* ── Chat header: Back arrow + Profile (mobile) / Profile only (desktop) ── */}
+              <div className="sticky top-0 z-20 flex items-center gap-3 px-4 py-4 border-b border-border bg-background/95 backdrop-blur-sm shadow-sm shrink-0">
+                {/* Back arrow — mobile only */}
+                {!isWideScreen && (
+                  <button
+                    type="button"
+                    onClick={() => setMobileChatOpen(false)}
+                    className="sm:hidden w-9 h-9 rounded-full flex items-center justify-center text-foreground/60 hover:text-foreground hover:bg-border/50 transition-colors shrink-0"
+                    aria-label="Back to conversations"
+                  >
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="m15 18 -6 -6 6 -6" />
+                    </svg>
+                  </button>
+                )}
+
+                {/* Avatar — centered on mobile via mx-auto, normal on desktop */}
+                <div className="sm:mx-0 mx-auto w-10 h-10 rounded-full bg-primary/15 text-primary flex items-center justify-center text-sm font-black border-2 border-primary/20 shrink-0">
                   {(active.buyerName?.[0] || "B").toUpperCase()}
                 </div>
-                <div className="flex-1 min-w-0">
+
+                {/* Name + listing — right side */}
+                <div className="min-w-0">
                   <p className="text-sm font-bold text-foreground truncate">
                     {active.buyerName}
                   </p>
-                  <p className="text-[10px] text-foreground/40 truncate">
-                    Re: {active.listingName}
+                  <p className="text-xs text-foreground/50 truncate">
+                    {active.listingName}
                   </p>
                 </div>
               </div>
+
+              {/* Messages */}
               <div
-                className="flex-1 overflow-y-auto px-4 py-4 space-y-2 bg-background/30"
-                style={{ minHeight: "280px" }}
+                ref={chatAreaRef}
+                className="relative flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-background/30"
+                style={{ minHeight: 0 }}
               >
                 {messages.map((m) => (
                   <div
@@ -2205,7 +2346,7 @@ const MessagesPanel = ({ sellerUid }) => {
                       </div>
                     )}
                     <div
-                      className={`max-w-[75%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed shadow-sm ${m.from === "seller" ? "bg-primary text-primary-foreground rounded-br-sm" : "bg-card text-foreground rounded-bl-sm border border-border"}`}
+                      className={`max-w-[95%] px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm ${m.from === "seller" ? "bg-primary text-primary-foreground rounded-br-sm" : "bg-card text-foreground rounded-bl-sm border border-border"}`}
                     >
                       <p>{m.text}</p>
                       <p
@@ -2223,7 +2364,9 @@ const MessagesPanel = ({ sellerUid }) => {
                 ))}
                 <div ref={bottomRef} />
               </div>
-              <div className="flex gap-2 px-3 py-3 border-t border-border shrink-0">
+
+              {/* Reply input */}
+              <div className="relative flex gap-2 py-3 px-4 border-t border-border shrink-0 bg-background z-10">
                 <input
                   value={reply}
                   onChange={(e) => setReply(e.target.value)}
@@ -2231,7 +2374,7 @@ const MessagesPanel = ({ sellerUid }) => {
                     e.key === "Enter" && !e.shiftKey && sendReply()
                   }
                   placeholder="Type a reply…"
-                  className="flex-1 px-4 py-2.5 rounded-xl text-sm bg-background border border-border focus:outline-none focus:border-primary/50 transition-all text-foreground placeholder:text-foreground/30"
+                  className="relative z-10 flex-1 px-4 py-2.5 rounded-xl text-sm bg-background border border-border focus:outline-none focus:border-primary/50 transition-all text-foreground placeholder:text-foreground/30"
                 />
                 <button
                   onClick={sendReply}
@@ -2313,6 +2456,12 @@ const SellerDashboard = () => {
     const p = new URLSearchParams(location.search).get("tab");
     if (p && NAV_ITEMS.find((n) => n.id === p)) setTab(p);
   }, [location.search]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "auto" });
+    }
+  }, [tab]);
 
   useEffect(() => {
     if (!user?.uid) {

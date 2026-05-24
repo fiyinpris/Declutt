@@ -649,6 +649,7 @@ const getCartKey = (uid) =>
 
 const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const { user, profile, logout } = useAuth();
@@ -673,9 +674,25 @@ const Navbar = () => {
 
   useEffect(() => {
     try {
-      setCartItems(JSON.parse(localStorage.getItem(getCartKey(uid)) || "[]"));
+      const stored = JSON.parse(localStorage.getItem(getCartKey(uid)) || "[]");
+      // schedule update asynchronously to avoid synchronous setState inside effect
+      setTimeout(() => {
+        try {
+          setCartItems((prev) => {
+            try {
+              return JSON.stringify(prev) === JSON.stringify(stored)
+                ? prev
+                : stored;
+            } catch {
+              return stored;
+            }
+          });
+        } catch (e) {
+          console.error("setCartItems async error:", e);
+        }
+      }, 0);
     } catch {
-      setCartItems([]);
+      setTimeout(() => setCartItems([]), 0);
     }
   }, [uid]);
 
@@ -717,18 +734,27 @@ const Navbar = () => {
   }, []);
 
   useEffect(() => {
-    const overflow = menuOpen || cartOpen ? "hidden" : "";
+    const overflow = menuOpen || accountOpen || cartOpen ? "hidden" : "";
     document.body.style.overflow = overflow;
     document.documentElement.style.overflow = overflow;
     return () => {
       document.body.style.overflow = "";
       document.documentElement.style.overflow = "";
     };
-  }, [menuOpen, cartOpen]);
+  }, [menuOpen, accountOpen, cartOpen]);
 
   useLayoutEffect(() => {
-    setMenuOpen(false);
-  }, [location.pathname]);
+    // close drawers async after navigation to avoid synchronous setState in layout effect
+    setTimeout(() => {
+      try {
+        setMenuOpen(false);
+        setAccountOpen(false);
+      } catch (e) {
+        console.error("closing drawers async error:", e);
+      }
+    }, 0);
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, [location.pathname, location.search]);
 
   /* ── Search click: focus input if on /listings, else navigate with state ── */
   const handleSearchClick = () => {
@@ -758,16 +784,27 @@ const Navbar = () => {
     profile?.role === "seller"
       ? "/seller"
       : profile?.role === "admin"
-      ? "/admin"
-      : "/buyer";
+        ? "/admin"
+        : "/buyer";
+
+  const mobileNavLinks = NAV_LINKS;
+  // During debugging, always render the dashboard link so it's visible
+  // on small screens. We'll restore conditional logic after verification.
+  const mobileDashboardLink = { label: "Dashboard", to: dashboardPath };
+
+  const activeAccountTab =
+    new URLSearchParams(location.search).get("tab") || "";
 
   const mobileAccountLinks = [
-    { id: "dashboard", label: "Dashboard", to: dashboardPath },
     { id: "messages", label: "Messages", to: `${dashboardPath}?tab=messages` },
     { id: "listings", label: "My Items", to: `${dashboardPath}?tab=listings` },
     { id: "orders", label: "Orders", to: `${dashboardPath}?tab=orders` },
     { id: "rewards", label: "Rewards", to: `${dashboardPath}?tab=rewards` },
-    { id: "referrals", label: "Referrals", to: `${dashboardPath}?tab=referrals` },
+    {
+      id: "referrals",
+      label: "Referrals",
+      to: `${dashboardPath}?tab=referrals`,
+    },
     { id: "profile", label: "My Profile", to: `${dashboardPath}?tab=profile` },
   ];
 
@@ -899,11 +936,26 @@ const Navbar = () => {
 
           {/* Mobile right side: search + hamburger */}
           <div className="md:hidden flex items-center gap-1">
-            {isOnListings && <SearchNavButton onClick={handleSearchClick} />}
+            <SearchNavButton onClick={handleSearchClick} />
+            {user && profile && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setAccountOpen(!accountOpen);
+                  setMenuOpen(false);
+                }}
+                aria-label="Account"
+                className="flex items-center justify-center w-10 h-10 rounded-xl text-foreground hover:text-primary hover:bg-primary/10 transition-colors z-100"
+                type="button"
+              >
+                <AccountIcon />
+              </button>
+            )}
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 setMenuOpen(!menuOpen);
+                setAccountOpen(false);
               }}
               aria-label="Menu"
               className="flex items-center justify-center w-10 h-10 rounded-xl text-foreground hover:text-primary hover:bg-primary/10 transition-colors z-100"
@@ -945,16 +997,16 @@ const Navbar = () => {
         }}
       >
         <div className="flex-1 overflow-y-auto">
-          <nav className="flex flex-col px-4 py-4 gap-1">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-foreground/30 px-4 pb-1">
+          <nav className="flex flex-col px-4 py-5 gap-3">
+            <p className="text-[11px] font-bold uppercase tracking-widest text-foreground/30 px-4 pb-1">
               Navigation
             </p>
-            {NAV_LINKS.map((l) => (
+            {mobileNavLinks.map((l) => (
               <Link
                 key={l.label}
                 to={l.to}
                 onClick={() => setMenuOpen(false)}
-                className={`flex items-center px-4 py-3 rounded-xl text-sm font-semibold transition-all ${isActive(l.to) ? "text-primary bg-primary/8" : "text-foreground/65 hover:text-primary hover:bg-primary/8"}`}
+                className={`flex items-center px-4 py-4 rounded-2xl text-sm font-semibold transition-all ${isActive(l.to) ? "text-primary bg-primary/8" : "text-foreground/70 hover:text-primary hover:bg-primary/8"}`}
                 style={{
                   border: isActive(l.to)
                     ? "1.5px solid hsl(var(--primary)/0.2)"
@@ -965,92 +1017,88 @@ const Navbar = () => {
               </Link>
             ))}
           </nav>
-
-          {user && profile && (
-            <div className="px-1 pb-4">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-foreground/30 px-4 pb-1">
-                Account
-              </p>
-              {mobileAccountLinks.map((item) => (
-                <Link
-                  key={item.id}
-                  to={item.to}
-                  onClick={() => setMenuOpen(false)}
-                  className="flex items-center px-4 py-3 rounded-xl text-sm font-semibold text-foreground/65 hover:text-primary hover:bg-primary/8 transition-all"
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </div>
-          )}
         </div>
+        {mobileDashboardLink && (
+          <div className="px-4 py-4 border-t border-border">
+            <Link
+              to={mobileDashboardLink.to}
+              onClick={() => setMenuOpen(false)}
+              className={`flex items-center justify-center w-full rounded-2xl px-4 py-4 text-sm font-semibold transition-all ${isActive(mobileDashboardLink.to) ? "text-primary bg-primary/8" : "text-foreground/70 hover:text-primary hover:bg-primary/8"}`}
+              style={{
+                border: isActive(mobileDashboardLink.to)
+                  ? "1.5px solid hsl(var(--primary)/0.2)"
+                  : "1.5px solid transparent",
+              }}
+            >
+              {mobileDashboardLink.label}
+            </Link>
+          </div>
+        )}
+      </div>
 
+      {accountOpen && (
         <div
-          className="shrink-0 px-4 py-4"
-          style={{ borderTop: "1px solid hsl(var(--border)/0.5)" }}
-        >
-          {user && profile ? (
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                {profile.photoURL ? (
-                  <img
-                    src={profile.photoURL}
-                    alt={profile.name}
-                    className="w-11 h-11 rounded-full object-cover border-2 border-primary/30 shrink-0"
-                  />
-                ) : (
-                  <div className="w-11 h-11 rounded-full bg-primary/15 text-primary flex items-center justify-center text-sm font-black border-2 border-primary/25 shrink-0">
-                    {profile.name
-                      ?.split(" ")
-                      .map((n) => n[0])
-                      .slice(0, 2)
-                      .join("")
-                      .toUpperCase()}
-                  </div>
+          className="fixed left-0 right-0 bottom-0 z-40 bg-black/45 backdrop-blur-sm md:hidden"
+          style={{ top: "56px" }}
+          onClick={() => setAccountOpen(false)}
+        />
+      )}
+
+      {/* Mobile account drawer */}
+      <div
+        className="md:hidden fixed left-0 bottom-0 z-60 flex flex-col justify-between bg-background"
+        style={{
+          top: "56px",
+          width: "78vw",
+          maxWidth: "320px",
+          borderRight: "1px solid hsl(var(--border)/0.5)",
+          transform: accountOpen ? "translateX(0)" : "translateX(-100%)",
+          transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
+          boxShadow: accountOpen ? "4px 0 28px rgba(0,0,0,0.13)" : "none",
+        }}
+      >
+        <div className="flex-1 overflow-y-auto px-4 py-5">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-foreground/30 px-1 pb-2">
+            Account
+          </p>
+          <div className="flex flex-col gap-3">
+            {mobileAccountLinks.map((item) => (
+              <Link
+                key={item.id}
+                to={item.to}
+                onClick={() => setAccountOpen(false)}
+                className={`flex items-center px-4 py-4 rounded-2xl text-sm font-semibold transition-all ${activeAccountTab === item.id ? "text-primary bg-primary/8" : "text-foreground/65 hover:text-primary hover:bg-primary/8"}`}
+              >
+                <span>{item.label}</span>
+                {item.id === "messages" && messageCount > 0 && (
+                  <span className="ml-auto inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-black">
+                    {messageCount}
+                  </span>
                 )}
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-foreground truncate">
-                    {profile.name}
-                  </p>
-                  <p className="text-xs text-foreground/40 truncate">
-                    {profile.email}
-                  </p>
-                </div>
-              </div>
-              <Link
-                to={
-                  profile.role === "seller"
-                    ? "/seller"
-                    : profile.role === "admin"
-                    ? "/admin"
-                    : "/buyer"
-                }
-                onClick={() => setMenuOpen(false)}
-                className="w-full inline-flex items-center justify-center px-4 py-3 text-sm font-semibold rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 transition-all"
-              >
-                My Dashboard
               </Link>
-              <LogoutButton onLogout={handleLogout} state={logoutState} />
+            ))}
+          </div>
+        </div>
+        <div className="shrink-0 px-4 py-4 border-t border-border">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-11 h-11 rounded-full bg-primary/15 text-primary flex items-center justify-center text-sm font-black border border-primary/25">
+              {profile?.name
+                ?.split(" ")
+                .map((n) => n[0])
+                .slice(0, 2)
+                .join("")
+                .toUpperCase()}
             </div>
-          ) : (
-            <div className="space-y-2">
-              <Link
-                to="/login"
-                onClick={() => setMenuOpen(false)}
-                className="w-full flex items-center justify-center px-4 py-3 text-sm font-semibold rounded-xl text-foreground transition-all"
-                style={{ border: "2px solid hsl(var(--border))" }}
-              >
-                Log in
-              </Link>
-              <Link
-                to="/signup"
-                onClick={() => setMenuOpen(false)}
-                className="main-button w-full text-center text-sm py-3 font-semibold block"
-              >
-                Get Started
-              </Link>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-foreground truncate">
+                {profile?.name}
+              </p>
+              <p className="text-xs text-foreground/40 truncate">
+                {profile?.email}
+              </p>
             </div>
-          )}
+          </div>
+          <LogoutButton onLogout={handleLogout} state={logoutState} />
         </div>
       </div>
     </>

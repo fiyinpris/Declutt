@@ -151,7 +151,7 @@ const TopSearchBar = ({
     </div>
 
     {/* Category chips with left/right fade edges */}
-    <div className="relative">
+    <div className="relative mt-3 mb-3">
       {/* Left fade - matches the sticky bar bg */}
       <div
         className="pointer-events-none absolute left-0 top-0 bottom-0 w-10 z-10"

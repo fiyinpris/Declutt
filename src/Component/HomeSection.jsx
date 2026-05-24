@@ -227,7 +227,7 @@ const OrbitRing = () => {
     SIZE = R * 2 + 56;
   return (
     <div
-      className="relative flex items-center justify-center shrink-0 "
+      className="relative flex items-center justify-center shrink-0"
       style={{ width: SIZE, height: SIZE }}
     >
       <svg
@@ -317,6 +317,7 @@ const CYCLE_WORDS = [
   "Fresh start,",
   "New chapter,",
 ];
+
 const TypewriterWord = () => {
   const [wordIndex, setWordIndex] = useState(0);
   const [displayed, setDisplayed] = useState("");
@@ -368,7 +369,7 @@ const StackedCards = () => {
               className="rounded-xl sm:rounded-2xl overflow-hidden bg-card border border-border flex flex-col"
             >
               <div className="flex items-center justify-between px-2 sm:px-3 py-2 sm:py-2.5 border-b border-border shrink-0 bg-card gap-1">
-                <span className="text-[7px] sm:text-[8px] font-bold uppercase tracking-wide text-foreground/50 leading-tight truncate">
+                <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wide text-foreground/60 leading-tight truncate">
                   {step.label}
                 </span>
                 <span className="text-primary shrink-0">
@@ -386,7 +387,7 @@ const StackedCards = () => {
                 />
               </div>
               <div className="px-2 sm:px-3 pt-1.5 sm:pt-2 shrink-0">
-                <span className="inline-block text-[7px] sm:text-[8px] font-bold uppercase tracking-wider text-primary bg-primary/10 border border-primary/20 rounded-full px-1.5 sm:px-2 py-0.5">
+                <span className="inline-block text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-primary bg-primary/10 border border-primary/20 rounded-full px-1.5 sm:px-2 py-0.5">
                   {step.badge}
                 </span>
               </div>
@@ -400,10 +401,10 @@ const StackedCards = () => {
                       : "none",
                 }}
               >
-                <h3 className="text-[9px] sm:text-[10px] font-bold text-foreground mb-0.5 leading-snug">
+                <h3 className="text-[10px] sm:text-[11px] font-bold text-foreground mb-0.5 leading-snug">
                   {step.title}
                 </h3>
-                <p className="text-[7px] sm:text-[8px] text-foreground/55 leading-relaxed line-clamp-3">
+                <p className="text-[8px] sm:text-[9px] text-foreground/65 leading-relaxed line-clamp-3">
                   {step.desc}
                 </p>
               </div>
@@ -440,7 +441,7 @@ const StackedCards = () => {
               }}
             >
               <div className="flex items-center justify-between px-3 xl:px-4 py-2.5 border-b border-border shrink-0 bg-card gap-1">
-                <span className="text-[9px] xl:text-[10px] font-bold uppercase tracking-widest text-foreground/50 leading-tight truncate">
+                <span className="text-[10px] xl:text-[11px] font-bold uppercase tracking-widest text-foreground/60 leading-tight truncate">
                   {step.label}
                 </span>
                 <span className="text-primary shrink-0 ml-1">
@@ -458,7 +459,7 @@ const StackedCards = () => {
                 />
               </div>
               <div className="px-3 xl:px-4 pt-2 shrink-0 bg-card">
-                <span className="inline-block text-[9px] font-bold uppercase tracking-wider text-primary bg-primary/10 border border-primary/20 rounded-full px-2 py-0.5">
+                <span className="inline-block text-[10px] font-bold uppercase tracking-wider text-primary bg-primary/10 border border-primary/20 rounded-full px-2 py-0.5">
                   {step.badge}
                 </span>
               </div>
@@ -473,10 +474,10 @@ const StackedCards = () => {
                       : "none",
                 }}
               >
-                <h3 className="text-xs xl:text-sm font-bold text-foreground mb-1 leading-snug">
+                <h3 className="text-sm xl:text-base font-bold text-foreground mb-1 leading-snug">
                   {step.title}
                 </h3>
-                <p className="text-[9px] xl:text-[10px] text-foreground/55 leading-relaxed line-clamp-3">
+                <p className="text-[10px] xl:text-[11px] text-foreground/65 leading-relaxed line-clamp-3">
                   {step.desc}
                 </p>
               </div>
@@ -619,16 +620,16 @@ const Section4 = () => {
                   : "opacity 0.4s ease, transform 0.4s ease",
             }}
           >
-            <p className="text-[8px] sm:text-[9px] text-foreground/50 font-medium mb-0.5 sm:mb-1">
+            <p className="text-[9px] sm:text-[10px] text-foreground/70 font-medium mb-0.5 sm:mb-1">
               New message
             </p>
-            <p className="text-[10px] sm:text-xs font-bold text-foreground leading-snug">
+            <p className="text-[11px] sm:text-sm font-bold text-foreground leading-snug">
               Buyer interested!
             </p>
-            <p className="text-[8px] sm:text-[9px] text-foreground/60 mt-0.5">
+            <p className="text-[9px] sm:text-[10px] text-foreground/70 mt-0.5">
               "Is this still available?"
             </p>
-            <span className="inline-block mt-1 sm:mt-1.5 text-[7px] sm:text-[8px] font-bold text-green-600 bg-green-500/10 rounded-full px-1.5 sm:px-2 py-0.5">
+            <span className="inline-block mt-1 sm:mt-1.5 text-[8px] sm:text-[9px] font-bold text-green-600 bg-green-500/10 rounded-full px-1.5 sm:px-2 py-0.5">
               Just now
             </span>
           </div>
@@ -644,16 +645,16 @@ const Section4 = () => {
                   : "opacity 0.4s ease, transform 0.4s ease",
             }}
           >
-            <p className="text-[8px] sm:text-[9px] text-foreground/50 font-medium mb-0.5 sm:mb-1">
+            <p className="text-[9px] sm:text-[10px] text-foreground/70 font-medium mb-0.5 sm:mb-1">
               Payment received
             </p>
-            <p className="text-[10px] sm:text-xs font-bold text-primary">
+            <p className="text-[11px] sm:text-sm font-bold text-primary">
               ₦45,000
             </p>
-            <p className="text-[8px] sm:text-[9px] text-foreground/60 mt-0.5">
+            <p className="text-[9px] sm:text-[10px] text-foreground/70 mt-0.5">
               Vintage Sofa sold ✓
             </p>
-            <span className="inline-block mt-1 sm:mt-1.5 text-[7px] sm:text-[8px] font-bold text-primary bg-primary/10 rounded-full px-1.5 sm:px-2 py-0.5">
+            <span className="inline-block mt-1 sm:mt-1.5 text-[8px] sm:text-[9px] font-bold text-primary bg-primary/10 rounded-full px-1.5 sm:px-2 py-0.5">
               Completed
             </span>
           </div>
@@ -910,7 +911,6 @@ const ReviewsSection = () => {
       className="w-full py-16 sm:py-20 relative overflow-hidden"
       style={{ background: "hsl(27 30% 12%)" }}
     >
-      {/* Background fx */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         {[
           {
@@ -1210,13 +1210,148 @@ const ReviewsSection = () => {
   );
 };
 
-// ── NEW: Minimal CTA Strip ───────────────────────────────────────────────────
-// Clicking "Log in" scrolls up to the navbar and focuses the login link.
+// ── Steps Timeline ────────────────────────────────────────────────────────────
+const TIMELINE_STEPS = [
+  {
+    number: "1",
+    label: "Create Your Account",
+    desc: "Sign up or log in within seconds and personalize your experience.",
+  },
+  {
+    number: "2",
+    label: "Browse Products",
+    desc: "Explore categories, search for items, and find products you love.",
+  },
+  {
+    number: "3",
+    label: "Buy or Start Selling",
+    desc: "Shop seamlessly or launch your own store and begin earning instantly.",
+  },
+  {
+    number: "4",
+    label: "Manage & Expand",
+    desc: "Track orders, gain reviews, and grow your audience every day.",
+  },
+];
+
+const StepsTimeline = () => {
+  const [ref, progress] = useScrollProgress();
+  const [headerRef, headerInView] = useInView(0.3);
+
+  // Node i activates when the line reaches it (evenly spaced at 0%, 33%, 66%, 100%)
+  const nodeThresholds = [0, 0.33, 0.66, 1];
+
+  return (
+    <section className="w-full px-4 xl:px-10 2xl:px-32 sm:py-12 py-12">
+      {/* Header */}
+      <div
+        ref={headerRef}
+        className="text-center mb-12 sm:mb-16"
+        style={{
+          opacity: headerInView ? 1 : 0,
+          transform: headerInView ? "translateY(0)" : "translateY(20px)",
+          transition: "opacity 0.7s ease, transform 0.7s ease",
+        }}
+      >
+        <p className="text-xs font-semibold uppercase tracking-widest text-primary mb-2">
+          How it works
+        </p>
+        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground">
+          Up &amp; running in <span className="text-primary">4 steps</span>
+        </h2>
+        <p className="mt-3 text-sm sm:text-base text-foreground/55 max-w-md mx-auto leading-relaxed">
+          Whether you're buying or selling, getting started on Declutт is
+          effortless.
+        </p>
+      </div>
+
+      {/* Timeline track */}
+      <div
+        ref={ref}
+        className="relative flex justify-between items-start max-w-4xl mx-auto"
+      >
+        {/* Background track */}
+        <div className="absolute top-[22px] left-[12.5%] right-[12.5%] h-0.5 bg-border/30 rounded-full" />
+
+        {/* Animated fill — scaleX driven by scroll progress */}
+        <div
+          className="absolute top-[22px] left-[12.5%] right-[12.5%] h-0.5 bg-primary rounded-full origin-left"
+          style={{
+            transform: `scaleX(${Math.min(1, progress * 1.4)})`,
+            transition: "transform 0.05s linear",
+          }}
+        />
+
+        {TIMELINE_STEPS.map((step, i) => {
+          const activated = progress >= nodeThresholds[i] * 0.72;
+          return (
+            <div
+              key={i}
+              className="relative flex flex-col items-center w-1/4 z-10"
+            >
+              {/* Numbered node */}
+              <div
+                className="w-11 h-11 rounded-full flex items-center justify-center text-base font-bold mb-4 sm:mb-5"
+                style={{
+                  background: activated
+                    ? "hsl(var(--primary))"
+                    : "hsl(var(--muted))",
+                  color: activated
+                    ? "hsl(var(--primary-foreground))"
+                    : "hsl(var(--foreground)/0.35)",
+                  boxShadow: activated
+                    ? "0 0 0 6px hsl(var(--primary)/0.15)"
+                    : "none",
+                  transform: activated ? "scale(1)" : "scale(0.82)",
+                  transition:
+                    "background 0.4s ease, color 0.4s ease, box-shadow 0.4s ease, transform 0.4s cubic-bezier(0.34,1.56,0.64,1)",
+                }}
+              >
+                {step.number}
+              </div>
+
+              {/* Label */}
+              <p
+                className="text-[11px] sm:text-sm font-bold text-center mb-1.5 leading-snug px-1"
+                style={{
+                  color: activated
+                    ? "hsl(var(--foreground))"
+                    : "hsl(var(--foreground)/0.3)",
+                  opacity: activated ? 1 : 0.4,
+                  transform: activated ? "translateY(0)" : "translateY(6px)",
+                  transition:
+                    "color 0.4s ease, opacity 0.4s ease, transform 0.4s ease",
+                }}
+              >
+                {step.label}
+              </p>
+
+              {/* Description */}
+              <p
+                className="text-[9px] sm:text-[11px] text-center leading-relaxed max-w-[100px] sm:max-w-[130px] hidden sm:block px-1"
+                style={{
+                  color: "hsl(var(--foreground)/0.55)",
+                  opacity: activated ? 1 : 0.2,
+                  transform: activated ? "translateY(0)" : "translateY(8px)",
+                  transition:
+                    "opacity 0.4s ease 0.1s, transform 0.4s ease 0.1s",
+                }}
+              >
+                {step.desc}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+};
+
+// ── CTA Section ───────────────────────────────────────────────────────────────
 const CTASection = () => {
   const [ref, inView] = useInView(0.3);
 
   const handleLoginClick = () => {
-    // Scroll to the very top where the navbar lives
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -1233,7 +1368,6 @@ const CTASection = () => {
           transition: "opacity 0.6s ease, transform 0.6s ease",
         }}
       >
-        {/* Left — text */}
         <div className="text-center sm:text-left">
           <p className="text-xs font-semibold uppercase tracking-widest text-primary mb-2">
             Ready to start?
@@ -1247,8 +1381,6 @@ const CTASection = () => {
             for free.
           </p>
         </div>
-
-        {/* Right — actions */}
         <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0">
           <button
             onClick={handleLoginClick}
@@ -1273,9 +1405,7 @@ const CTASection = () => {
               </svg>
             </span>
           </button>
-
           <span className="hidden sm:block w-px h-5 bg-border/60" />
-
           <Link
             to="/signup"
             className="main-button text-sm px-6 py-2.5 whitespace-nowrap"
@@ -1575,6 +1705,9 @@ export const HomeSection = () => {
 
       {/* ════════ FAQ ════════ */}
       <FAQSection />
+
+      {/* ════════ Steps Timeline ════════ */}
+      <StepsTimeline />
 
       {/* ════════ CTA Strip ════════ */}
       <CTASection />

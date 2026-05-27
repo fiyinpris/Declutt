@@ -364,38 +364,13 @@ const ListingCard = ({
 };
 
 /* ── Popular Collections ── */
-const DESKTOP_SLOTS = 4;
 const MOBILE_SLOTS = 10;
 
 const PopularCollections = ({ listings }) => {
   const pool = listings.filter((l) => l.available);
-  const [slotIndices, setSlotIndices] = useState(() =>
-    Array.from(
-      { length: MOBILE_SLOTS },
-      (_, i) => i % Math.max(pool.length, 1),
-    ),
-  );
-  // Track whether left/right scroll-hint arrows should show
   const [showRight, setShowRight] = useState(true);
   const [showLeft, setShowLeft] = useState(false);
   const scrollRef = useRef(null);
-
-  useEffect(() => {
-    if (pool.length < 2) return;
-    const timers = Array.from({ length: MOBILE_SLOTS }, (_, slot) =>
-      setInterval(
-        () => {
-          setSlotIndices((prev) => {
-            const next = [...prev];
-            next[slot] = (prev[slot] + 1) % pool.length;
-            return next;
-          });
-        },
-        6000 + slot * 1200,
-      ),
-    );
-    return () => timers.forEach(clearInterval);
-  }, [pool.length]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -406,62 +381,29 @@ const PopularCollections = ({ listings }) => {
       setShowRight(scrollLeft < scrollWidth - clientWidth - 20);
     };
     el.addEventListener("scroll", onScroll, { passive: true });
-    // Run once on mount so initial state is correct
     onScroll();
     return () => el.removeEventListener("scroll", onScroll);
   }, []);
 
   if (pool.length === 0) return null;
 
-  const getItem = (slot) =>
-    pool[slotIndices[slot % MOBILE_SLOTS] % pool.length];
+  const getItem = (slot) => pool[slot % pool.length];
 
   /* Non-clickable display tile */
   const CollectionTile = ({ slot, className, style }) => {
     const item = getItem(slot);
-    const [currentItem, setCurrentItem] = useState(item);
-    const [prevItem, setPrevItem] = useState(null);
-    const [showActive, setShowActive] = useState(true);
-
-    useEffect(() => {
-      if (!item) return;
-      if (!currentItem || currentItem.id !== item.id) {
-        setPrevItem(currentItem);
-        setCurrentItem(item);
-        setShowActive(false);
-        const fadeTimer = window.setTimeout(() => setShowActive(true), 50);
-        return () => window.clearTimeout(fadeTimer);
-      }
-    }, [item, currentItem]);
-
-    useEffect(() => {
-      if (!prevItem) return;
-      const removeTimer = window.setTimeout(() => setPrevItem(null), 1600);
-      return () => window.clearTimeout(removeTimer);
-    }, [prevItem]);
-
-    const activeItem = currentItem || item;
 
     return (
       <div
         className={`relative rounded-2xl overflow-hidden select-none pointer-events-none ${className}`}
         style={style}
       >
-        {activeItem?.imageUrl ? (
-          <div className="relative w-full h-full">
-            {prevItem?.imageUrl && (
-              <img
-                src={prevItem.imageUrl}
-                alt={prevItem.name || "Popular item"}
-                className={`absolute inset-0 w-full h-full object-cover transition-all duration-[1400ms] ease-in-out ${showActive ? "opacity-0 scale-105 blur-sm" : "opacity-100 scale-100 blur-0"}`}
-              />
-            )}
-            <img
-              src={activeItem.imageUrl}
-              alt={activeItem.name || "Popular item"}
-              className={`absolute inset-0 w-full h-full object-cover transition-all duration-[1400ms] ease-in-out delay-[180ms] ${showActive ? "opacity-100 scale-100 blur-0" : "opacity-0 scale-95 blur-sm"}`}
-            />
-          </div>
+        {item?.imageUrl ? (
+          <img
+            src={item.imageUrl}
+            alt={item.name || "Popular item"}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
         ) : (
           <div className="w-full h-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-foreground/50 text-sm uppercase tracking-[0.2em]">
             No image
@@ -470,10 +412,10 @@ const PopularCollections = ({ listings }) => {
         <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/5 to-transparent" />
         <div className="absolute bottom-3 left-3 right-3">
           <span className="inline-flex items-center bg-primary text-primary-foreground text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg">
-            {activeItem?.category || activeItem?.name}
+            {item?.category || item?.name}
           </span>
           <p className="text-white text-[10px] mt-1 truncate opacity-75 font-medium">
-            {activeItem?.name}
+            {item?.name}
           </p>
         </div>
       </div>

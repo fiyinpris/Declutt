@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import {
   collection,
@@ -17,22 +17,8 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
-import { DecluttLogo } from "./Navbar";
 
 const NAVBAR_H = 64;
-
-const CATEGORIES = [
-  "Electronics",
-  "Furniture",
-  "Clothing",
-  "Books",
-  "Appliances",
-  "Bikes & Vehicles",
-  "Sports",
-  "Music",
-  "Kitchen",
-  "Other",
-];
 
 const CONDITIONS = ["Brand new", "Like new", "Good", "Fair", "For parts"];
 
@@ -72,7 +58,26 @@ const NAV_ITEMS = [
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        <path d="M21 15a2 2 0 0 1 -2 2H7l-4 4V5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2z" />
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      </svg>
+    ),
+  },
+  {
+    id: "notifications",
+    label: "Notifications",
+    icon: (
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
       </svg>
     ),
   },
@@ -90,7 +95,7 @@ const NAV_ITEMS = [
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1 -2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
         <line x1="7" y1="7" x2="7.01" y2="7" />
       </svg>
     ),
@@ -111,7 +116,7 @@ const NAV_ITEMS = [
       >
         <circle cx="9" cy="21" r="1" />
         <circle cx="20" cy="21" r="1" />
-        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2 -1.61L23 6H6" />
+        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
       </svg>
     ),
   },
@@ -147,9 +152,9 @@ const NAV_ITEMS = [
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        <path d="M17 21v-2a4 4 0 0 0 -4 -4H5a4 4 0 0 0 -4 4v2" />
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
         <circle cx="9" cy="7" r="4" />
-        <path d="M23 21v-2a4 4 0 0 0 -3 -3.87" />
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
         <path d="M16 3.13a4 4 0 0 1 0 7.75" />
       </svg>
     ),
@@ -168,7 +173,7 @@ const NAV_ITEMS = [
         strokeLinecap="round"
         strokeLinejoin="round"
       >
-        <path d="M20 21v-2a4 4 0 0 0 -4 -4H8a4 4 0 0 0 -4 4v2" />
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
         <circle cx="12" cy="7" r="4" />
       </svg>
     ),
@@ -189,6 +194,16 @@ const getInitials = (name) => {
     .map((n) => n[0])
     .join("")
     .toUpperCase();
+};
+
+const timeAgo = (ts) => {
+  if (!ts) return "";
+  const date = ts?.toDate ? ts.toDate() : new Date(ts);
+  const diff = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
 };
 
 const useLogout = (logoutFn, navigate) => {
@@ -221,7 +236,7 @@ const LogoutButton = ({ onLogout, state }) => (
         stroke="currentColor"
         strokeWidth="2"
       >
-        <path d="M21 12a9 9 0 1 1 -6.219 -8.56" />
+        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
       </svg>
     )}
     {state === "success" && (
@@ -251,7 +266,7 @@ const LogoutButton = ({ onLogout, state }) => (
         strokeLinejoin="round"
         className="shrink-0"
       >
-        <path d="M9 21H5a2 2 0 0 1 -2 -2V5a2 2 0 0 1 2 -2h4" />
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
         <polyline points="16 17 21 12 16 7" />
         <line x1="21" y1="12" x2="9" y2="12" />
       </svg>
@@ -264,6 +279,408 @@ const LogoutButton = ({ onLogout, state }) => (
   </button>
 );
 
+// ── Notification Toast Popup ──────────────────────────────────────────────────
+const NotificationToast = ({ notification, onDismiss, onMessage }) => {
+  const [visible, setVisible] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    requestAnimationFrame(() => setVisible(true));
+    timerRef.current = setTimeout(() => dismiss(), 6000);
+    return () => clearTimeout(timerRef.current);
+  }, []);
+
+  const dismiss = () => {
+    setLeaving(true);
+    setTimeout(() => onDismiss(), 350);
+  };
+
+  const initials = getInitials(notification.buyerName);
+  const accentColors = [
+    "from-violet-500 to-purple-600",
+    "from-blue-500 to-cyan-500",
+    "from-emerald-500 to-teal-500",
+    "from-orange-500 to-amber-500",
+    "from-rose-500 to-pink-500",
+  ];
+  const colorIdx = notification.buyerName
+    ? notification.buyerName.charCodeAt(0) % accentColors.length
+    : 0;
+
+  return (
+    <div
+      style={{
+        background: "hsl(var(--card))",
+        border: "1.5px solid hsl(var(--border))",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08)",
+        transform:
+          visible && !leaving
+            ? "translateY(0) scale(1)"
+            : "translateY(16px) scale(0.96)",
+        opacity: visible && !leaving ? 1 : 0,
+        transition: "all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)",
+      }}
+      className="w-80 rounded-2xl shadow-2xl overflow-hidden"
+    >
+      <div className="h-0.5 bg-border/40 overflow-hidden">
+        <div
+          className="h-full bg-gradient-to-r from-primary to-primary/60"
+          style={{ animation: "shrink-progress 6s linear forwards" }}
+        />
+      </div>
+
+      <div className="p-3.5 flex items-start gap-3">
+        <div
+          className={`w-10 h-10 rounded-full bg-gradient-to-br ${accentColors[colorIdx]} flex items-center justify-center text-white text-sm font-black shrink-0 shadow-md`}
+        >
+          {initials}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-xs font-black text-foreground leading-tight">
+                {notification.buyerName}
+              </p>
+              <p className="text-[11px] text-foreground/60 mt-0.5 leading-snug">
+                saved your{" "}
+                <span className="font-semibold text-foreground/80">
+                  {notification.listingName}
+                </span>
+              </p>
+            </div>
+            <button
+              onClick={dismiss}
+              className="w-5 h-5 rounded-full flex items-center justify-center text-foreground/30 hover:text-foreground/70 hover:bg-border/50 transition-colors shrink-0 mt-0.5"
+            >
+              <svg
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+              >
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 mt-2.5">
+            <button
+              onClick={() => {
+                onMessage(notification);
+                dismiss();
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-[11px] font-bold hover:bg-primary/90 transition-colors shadow-sm"
+            >
+              <svg
+                width="10"
+                height="10"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+              >
+                <path d="m22 2-7 20-4-9-9-4Z" />
+                <path d="M22 2 11 13" />
+              </svg>
+              Message them
+            </button>
+            <span className="text-[10px] text-foreground/35">
+              {timeAgo(notification.createdAt)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {notification.listingImageUrl && (
+        <div className="mx-3.5 mb-3 rounded-lg overflow-hidden h-10 bg-border/20">
+          <img
+            src={notification.listingImageUrl}
+            alt={notification.listingName}
+            className="w-full h-full object-cover"
+          />
+        </div>
+      )}
+
+      <style>{`
+        @keyframes shrink-progress {
+          from { width: 100%; }
+          to { width: 0%; }
+        }
+      `}</style>
+    </div>
+  );
+};
+
+// ── Toast Container ───────────────────────────────────────────────────────────
+const ToastContainer = ({ toasts, onDismiss, onMessage }) => {
+  if (toasts.length === 0) return null;
+  return (
+    <div
+      className="fixed bottom-6 right-4 sm:right-6 z-[9999] flex flex-col gap-3 items-end pointer-events-none"
+      style={{ maxWidth: "320px" }}
+    >
+      {toasts.map((t) => (
+        <div key={t.id} className="pointer-events-auto w-full">
+          <NotificationToast
+            notification={t}
+            onDismiss={() => onDismiss(t.id)}
+            onMessage={onMessage}
+          />
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// ── Notifications Panel ───────────────────────────────────────────────────────
+const NotificationsPanel = ({ sellerUid, onMessageBuyer }) => {
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("all");
+
+  useEffect(() => {
+    if (!sellerUid) {
+      setLoading(false);
+      return;
+    }
+    const q = query(
+      collection(db, "notifications"),
+      where("sellerUid", "==", sellerUid),
+      orderBy("createdAt", "desc"),
+      limit(50),
+    );
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setNotifications(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setLoading(false);
+      },
+      (err) => {
+        console.error("Notifications listener:", err);
+        setLoading(false);
+      },
+    );
+    return () => unsub();
+  }, [sellerUid]);
+
+  const markAllRead = async () => {
+    const unread = notifications.filter((n) => !n.read);
+    if (!unread.length) return;
+    const batch = writeBatch(db);
+    unread.forEach((n) =>
+      batch.update(doc(db, "notifications", n.id), { read: true }),
+    );
+    await batch.commit();
+  };
+
+  const markRead = async (id) => {
+    await updateDoc(doc(db, "notifications", id), { read: true });
+  };
+
+  const clearAll = async () => {
+    const batch = writeBatch(db);
+    notifications.forEach((n) => batch.delete(doc(db, "notifications", n.id)));
+    await batch.commit();
+  };
+
+  const displayed =
+    filter === "unread" ? notifications.filter((n) => !n.read) : notifications;
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  const accentColors = [
+    "from-violet-500 to-purple-600",
+    "from-blue-500 to-cyan-500",
+    "from-emerald-500 to-teal-500",
+    "from-orange-500 to-amber-500",
+    "from-rose-500 to-pink-500",
+  ];
+
+  if (loading) {
+    return (
+      <div className="flex justify-center py-20">
+        <svg
+          className="animate-spin text-foreground/30"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        >
+          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+        </svg>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-2xl font-black text-foreground">Notifications</p>
+          <p className="text-xs text-foreground/40 mt-0.5">
+            Activity from buyers on your listings
+          </p>
+        </div>
+        {notifications.length > 0 && (
+          <div className="flex items-center gap-2 shrink-0">
+            {unreadCount > 0 && (
+              <button
+                onClick={markAllRead}
+                className="text-xs font-semibold text-primary hover:underline underline-offset-4 transition-all"
+              >
+                Mark all read
+              </button>
+            )}
+            <button
+              onClick={clearAll}
+              className="text-xs font-semibold text-foreground/40 hover:text-red-500 transition-colors"
+            >
+              Clear all
+            </button>
+          </div>
+        )}
+      </div>
+
+      {notifications.length > 0 && (
+        <div className="flex gap-2">
+          {["all", "unread"].map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                filter === f
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-border/40 text-foreground/55 hover:bg-border/70"
+              }`}
+            >
+              {f === "all"
+                ? `All (${notifications.length})`
+                : `Unread (${unreadCount})`}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {displayed.length === 0 ? (
+        <div className="py-20 flex flex-col items-center gap-4 text-center">
+          <div
+            className="w-16 h-16 rounded-2xl bg-primary/6 flex items-center justify-center"
+            style={{ border: "2px dashed hsl(var(--primary)/0.2)" }}
+          >
+            <svg
+              width="26"
+              height="26"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              className="text-primary/30"
+            >
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+          </div>
+          <p className="text-sm font-semibold text-foreground/50">
+            {filter === "unread"
+              ? "No unread notifications"
+              : "No notifications yet"}
+          </p>
+          <p className="text-xs text-foreground/30 max-w-xs">
+            You'll be notified here when buyers save or show interest in your
+            items.
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {displayed.map((n) => {
+            const colorIdx = n.buyerName
+              ? n.buyerName.charCodeAt(0) % accentColors.length
+              : 0;
+            const initials = getInitials(n.buyerName);
+            return (
+              <div
+                key={n.id}
+                onClick={() => {
+                  if (!n.read) markRead(n.id);
+                }}
+                className={`relative flex items-start gap-3.5 p-4 rounded-2xl transition-all cursor-default group ${
+                  !n.read
+                    ? "bg-primary/5 border border-primary/20"
+                    : "bg-card border border-border hover:border-border/70"
+                }`}
+              >
+                {!n.read && (
+                  <span className="absolute top-4 right-4 w-2 h-2 rounded-full bg-primary animate-pulse" />
+                )}
+
+                <div
+                  className={`w-10 h-10 rounded-full bg-gradient-to-br ${accentColors[colorIdx]} flex items-center justify-center text-white text-sm font-black shrink-0 shadow-sm`}
+                >
+                  {initials}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start gap-2">
+                    {n.listingImageUrl && (
+                      <img
+                        src={n.listingImageUrl}
+                        alt={n.listingName}
+                        className="w-10 h-10 rounded-xl object-cover border border-border shrink-0"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-foreground leading-snug">
+                        <span className="font-black">{n.buyerName}</span>{" "}
+                        <span className="text-foreground/60">
+                          {n.type === "saved" ? "saved" : "added"} your item to
+                          their wishlist
+                        </span>
+                      </p>
+                      <p className="text-xs text-primary font-semibold mt-0.5 truncate">
+                        {n.listingName}
+                      </p>
+                      <p className="text-[11px] text-foreground/35 mt-0.5">
+                        {timeAgo(n.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMessageBuyer(n);
+                    }}
+                    className="mt-3 flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary/10 text-primary text-xs font-bold hover:bg-primary hover:text-primary-foreground transition-all border border-primary/20 hover:border-primary"
+                  >
+                    <svg
+                      width="11"
+                      height="11"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                    >
+                      <path d="m22 2-7 20-4-9-9-4Z" />
+                      <path d="M22 2 11 13" />
+                    </svg>
+                    Message {n.buyerName?.split(" ")[0]} to close the deal
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Location Picker ───────────────────────────────────────────────────────────
 const LocationPicker = ({
   coords,
   onCapture,
@@ -284,7 +701,7 @@ const LocationPicker = ({
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          <path d="M20 10c0 6 -8 12 -8 12s-8 -6 -8 -12a8 8 0 0 1 16 0Z" />
+          <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
           <circle cx="12" cy="10" r="3" />
         </svg>
         <span className="font-semibold text-xs flex-1">
@@ -323,7 +740,7 @@ const LocationPicker = ({
           stroke="currentColor"
           strokeWidth="2"
         >
-          <path d="M21 12a9 9 0 1 1 -6.219 -8.56" />
+          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
         </svg>
       ) : (
         <svg
@@ -336,7 +753,7 @@ const LocationPicker = ({
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          <path d="M20 10c0 6 -8 12 -8 12s-8 -6 -8 -12a8 8 0 0 1 16 0Z" />
+          <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
           <circle cx="12" cy="10" r="3" />
         </svg>
       )}
@@ -402,7 +819,6 @@ const ListingModal = ({
 }) => {
   const mainFileRef = useRef();
   const thumbFileRef = useRef();
-
   const [form, setForm] = useState({
     name: existing?.name || "",
     description: existing?.description || "",
@@ -424,7 +840,6 @@ const ListingModal = ({
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const captureLocation = () => {
@@ -499,7 +914,6 @@ const ListingModal = ({
       setError("Please upload a product image.");
       return;
     }
-
     const uid =
       currentUserUid || sellerProfile?.uid || sellerProfile?.id || null;
     if (!uid) {
@@ -508,12 +922,10 @@ const ListingModal = ({
       );
       return;
     }
-
     setSaving(true);
     try {
       let imageUrl = existing?.imageUrl || "";
       if (mainImageFile) imageUrl = await compressToBase64(mainImageFile);
-
       const compressedAdditional = [];
       for (const img of additionalImages) {
         if (img.startsWith("blob:")) {
@@ -529,7 +941,6 @@ const ListingModal = ({
           compressedAdditional.push(img);
         }
       }
-
       const payload = {
         name: form.name.trim(),
         description: form.description.trim(),
@@ -545,7 +956,6 @@ const ListingModal = ({
         ...(gpsCoords ? { lat: gpsCoords.lat, lng: gpsCoords.lng } : {}),
         updatedAt: serverTimestamp(),
       };
-
       if (existing) {
         await updateDoc(doc(db, "listings", existing.id), payload);
       } else {
@@ -603,14 +1013,12 @@ const ListingModal = ({
             </svg>
           </button>
         </div>
-
         <div className="flex-1 overflow-y-auto px-6 py-5 flex flex-col gap-4">
           {error && (
             <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/25 text-red-500 text-sm font-medium">
               {error}
             </div>
           )}
-
           <Field label="Main product image" htmlFor="listing-image">
             <div
               onClick={() => mainFileRef.current?.click()}
@@ -634,7 +1042,7 @@ const ListingModal = ({
                   >
                     <rect x="3" y="3" width="18" height="18" rx="2" />
                     <circle cx="8.5" cy="8.5" r="1.5" />
-                    <path d="m21 15 -5 -5L5 21" />
+                    <path d="m21 15-5-5L5 21" />
                   </svg>
                   <span className="text-xs font-medium">
                     Click to upload main photo
@@ -661,7 +1069,6 @@ const ListingModal = ({
               className="hidden"
             />
           </Field>
-
           <Field label={`Additional photos (${additionalImages.length}/3)`}>
             <div className="flex gap-2 flex-wrap">
               {additionalImages.map((src, idx) => (
@@ -725,7 +1132,6 @@ const ListingModal = ({
               Up to 3 additional product photos shown as thumbnails
             </p>
           </Field>
-
           <div className="grid grid-cols-2 gap-3">
             <Field label="Product name" htmlFor="listing-name">
               <input
@@ -748,7 +1154,6 @@ const ListingModal = ({
               />
             </Field>
           </div>
-
           <Field label="Description" htmlFor="listing-desc">
             <textarea
               id="listing-desc"
@@ -759,7 +1164,6 @@ const ListingModal = ({
               placeholder="Describe the item — condition, specs, reason for selling…"
             />
           </Field>
-
           <div className="grid grid-cols-2 gap-3">
             <Field label="Category" htmlFor="listing-cat">
               <input
@@ -767,7 +1171,7 @@ const ListingModal = ({
                 type="text"
                 value={form.category}
                 onChange={(e) => set("category", e.target.value)}
-                placeholder="e.g. Electronics, Furniture, Sports"
+                placeholder="e.g. Electronics, Furniture"
                 className={inputCls}
               />
             </Field>
@@ -784,7 +1188,6 @@ const ListingModal = ({
               </select>
             </Field>
           </div>
-
           <Field
             label="Your location (required for buyer distance)"
             hint="This will show buyers how far away your item is."
@@ -797,7 +1200,6 @@ const ListingModal = ({
               allowClear={false}
             />
           </Field>
-
           <Field label="Availability">
             <div className="flex items-center gap-3">
               <button
@@ -815,7 +1217,6 @@ const ListingModal = ({
             </div>
           </Field>
         </div>
-
         <div className="flex gap-3 px-6 py-4 border-t border-border shrink-0">
           <button
             type="button"
@@ -839,7 +1240,7 @@ const ListingModal = ({
                 stroke="currentColor"
                 strokeWidth="2"
               >
-                <path d="M21 12a9 9 0 1 1 -6.219 -8.56" />
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
               </svg>
             )}
             {saving
@@ -873,7 +1274,7 @@ const DeleteModal = ({ onConfirm, onCancel }) => (
           className="text-red-500"
         >
           <polyline points="3 6 5 6 21 6" />
-          <path d="M19 6v14a2 2 0 0 1 -2 2H7a2 2 0 0 1 -2 -2V6m3 0V4a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v2" />
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
         </svg>
       </div>
       <p className="text-base font-bold text-foreground mb-2">
@@ -987,8 +1388,8 @@ const ItemCard = ({ listing, onEdit, onDelete, showActions = true }) => (
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
-                <path d="M11 4H4a2 2 0 0 0 -2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2 -2v-7" />
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1 -4 9.5 -9.5z" />
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
               </svg>
               Edit
             </button>
@@ -1012,7 +1413,7 @@ const ItemCard = ({ listing, onEdit, onDelete, showActions = true }) => (
                 strokeLinejoin="round"
               >
                 <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6v14a2 2 0 0 1 -2 2H7a2 2 0 0 1 -2 -2V6m3 0V4a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v2" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
               </svg>
             </button>
           )}
@@ -1042,7 +1443,7 @@ const ItemCard = ({ listing, onEdit, onDelete, showActions = true }) => (
               strokeLinecap="round"
               strokeLinejoin="round"
             >
-              <path d="M20 10c0 6 -8 12 -8 12s-8 -6 -8 -12a8 8 0 0 1 16 0Z" />
+              <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
               <circle cx="12" cy="10" r="3" />
             </svg>
             GPS
@@ -1053,7 +1454,6 @@ const ItemCard = ({ listing, onEdit, onDelete, showActions = true }) => (
   </div>
 );
 
-// ── Empty State ───────────────────────────────────────────────────────────────
 const Empty = ({ msg, cta, ctaAction }) => (
   <div className="py-20 flex flex-col items-center gap-4 text-center">
     <div
@@ -1085,7 +1485,6 @@ const Empty = ({ msg, cta, ctaAction }) => (
   </div>
 );
 
-// ── Pagination ────────────────────────────────────────────────────────────────
 const Pagination = ({ total, perPage, current, onChange }) => {
   const pages = Math.ceil(total / perPage);
   if (pages <= 1) return null;
@@ -1104,7 +1503,7 @@ const Pagination = ({ total, perPage, current, onChange }) => {
           stroke="currentColor"
           strokeWidth="2.5"
         >
-          <path d="m15 18 -6 -6 6 -6" />
+          <path d="m15 18-6-6 6-6" />
         </svg>
       </button>
       {Array.from({ length: pages }, (_, i) => i + 1).map((p) => (
@@ -1129,7 +1528,7 @@ const Pagination = ({ total, perPage, current, onChange }) => {
           stroke="currentColor"
           strokeWidth="2.5"
         >
-          <path d="m9 18 6 -6 -6 -6" />
+          <path d="m9 18 6-6-6-6" />
         </svg>
       </button>
     </div>
@@ -1194,7 +1593,7 @@ const OverviewPanel = ({ profile, listings, setTab, onAddNew }) => {
         <StatCard
           label="Total items"
           value={listings.length}
-          icon={NAV_ITEMS[2].icon}
+          icon={NAV_ITEMS[3].icon}
         />
         <StatCard
           label="Currently live"
@@ -1202,11 +1601,11 @@ const OverviewPanel = ({ profile, listings, setTab, onAddNew }) => {
           sub="visible in Browse"
           icon={NAV_ITEMS[0].icon}
         />
-        <StatCard label="Items sold" value={sold} icon={NAV_ITEMS[3].icon} />
+        <StatCard label="Items sold" value={sold} icon={NAV_ITEMS[4].icon} />
         <StatCard
           label="Est. earned"
           value={`₦${earned.toLocaleString()}`}
-          icon={NAV_ITEMS[4].icon}
+          icon={NAV_ITEMS[5].icon}
           accent
         />
       </div>
@@ -1217,19 +1616,16 @@ const OverviewPanel = ({ profile, listings, setTab, onAddNew }) => {
             label: "View your items",
             desc: "See & manage all your listings",
             tab: "listings",
-            emoji: "",
           },
           {
             label: "Check orders",
             desc: "See who wants your items",
             tab: "orders",
-            emoji: "",
           },
           {
             label: "Earn rewards",
             desc: "Points & referral bonuses",
             tab: "rewards",
-            emoji: "",
           },
         ].map((a) => (
           <button
@@ -1238,9 +1634,7 @@ const OverviewPanel = ({ profile, listings, setTab, onAddNew }) => {
             className="flex items-center gap-3 p-4 rounded-2xl bg-card text-left hover:shadow-md transition-all duration-200 hover:-translate-y-0.5"
             style={{ border: "1.5px solid hsl(var(--border))" }}
           >
-            <div className="w-10 h-10 rounded-xl bg-primary/8 flex items-center justify-center text-lg shrink-0">
-              {a.emoji}
-            </div>
+            <div className="w-10 h-10 rounded-xl bg-primary/8 flex items-center justify-center text-lg shrink-0" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-foreground">{a.label}</p>
               <p className="text-xs text-foreground/45 truncate">{a.desc}</p>
@@ -1256,7 +1650,7 @@ const OverviewPanel = ({ profile, listings, setTab, onAddNew }) => {
               strokeLinejoin="round"
               className="text-foreground/25 shrink-0"
             >
-              <path d="m9 18 6 -6 -6 -6" />
+              <path d="m9 18 6-6-6-6" />
             </svg>
           </button>
         ))}
@@ -1376,7 +1770,6 @@ const ORDER_TABS = [
   "Delivered",
   "Cancelled",
 ];
-
 const OrdersPanel = () => {
   const [activeTab, setActiveTab] = useState("All");
   return (
@@ -1467,22 +1860,18 @@ const RewardsPanel = ({ profile }) => {
             {
               title: "Refer a seller",
               desc: "Invite friends to sell on Declutt.",
-              emoji: "",
             },
             {
               title: "Close your first sale",
               desc: "Earn points on first successful sale.",
-              emoji: "",
             },
             {
               title: "Write a review",
               desc: "Get rewarded for sharing feedback.",
-              emoji: "",
             },
             {
               title: "Special events",
               desc: "Earn double points during promos.",
-              emoji: "",
             },
           ].map((r) => (
             <div
@@ -1490,9 +1879,7 @@ const RewardsPanel = ({ profile }) => {
               className="flex items-start gap-3 p-4 rounded-2xl bg-card"
               style={{ border: "1.5px solid hsl(var(--border))" }}
             >
-              <div className="w-9 h-9 rounded-xl bg-primary/8 flex items-center justify-center text-lg shrink-0 mt-0.5">
-                {r.emoji}
-              </div>
+              <div className="w-9 h-9 rounded-xl bg-primary/8 flex items-center justify-center text-lg shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-semibold text-foreground">
                   {r.title}
@@ -1599,7 +1986,7 @@ const NIGERIAN_STATES = [
   "Zamfara",
 ];
 
-// ── Profile Panel — CENTERED ──────────────────────────────────────────────────
+// ── Profile Panel ─────────────────────────────────────────────────────────────
 const ProfilePanel = ({ profile }) => {
   const photoRef = useRef();
   const [photoPreview, setPhotoPreview] = useState(profile?.photoURL || null);
@@ -1617,19 +2004,16 @@ const ProfilePanel = ({ profile }) => {
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-
   const set = (k, v) => {
     setForm((f) => ({ ...f, [k]: v }));
     setErrors((e) => ({ ...e, [k]: "" }));
   };
-
   const handlePhoto = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     setPhotoFile(file);
     setPhotoPreview(URL.createObjectURL(file));
   };
-
   const uploadPhoto = async () => {
     if (!photoFile) return;
     setUploading(true);
@@ -1645,7 +2029,6 @@ const ProfilePanel = ({ profile }) => {
       setPhotoFile(null);
     }
   };
-
   const validate = () => {
     const e = {};
     if (!form.phone.match(/^(\+?234|0)[789][01]\d{8}$/))
@@ -1661,7 +2044,6 @@ const ProfilePanel = ({ profile }) => {
       e.bvn = "BVN must be exactly 11 digits";
     return e;
   };
-
   const handleSave = async () => {
     const e = validate();
     if (Object.keys(e).length) {
@@ -1682,10 +2064,8 @@ const ProfilePanel = ({ profile }) => {
       setSaving(false);
     }
   };
-
   const inputCls =
     "w-full px-3.5 py-2.5 rounded-xl border bg-background text-sm text-foreground placeholder:text-foreground/30 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all";
-
   const PField = ({ label, error, children, hint, htmlFor }) => (
     <div className="flex flex-col gap-1.5">
       <label
@@ -1701,9 +2081,7 @@ const ProfilePanel = ({ profile }) => {
       {error && <p className="text-[11px] text-red-500">{error}</p>}
     </div>
   );
-
   const initials = getInitials(profile?.name);
-
   return (
     <div className="flex flex-col items-center w-full">
       <div className="w-full max-w-xl space-y-6">
@@ -1713,7 +2091,6 @@ const ProfilePanel = ({ profile }) => {
             Keep your info up to date so buyers can reach you.
           </p>
         </div>
-
         <div
           className="p-5 rounded-2xl bg-card space-y-4"
           style={{ border: "1.5px solid hsl(var(--border))" }}
@@ -1780,7 +2157,7 @@ const ProfilePanel = ({ profile }) => {
                         stroke="currentColor"
                         strokeWidth="2"
                       >
-                        <path d="M21 12a9 9 0 1 1 -6.219 -8.56" />
+                        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                       </svg>
                     )}
                     {uploadDone
@@ -1801,7 +2178,6 @@ const ProfilePanel = ({ profile }) => {
             className="hidden"
           />
         </div>
-
         <div
           className="p-5 rounded-2xl bg-card space-y-4"
           style={{ border: "1.5px solid hsl(var(--border))" }}
@@ -1877,7 +2253,6 @@ const ProfilePanel = ({ profile }) => {
               />
             </PField>
           </div>
-
           <div className="pt-2 border-t border-border/50">
             <p className="text-xs font-bold text-foreground/50 uppercase tracking-wide mb-3">
               Identity verification{" "}
@@ -1922,7 +2297,6 @@ const ProfilePanel = ({ profile }) => {
               </PField>
             </div>
           </div>
-
           <div className="flex justify-center pt-2">
             <button
               onClick={handleSave}
@@ -1939,7 +2313,7 @@ const ProfilePanel = ({ profile }) => {
                   stroke="currentColor"
                   strokeWidth="2"
                 >
-                  <path d="M21 12a9 9 0 1 1 -6.219 -8.56" />
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                 </svg>
               )}
               {saved && (
@@ -1966,7 +2340,7 @@ const ProfilePanel = ({ profile }) => {
 };
 
 // ── Messages Panel ────────────────────────────────────────────────────────────
-const MessagesPanel = ({ sellerUid }) => {
+const MessagesPanel = ({ sellerUid, initialBuyer = null }) => {
   const [threads, setThreads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState(null);
@@ -1978,11 +2352,12 @@ const MessagesPanel = ({ sellerUid }) => {
     typeof window !== "undefined" ? window.innerWidth >= 640 : false,
   );
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
-  const [viewedAt, setViewedAt] = useState({}); // threadKey → Date
+  const [viewedAt, setViewedAt] = useState({});
   const bottomRef = useRef();
   const chatAreaRef = useRef(null);
   const prevMessagesLength = useRef(0);
   const isInitialLoad = useRef(true);
+  const initialBuyerApplied = useRef(false);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(min-width: 640px)");
@@ -1999,12 +2374,9 @@ const MessagesPanel = ({ sellerUid }) => {
   useEffect(() => {
     if (!active) return;
     if (!isWideScreen) {
-      if (typeof window !== "undefined") {
+      if (typeof window !== "undefined")
         window.scrollTo({ top: 0, behavior: "auto" });
-      }
-      if (chatAreaRef.current) {
-        chatAreaRef.current.scrollTop = 0;
-      }
+      if (chatAreaRef.current) chatAreaRef.current.scrollTop = 0;
     }
   }, [active, isWideScreen]);
 
@@ -2015,7 +2387,6 @@ const MessagesPanel = ({ sellerUid }) => {
     }
     setLoading(true);
     setError(null);
-
     const q = query(
       collection(db, "messages"),
       where("sellerUid", "==", sellerUid),
@@ -2047,20 +2418,17 @@ const MessagesPanel = ({ sellerUid }) => {
           grouped[key].lastText = m.text || "";
           if (m.from === "buyer" && !m.read) grouped[key].unread++;
         });
-
         const threadList = Object.values(grouped).sort(
           (a, b) => (b.lastAt?.seconds || 0) - (a.lastAt?.seconds || 0),
         );
         setThreads(threadList);
         setLoading(false);
-
-        if (!active && threadList.length > 0) {
+        if (!active && threadList.length > 0 && !initialBuyerApplied.current) {
           setActive(threadList[0]);
           setMessages(threadList[0].messages);
           isInitialLoad.current = true;
           return;
         }
-
         if (active) {
           const updated = threadList.find((t) => t.key === active.key);
           if (updated) {
@@ -2085,31 +2453,39 @@ const MessagesPanel = ({ sellerUid }) => {
     return () => unsub();
   }, [sellerUid]);
 
-  // ── Smart auto-scroll ─────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!initialBuyer || initialBuyerApplied.current || threads.length === 0)
+      return;
+    const found = threads.find(
+      (t) =>
+        t.buyerUid === initialBuyer.buyerUid &&
+        t.listingId === initialBuyer.listingId,
+    );
+    if (found) {
+      initialBuyerApplied.current = true;
+      setActive(found);
+      setMessages(found.messages);
+      if (!isWideScreen) setMobileChatOpen(true);
+      isInitialLoad.current = true;
+    }
+  }, [threads, initialBuyer]);
+
   useEffect(() => {
     if (!messages.length) return;
-
     if (isInitialLoad.current) {
-      if (chatAreaRef.current) {
-        chatAreaRef.current.scrollTop = 0;
-      }
+      if (chatAreaRef.current) chatAreaRef.current.scrollTop = 0;
       isInitialLoad.current = false;
       prevMessagesLength.current = messages.length;
       return;
     }
-
-    if (messages.length > prevMessagesLength.current) {
+    if (messages.length > prevMessagesLength.current)
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-
     prevMessagesLength.current = messages.length;
   }, [messages]);
 
-  // ── Mark messages as read ───────────────────────────────────────────────────
   useEffect(() => {
     if (!active) return;
     let cancelled = false;
-
     const markRead = async () => {
       try {
         const q = query(
@@ -2128,14 +2504,12 @@ const MessagesPanel = ({ sellerUid }) => {
         console.error("Error marking messages read:", e);
       }
     };
-
     markRead();
     return () => {
       cancelled = true;
     };
   }, [active]);
 
-  // ── Smart unread count ──────────────────────────────────────────────────────
   const getUnread = (thread) => {
     if (active?.key === thread.key) return 0;
     const lastViewed = viewedAt[thread.key];
@@ -2198,7 +2572,7 @@ const MessagesPanel = ({ sellerUid }) => {
               stroke="currentColor"
               strokeWidth="2"
             >
-              <path d="M21 12a9 9 0 1 1 -6.219 -8.56" />
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
             </svg>
             <span className="text-sm">Loading conversations…</span>
           </div>
@@ -2209,7 +2583,6 @@ const MessagesPanel = ({ sellerUid }) => {
 
   return (
     <div className="space-y-4">
-      {/* ── Desktop header only (hidden on mobile chat view) ── */}
       <div
         className={`${!isWideScreen && mobileChatOpen ? "hidden sm:block" : "block"}`}
       >
@@ -2218,13 +2591,11 @@ const MessagesPanel = ({ sellerUid }) => {
           Real-time conversations from buyers
         </p>
       </div>
-
       {error && (
         <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/25 text-red-500 text-sm">
           {error}
         </div>
       )}
-
       {threads.length === 0 ? (
         <Empty msg="No messages yet. When buyers contact you, they'll appear here." />
       ) : (
@@ -2232,7 +2603,6 @@ const MessagesPanel = ({ sellerUid }) => {
           className="grid grid-cols-1 sm:grid-cols-[280px_1fr] gap-0 sm:gap-4 -mx-4 sm:mx-0"
           style={{ minHeight: "calc(100dvh - 220px)" }}
         >
-          {/* ── Thread sidebar ── */}
           <div
             className={`flex flex-col gap-1 overflow-y-auto rounded-none sm:rounded-2xl bg-card ${mobileChatOpen ? "hidden" : "block"} sm:block`}
             style={{
@@ -2276,8 +2646,6 @@ const MessagesPanel = ({ sellerUid }) => {
               );
             })}
           </div>
-
-          {/* ── Chat panel ── */}
           {active ? (
             <div
               className={`flex flex-col rounded-none sm:rounded-2xl overflow-hidden bg-card flex-1 ${isWideScreen || mobileChatOpen ? "block" : "hidden"}`}
@@ -2288,15 +2656,12 @@ const MessagesPanel = ({ sellerUid }) => {
                 minHeight: 0,
               }}
             >
-              {/* ── Chat header: Back arrow + Profile (mobile) / Profile only (desktop) ── */}
               <div className="sticky top-0 z-20 flex items-center gap-3 px-4 py-4 border-b border-border bg-background/95 backdrop-blur-sm shadow-sm shrink-0">
-                {/* Back arrow — mobile only */}
                 {!isWideScreen && (
                   <button
                     type="button"
                     onClick={() => setMobileChatOpen(false)}
                     className="sm:hidden w-9 h-9 rounded-full flex items-center justify-center text-foreground/60 hover:text-foreground hover:bg-border/50 transition-colors shrink-0"
-                    aria-label="Back to conversations"
                   >
                     <svg
                       width="20"
@@ -2308,17 +2673,13 @@ const MessagesPanel = ({ sellerUid }) => {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     >
-                      <path d="m15 18 -6 -6 6 -6" />
+                      <path d="m15 18-6-6 6-6" />
                     </svg>
                   </button>
                 )}
-
-                {/* Avatar — centered on mobile via mx-auto, normal on desktop */}
-                <div className="sm:mx-0 mx-auto w-10 h-10 rounded-full bg-primary/15 text-primary flex items-center justify-center text-sm font-black border-2 border-primary/20 shrink-0">
+                <div className="w-10 h-10 rounded-full bg-primary/15 text-primary flex items-center justify-center text-sm font-black border-2 border-primary/20 shrink-0">
                   {(active.buyerName?.[0] || "B").toUpperCase()}
                 </div>
-
-                {/* Name + listing — right side */}
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-foreground truncate">
                     {active.buyerName}
@@ -2328,8 +2689,6 @@ const MessagesPanel = ({ sellerUid }) => {
                   </p>
                 </div>
               </div>
-
-              {/* Messages */}
               <div
                 ref={chatAreaRef}
                 className="relative flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-background/30"
@@ -2364,8 +2723,6 @@ const MessagesPanel = ({ sellerUid }) => {
                 ))}
                 <div ref={bottomRef} />
               </div>
-
-              {/* Reply input */}
               <div className="relative flex gap-2 py-3 px-4 border-t border-border shrink-0 bg-background z-10">
                 <input
                   value={reply}
@@ -2391,7 +2748,7 @@ const MessagesPanel = ({ sellerUid }) => {
                       stroke="currentColor"
                       strokeWidth="2"
                     >
-                      <path d="M21 12a9 9 0 1 1 -6.219 -8.56" />
+                      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                     </svg>
                   ) : (
                     <svg
@@ -2402,7 +2759,7 @@ const MessagesPanel = ({ sellerUid }) => {
                       stroke="currentColor"
                       strokeWidth="2.5"
                     >
-                      <path d="m22 2 -7 20 -4 -9 -9 -4Z" />
+                      <path d="m22 2-7 20-4-9-9-4Z" />
                       <path d="M22 2 11 13" />
                     </svg>
                   )}
@@ -2427,7 +2784,7 @@ const MessagesPanel = ({ sellerUid }) => {
                   strokeWidth="1.5"
                   className="mx-auto text-foreground/15"
                 >
-                  <path d="M21 15a2 2 0 0 1 -2 2H7l-4 4V5a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2z" />
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                 </svg>
                 <p>Select a conversation</p>
               </div>
@@ -2450,7 +2807,12 @@ const SellerDashboard = () => {
   const [editTarget, setEditTarget] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [messageCount, setMessageCount] = useState(0);
+  const [notifCount, setNotifCount] = useState(0);
+  const [toasts, setToasts] = useState([]);
+  const [messageBuyerTarget, setMessageBuyerTarget] = useState(null);
   const { state: logoutState, handleLogout } = useLogout(logout, navigate);
+  const isFirstNotifLoad = useRef(true);
+  const seenNotifIds = useRef(new Set());
 
   useEffect(() => {
     const p = new URLSearchParams(location.search).get("tab");
@@ -2458,26 +2820,24 @@ const SellerDashboard = () => {
   }, [location.search]);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined")
       window.scrollTo({ top: 0, behavior: "auto" });
-    }
   }, [tab]);
 
+  // Unread message badge
   useEffect(() => {
     if (!user?.uid) {
       setMessageCount(0);
       return;
     }
-
-    const messagesQuery = query(
+    const q = query(
       collection(db, "messages"),
       where("sellerUid", "==", user.uid),
       where("from", "==", "buyer"),
       where("read", "==", false),
     );
-
-    const unsubscribe = onSnapshot(
-      messagesQuery,
+    const unsub = onSnapshot(
+      q,
       (snap) => {
         setMessageCount(snap.size);
       },
@@ -2485,9 +2845,57 @@ const SellerDashboard = () => {
         console.error("Unread message badge listener error:", err);
       },
     );
-
-    return () => unsubscribe();
+    return () => unsub();
   }, [user]);
+
+  // Notification badge + real-time toasts
+  useEffect(() => {
+    if (!user?.uid) {
+      setNotifCount(0);
+      return;
+    }
+    const q = query(
+      collection(db, "notifications"),
+      where("sellerUid", "==", user.uid),
+      where("read", "==", false),
+      orderBy("createdAt", "desc"),
+      limit(50),
+    );
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setNotifCount(snap.size);
+        if (isFirstNotifLoad.current) {
+          snap.docs.forEach((d) => seenNotifIds.current.add(d.id));
+          isFirstNotifLoad.current = false;
+          return;
+        }
+        snap.docs.forEach((d) => {
+          if (!seenNotifIds.current.has(d.id)) {
+            seenNotifIds.current.add(d.id);
+            const data = { id: d.id, ...d.data() };
+            setToasts((prev) => [...prev, data]);
+          }
+        });
+      },
+      (err) => {
+        console.error("Notifications badge listener:", err);
+      },
+    );
+    return () => unsub();
+  }, [user]);
+
+  const dismissToast = useCallback((id) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const handleNotifMessage = useCallback((notif) => {
+    setMessageBuyerTarget({
+      buyerUid: notif.buyerUid,
+      listingId: notif.listingId,
+    });
+    setTab("messages");
+  }, []);
 
   const fetchListings = async () => {
     if (!user) return;
@@ -2525,6 +2933,10 @@ const SellerDashboard = () => {
     fetchListings();
   }, [user, profile]);
 
+  useEffect(() => {
+    if (tab !== "messages") setMessageBuyerTarget(null);
+  }, [tab]);
+
   const handleDelete = async () => {
     if (!deleteConfirm) return;
     try {
@@ -2555,7 +2967,7 @@ const SellerDashboard = () => {
       style={{ paddingTop: `${NAVBAR_H}px` }}
     >
       <div className="flex flex-1 min-h-screen items-stretch">
-        {/* ── Desktop Sidebar — full height, scrolls with page (NOT sticky) ── */}
+        {/* Desktop Sidebar */}
         <aside
           className="hidden md:flex md:flex-col w-64 xl:w-72 shrink-0 bg-card"
           style={{
@@ -2566,13 +2978,12 @@ const SellerDashboard = () => {
             alignSelf: "stretch",
           }}
         >
-          {/* Nav items */}
           <div className="px-4 pt-5 pb-2">
             <p className="text-[10px] font-bold uppercase tracking-widest text-foreground/35">
               Menu
             </p>
           </div>
-          <nav className="flex-1 px-3 pt-2 space-y-3 pb-4 mb-auto">
+          <nav className="flex-1 px-3 pt-2 space-y-1 pb-4 mb-auto">
             {NAV_ITEMS.map((item) => (
               <button
                 key={item.id}
@@ -2588,11 +2999,14 @@ const SellerDashboard = () => {
                     {messageCount > 9 ? "9+" : messageCount}
                   </span>
                 )}
+                {item.id === "notifications" && notifCount > 0 && (
+                  <span className="min-w-[24px] h-6 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center px-2 animate-pulse">
+                    {notifCount > 9 ? "9+" : notifCount}
+                  </span>
+                )}
               </button>
             ))}
           </nav>
-
-          {/* Sidebar footer */}
           <div
             className="shrink-0 px-3 pb-5 space-y-2 mt-auto"
             style={{ borderTop: "1px solid hsl(var(--border)/0.4)" }}
@@ -2622,7 +3036,7 @@ const SellerDashboard = () => {
           </div>
         </aside>
 
-        {/* ── Main content ── */}
+        {/* Main content */}
         <main className="flex-1 min-w-0 flex flex-col">
           <div className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-7xl w-full mx-auto h-full">
             {tab === "overview" && (
@@ -2641,16 +3055,32 @@ const SellerDashboard = () => {
                 onDelete={setDeleteConfirm}
               />
             )}
+            {tab === "notifications" && (
+              <NotificationsPanel
+                sellerUid={user?.uid}
+                onMessageBuyer={(n) => {
+                  setMessageBuyerTarget({
+                    buyerUid: n.buyerUid,
+                    listingId: n.listingId,
+                  });
+                  setTab("messages");
+                }}
+              />
+            )}
             {tab === "orders" && <OrdersPanel />}
             {tab === "rewards" && <RewardsPanel profile={profile} />}
             {tab === "referrals" && <ReferralsPanel profile={profile} />}
             {tab === "profile" && <ProfilePanel profile={profile} />}
-            {tab === "messages" && <MessagesPanel sellerUid={user?.uid} />}
+            {tab === "messages" && (
+              <MessagesPanel
+                sellerUid={user?.uid}
+                initialBuyer={messageBuyerTarget}
+              />
+            )}
           </div>
         </main>
       </div>
 
-      {/* ── Modals ── */}
       {showModal && (
         <ListingModal
           existing={editTarget}
@@ -2669,6 +3099,12 @@ const SellerDashboard = () => {
           onCancel={() => setDeleteConfirm(null)}
         />
       )}
+
+      <ToastContainer
+        toasts={toasts}
+        onDismiss={dismissToast}
+        onMessage={handleNotifMessage}
+      />
     </div>
   );
 };

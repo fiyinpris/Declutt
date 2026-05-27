@@ -230,15 +230,16 @@ const ListingCard = ({
     setQty((q) => Math.max(q - 1, 0));
   };
 
-  return (
+    return (
     <div
-      onClick={() => onSelect(listing)}
+      data-listing-id={listing.id}
       className="card-enter bg-card rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-lg flex flex-col border border-border/60 relative group"
       style={{ animationDelay: `${animDelay}ms` }}
     >
       <div
-        className="relative overflow-hidden bg-muted"
+        className="relative overflow-hidden bg-muted cursor-pointer"
         style={{ aspectRatio: "1/1" }}
+        onClick={() => onSelect(listing)}
       >
         {listing.imageUrl ? (
           <img
@@ -292,7 +293,7 @@ const ListingCard = ({
           {qty === 0 ? (
             <button
               onClick={handleAddFirst}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-primary text-primary-foreground text-[11px] font-bold shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-primary text-primary-foreground text-[11px] font-bold shadow-lg opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap"
             >
               <svg
                 width="11"
@@ -331,7 +332,7 @@ const ListingCard = ({
           )}
         </div>
       </div>
-      <div className="p-3 flex flex-col gap-1 min-h-[110px]">
+      <div className="p-3 flex flex-col gap-1 min-h-[110px] cursor-pointer" onClick={() => onSelect(listing)}>
         <div className="flex items-start justify-between gap-2">
           <h3 className="text-xs font-bold text-foreground leading-snug line-clamp-2 text-left flex-1">
             {listing.name}
@@ -769,9 +770,40 @@ const Listings = () => {
   };
 
   const handleSelect = (listing) => {
-    window.scrollTo({ top: 0, behavior: "instant" });
+    try {
+      sessionStorage.setItem("listings_scroll", String(window.scrollY || 0));
+      sessionStorage.setItem("listings_scroll_id", String(listing.id));
+    } catch (_) {}
     navigate(`/product/${listing.id}`);
   };
+
+  // Restore scroll position if available (after listings load)
+  useEffect(() => {
+    try {
+      const id = sessionStorage.getItem("listings_scroll_id");
+      const v = sessionStorage.getItem("listings_scroll");
+      if (id) {
+        const el = document.querySelector(`[data-listing-id="${id}"]`);
+        if (el) {
+          setTimeout(() => {
+            el.scrollIntoView({ block: "center", behavior: "auto" });
+            sessionStorage.removeItem("listings_scroll_id");
+            sessionStorage.removeItem("listings_scroll");
+          }, 120);
+          return;
+        }
+      }
+      if (!v) return;
+      const pos = Number(v);
+      if (Number.isFinite(pos)) {
+        // Wait until layout stabilizes
+        setTimeout(() => {
+          window.scrollTo({ top: pos, behavior: "auto" });
+          sessionStorage.removeItem("listings_scroll");
+        }, 120);
+      }
+    } catch (_) {}
+  }, [loading]);
 
   return (
     <div className="min-h-screen bg-background ">

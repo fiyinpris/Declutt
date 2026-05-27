@@ -77,29 +77,117 @@ const Toast = ({ msg, show }) => (
 /* ── Image Gallery ── */
 const ImageGallery = ({ images, productName }) => {
   const [selected, setSelected] = useState(0);
+  const [offset, setOffset] = useState(0); // pixel offset during drag
+  const [dragging, setDragging] = useState(false);
   const slots = [0, 1, 2];
   const realImages = (images || []).filter(Boolean);
   const hasImages = realImages.length > 0;
+  const containerRef = useRef(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const startXRef = useRef(0);
 
   const prev = () =>
     setSelected((i) => (i - 1 + realImages.length) % realImages.length);
   const next = () => setSelected((i) => (i + 1) % realImages.length);
 
+  const handleTouchStart = (clientX) => {
+    startXRef.current = clientX;
+    setDragging(true);
+    setOffset(0);
+  };
+  const handleTouchMove = (clientX) => {
+    if (!dragging || !containerRef.current) return;
+    setOffset(clientX - startXRef.current);
+  };
+  const handleTouchEnd = () => {
+    if (!dragging) return;
+    const w = containerRef.current?.clientWidth || 1;
+    const dx = offset;
+    const threshold = Math.max(40, w * 0.12);
+    if (dx > threshold) prev();
+    else if (dx < -threshold) next();
+    setOffset(0);
+    setDragging(false);
+  };
+
+  // Pointer/mouse handlers
+  const onPointerDown = (e) => {
+    const clientX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+    handleTouchStart(clientX);
+    try {
+      // try pointer capture for smoother move events
+      if (containerRef.current && e.pointerId != null) {
+        containerRef.current.setPointerCapture?.(e.pointerId);
+        startXRef.current = clientX;
+      }
+    } catch (_) {}
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+  };
+  const onPointerMove = (e) => handleTouchMove(e.clientX);
+  const onPointerUp = () => {
+    handleTouchEnd();
+    try {
+      if (containerRef.current && typeof containerRef.current.releasePointerCapture === "function") {
+        // best-effort release all
+        // Note: can't know pointerId here reliably for touch fallback, but release is optional
+      }
+    } catch (_) {}
+    window.removeEventListener("pointermove", onPointerMove);
+    window.removeEventListener("pointerup", onPointerUp);
+  };
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const setW = () => setContainerWidth(el.clientWidth || 0);
+    setW();
+    window.addEventListener("resize", setW);
+    return () => window.removeEventListener("resize", setW);
+  }, []);
+
   return (
-    <div className="w-full max-w-[380px] mx-auto space-y-3">
+    <div className="w-full max-w-none sm:max-w-[380px] space-y-3">
       <div
-        className="relative w-full rounded-2xl overflow-hidden bg-border/20 border border-border/60 group"
-        style={{ aspectRatio: "1/1" }}
+        ref={containerRef}
+        className="relative w-full overflow-hidden bg-border/20 border border-border/60 group rounded-none sm:rounded-2xl sm:border-border/60"
+        style={{ aspectRatio: "1/1", touchAction: "pan-y" }}
+        onPointerDown={onPointerDown}
+        onTouchStart={(e) => handleTouchStart(e.touches[0].clientX)}
+        onTouchMove={(e) => handleTouchMove(e.touches[0].clientX)}
+        onTouchEnd={handleTouchEnd}
       >
         {hasImages ? (
-          <img
-            src={realImages[selected]}
-            alt={productName}
-            className="w-full h-full object-cover"
-          />
+          <>
+            {realImages.map((src, i) => {
+              const rel = i - selected;
+              const w = containerWidth || 1;
+              const percent = rel * 100 + (offset / w) * 100;
+              return (
+                <img
+                  key={i}
+                  src={src}
+                  alt={`${productName} ${i + 1}`}
+                  className="absolute inset-0 w-full h-full object-cover transition-transform"
+                  draggable={false}
+                  onDragStart={(ev) => ev.preventDefault()}
+                  style={{
+                    transform: `translateX(${percent}%)`,
+                    transition: dragging ? "none" : "transform 320ms ease",
+                  }}
+                />
+              );
+            })}
+          </>
         ) : (
           <div className="w-full h-full flex items-center justify-center text-foreground/20">
             No Image
+          </div>
+        )}
+        {/* Image count overlay (e.g. 1/3) */}
+        {realImages.length > 0 && (
+          <div className="absolute bottom-3 right-3 bg-black/60 text-white text-xs px-2 py-0.5 rounded-md">
+            {selected + 1}/{realImages.length}
           </div>
         )}
         {realImages.length > 1 && (
@@ -207,25 +295,38 @@ const MessagingPanel = ({ listing, onClose, currentUser }) => {
   const bottomRef = useRef(null);
 
   useEffect(() => {
-    if (!currentUser?.uid || !listing?.id) {
-      setReady(true);
-      return;
-    }
-    const q = query(
-      collection(db, "messages"),
-      where("listingId", "==", listing.id),
-      where("buyerUid", "==", currentUser.uid),
-      orderBy("createdAt", "asc"),
-    );
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
+    // Temporary: use polling instead of onSnapshot to avoid Firestore watch-stream INTERNAL ASSERTION errors
+    let mounted = true;
+    let pollId = null;
+    const load = async () => {
+      if (!currentUser?.uid || !listing?.id) {
+        if (mounted) setReady(true);
+        return;
+      }
+      try {
+        const q = query(
+          collection(db, "messages"),
+          where("listingId", "==", listing.id),
+          where("buyerUid", "==", currentUser.uid),
+          orderBy("createdAt", "asc"),
+        );
+        const snap = await getDocs(q);
+        if (!mounted) return;
         setMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
         setReady(true);
-      },
-      () => setReady(true),
-    );
-    return () => unsub();
+      } catch (e) {
+        console.error("messages poll error", e);
+        if (mounted) setReady(true);
+      }
+    };
+    // initial load
+    load();
+    // poll every 2.5s
+    pollId = window.setInterval(load, 2500);
+    return () => {
+      mounted = false;
+      if (pollId) window.clearInterval(pollId);
+    };
   }, [listing?.id, currentUser?.uid]);
 
   useEffect(() => {
@@ -567,6 +668,25 @@ const SellerInfo = ({ listing, onMsg }) => (
 );
 
 /* ── Saved Items helpers ── */
+const createSaveNotification = async (listing, buyerName, buyerUid) => {
+  try {
+    await addDoc(collection(db, "notifications"), {
+      type: "saved",
+      listingId: listing.id,
+      listingName: listing.name,
+      listingImageUrl: listing.imageUrl || null,
+      sellerUid: listing.sellerUid,
+      sellerName: listing.sellerName || "Seller",
+      buyerUid: buyerUid,
+      buyerName: buyerName || "Buyer",
+      read: false,
+      createdAt: serverTimestamp(),
+    });
+  } catch (e) {
+    console.error("Notification creation error:", e);
+  }
+};
+
 const savedHelpers = {
   _key: (uid) => (uid ? `declutt_saved_${uid}` : "declutt_saved_guest"),
   get: (uid) => {
@@ -576,7 +696,7 @@ const savedHelpers = {
       return [];
     }
   },
-  toggle: (uid, listing) => {
+  toggle: (uid, listing, buyerName) => {
     const saved = savedHelpers.get(uid);
     const idx = saved.findIndex((i) => i.id === listing.id);
     let next;
@@ -593,6 +713,10 @@ const savedHelpers = {
           category: listing.category || "",
         },
       ];
+      // Trigger notification creation when item is saved (not unsaved)
+      if (uid) {
+        createSaveNotification(listing, buyerName, uid);
+      }
     }
     localStorage.setItem(savedHelpers._key(uid), JSON.stringify(next));
     window.dispatchEvent(new CustomEvent("saved-updated", { detail: { uid } }));
@@ -676,6 +800,45 @@ const RelatedItems = ({ currentId, category }) => {
   );
 };
 
+/* ── Reviews Section (simple placeholder when no reviews) ── */
+const ReviewsSection = ({ listing }) => {
+  const count = listing.reviewCount || 0;
+  const avg = listing.avgRating || 0;
+  return (
+    <div className="mt-8 border-t border-border pt-6">
+      <h2 className="text-base font-bold text-foreground mb-3">Reviews</h2>
+      <div className="bg-card border rounded-2xl p-4">
+        {count > 0 ? (
+          <div className="flex items-center gap-3">
+            <div className="flex gap-0.5">
+              {[...Array(5)].map((_, i) => (
+                <svg
+                  key={i}
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill={i < Math.round(avg) ? "currentColor" : "none"}
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  className="text-primary"
+                >
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                </svg>
+              ))}
+            </div>
+            <div>
+              <p className="text-sm font-bold">{avg.toFixed(1)}</p>
+              <p className="text-xs text-foreground/40">{count} review{count!==1?"s":""}</p>
+            </div>
+          </div>
+        ) : (
+          <div className="text-sm text-foreground/50">0 reviews</div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 /* ── Main ProductDetails ── */
 const ProductDetails = () => {
   const { id } = useParams();
@@ -743,7 +906,8 @@ const ProductDetails = () => {
   };
 
   const handleSave = () => {
-    const nowSaved = savedHelpers.toggle(uid, listing);
+    const buyerName = user?.displayName || "Buyer";
+    const nowSaved = savedHelpers.toggle(uid, listing, buyerName);
     setIsSaved(nowSaved);
     showToast(nowSaved ? "Saved ✓" : "Removed from saved");
   };
@@ -889,10 +1053,12 @@ const ProductDetails = () => {
         </div>
       </div>
 
-      <main className="flex-1 w-full mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 pb-24 sm:pb-8 mt-15">
+      <main className="flex-1 w-full mx-auto px-3 sm:px-4 lg:px-6 pt-0 sm:py-6 pb-24 sm:pb-8 mt-15">
         <div className="grid grid-cols-1 lg:grid-cols-[480px_1fr_330px] gap-4 lg:gap-6 items-start">
-          <div className="w-full lg:sticky lg:top-28 mt-1">
-            <ImageGallery images={images} productName={listing.name} />
+          <div className="w-full lg:sticky lg:top-28 mt-0 sm:mt-1">
+            <div className="-mx-3 sm:mx-0">
+              <ImageGallery images={images} productName={listing.name} />
+            </div>
           </div>
 
           <div className="space-y-4 text-left">
@@ -1037,6 +1203,9 @@ const ProductDetails = () => {
             </div>
           </div>
         </div>
+
+        {/* Reviews */}
+        <ReviewsSection listing={listing} />
 
         {/* Related Items */}
         <div className="mt-10 sm:mt-12 border-t border-border pt-8">

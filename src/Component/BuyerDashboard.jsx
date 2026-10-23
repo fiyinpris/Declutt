@@ -5,7 +5,7 @@ import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
 import { useSavedItems } from "../utils/savedItems";
 import ChatCenter from "./ChatCenter";
-import { markDelivered } from "./chatUI";
+import { markDelivered } from "./Chatui";
 import { Ico, Spin } from "./Ico";
 import { useCloseFooterGap } from "../utils/footerGap";
 

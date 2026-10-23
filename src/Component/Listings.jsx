@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { collection, getDocs, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
 import { useBuyerLocation, listingDistance } from "../utils/geo";
-import { cartHelpers } from "../utils/cart";
+import { cartHelpers } from "../utils/Cart";
 import { useAuth } from "../context/AuthContext";
 import { LocationBanner } from "./GeoUI";
 

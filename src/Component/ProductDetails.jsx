@@ -15,9 +15,9 @@ import {
 import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
 import { toggleSaved, useSavedItems } from "../utils/savedItems";
-import { tsMs, markDelivered, MessageList, Composer, Avatar } from "./chatUI";
+import { tsMs, markDelivered, MessageList, Composer, Avatar } from "./Chatui";
 import { useBuyerLocation } from "../utils/geo";
-import { cartHelpers } from "../utils/cart";
+import { cartHelpers } from "../utils/Cart";
 import { DistanceLine } from "./GeoUI";
 import Navbar from "./Navbar";
 import Footer from "./Footer";

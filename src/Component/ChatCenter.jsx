@@ -23,7 +23,7 @@ import {
   ProductThumb,
   MessageList,
   Composer,
-} from "./chatUI";
+} from "./Chatui";
 
 export { tsMs }; // other files import tsMs from here
 

@@ -15,17 +15,20 @@ import vaseImg from "../images/vase.jpg";
 import lampsImg from "../images/chandelier.jpg";
 import bedImg from "../images/bed.jpg";
 
-// Same categories sellers choose from when listing
+// The kinds of things people sell here — all within Furniture, Appliances and Electronics
 const CATEGORIES = [
-  "Electronics",
-  "Furniture",
-  "Clothing",
-  "Books",
-  "Appliances",
-  "Bikes & Vehicles",
-  "Sports",
-  "Music",
-  "Kitchen",
+  "Sofas & chairs",
+  "Beds & wardrobes",
+  "Dining sets",
+  "Desks & shelves",
+  "Fridges & freezers",
+  "Washing machines",
+  "Cookers & microwaves",
+  "Fans & ACs",
+  "TVs",
+  "Laptops",
+  "Phones & tablets",
+  "Speakers",
 ];
 
 const STORY = [
@@ -166,9 +169,10 @@ const About = () => {
           </h1>
           <div className="opacity-0 animate-fade-in-delay-2 mt-6 h-px w-24 bg-primary" />
           <p className="opacity-0 animate-fade-in-delay-2 mt-6 text-base sm:text-lg text-foreground/65 max-w-lg leading-relaxed">
-            Declutt is a local marketplace for pre-loved items. We make it easy
-            to pass on what you no longer need to someone nearby who does —
-            and to find great things without paying for new.
+            Declutt is a local marketplace for pre-loved furniture, home
+            appliances and electronics. We make it easy to pass on what you no
+            longer need to someone nearby who does — and to find great things
+            without paying for new.
           </p>
         </div>
 

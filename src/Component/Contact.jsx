@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
@@ -22,10 +22,13 @@ const SUBJECTS = [
   "General question",
   "Buying an item",
   "Selling an item",
+  "Feature my listing",
   "My account",
   "Report a problem",
   "Partnerships",
 ];
+// /contact?topic=feature (from "Request featuring" in My Items) opens with that topic chosen
+const TOPIC_LINKS = { feature: "Feature my listing" };
 
 const FAQS = [
   {
@@ -140,11 +143,12 @@ const Faq = ({ q, a }) => {
 };
 
 const Contact = () => {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
+  const [params] = useSearchParams();
   const blank = {
-    name: profile?.name || "",
-    email: profile?.email || user?.email || "",
-    subject: SUBJECTS[0],
+    name: "",
+    email: "",
+    subject: TOPIC_LINKS[params.get("topic")] || SUBJECTS[0],
     message: "",
     company: "", // honeypot — real people never see or fill this
   };

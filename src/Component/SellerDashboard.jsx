@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   collection,
   getDocs,
@@ -22,6 +22,15 @@ import { Ico, Spin } from "./Ico";
 import { useCloseFooterGap } from "../utils/footerGap";
 import { captureBestPosition, describeGeoError, getCoords } from "../utils/geo";
 import { compressToBase64 } from "../utils/images";
+import {
+  CATEGORIES,
+  REVIEWED_FIELDS,
+  isAllowedListing,
+  isFeatured,
+  isPublicListing,
+  listingStatus,
+  normalizeCategory,
+} from "../utils/categories";
 import ProfilePhotoCard from "./ProfilePhotoCard";
 
 const NAVBAR_H = 64;
@@ -637,7 +646,8 @@ const ListingModal = ({
     name: existing?.name || "",
     description: existing?.description || "",
     price: existing?.price || "",
-    category: existing?.category || "",
+    // older listings may have a typed category; keep it only if it maps to an allowed one
+    category: normalizeCategory(existing?.category) || "",
     condition: existing?.condition || CONDITIONS[0],
     available: existing?.available ?? true,
   });
@@ -705,8 +715,10 @@ const ListingModal = ({
       setError("Enter a valid price.");
       return;
     }
-    if (!form.category.trim()) {
-      setError("Please enter a category for your item.");
+    if (!CATEGORIES.includes(form.category)) {
+      setError(
+        "Choose a category. Declutt only accepts furniture, appliances and electronics.",
+      );
       return;
     }
     if (!gpsCoords) {
@@ -769,10 +781,16 @@ const ListingModal = ({
         updatedAt: serverTimestamp(),
       };
       if (existing) {
+        // Changing what buyers rely on (name, description, photos, category) needs a fresh review;
+        // price, condition, availability and location changes go live straight away
+        const same = (k) =>
+          JSON.stringify(payload[k] ?? null) === JSON.stringify(existing[k] ?? null);
+        if (!REVIEWED_FIELDS.every(same)) payload.status = "pending";
         await updateDoc(doc(db, "listings", existing.id), payload);
       } else {
         await addDoc(collection(db, "listings"), {
           ...payload,
+          status: "pending", // an admin approves it before buyers can see it
           createdAt: serverTimestamp(),
         });
       }
@@ -948,14 +966,17 @@ const ListingModal = ({
           </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Category" htmlFor="listing-cat">
-              <input
+              <select
                 id="listing-cat"
-                type="text"
+                className={selectCls}
                 value={form.category}
                 onChange={(e) => set("category", e.target.value)}
-                placeholder="e.g. Electronics, Furniture"
-                className={inputCls}
-              />
+              >
+                <option value="">Choose…</option>
+                {CATEGORIES.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
             </Field>
             <Field label="Condition" htmlFor="listing-cond">
               <select
@@ -970,6 +991,14 @@ const ListingModal = ({
               </select>
             </Field>
           </div>
+          <p className="-mt-1 text-[11px] text-foreground/45 leading-relaxed">
+            Declutt is for{" "}
+            <span className="font-semibold text-foreground/65">
+              furniture, home appliances and electronics
+            </span>{" "}
+            only. Other items (clothes, food, books, sports or music gear…)
+            aren't allowed and will be removed.
+          </p>
           <Field
             label="Your location (required for buyer distance)"
             hint="This will show buyers how far away your item is."
@@ -1169,6 +1198,26 @@ const ItemCard = ({ listing, onEdit, onDelete, showActions = true }) => (
       <p className="text-xs text-foreground/40 truncate mt-0.5">
         {listing.category} · {listing.condition}
       </p>
+      {!isAllowedListing(listing) ? (
+        <p className="mt-1.5 text-[11px] font-semibold text-amber-600 leading-snug">
+          Hidden from buyers — edit and choose Furniture, Appliances or
+          Electronics.
+        </p>
+      ) : listingStatus(listing) === "pending" ? (
+        <p className="mt-1.5 text-[11px] font-semibold text-amber-600 leading-snug">
+          ⏳ Waiting for review — buyers will see it once approved.
+        </p>
+      ) : listingStatus(listing) === "rejected" ? (
+        <p className="mt-1.5 text-[11px] font-semibold text-red-500 leading-snug">
+          Not approved
+          {listing.rejectReason ? `: ${listing.rejectReason}` : ""}. Edit it to
+          send it for review again.
+        </p>
+      ) : (
+        isFeatured(listing) && (
+          <p className="mt-1.5 text-[11px] font-bold text-primary">★ Featured</p>
+        )
+      )}
       <div className="flex items-center justify-between mt-2">
         <p className="text-sm font-black text-primary">
           ₦{Number(listing.price).toLocaleString()}
@@ -1250,7 +1299,8 @@ const Pagination = ({ total, perPage, current, onChange }) => {
 
 // ── Overview Panel ────────────────────────────────────────────────────────────
 const OverviewPanel = ({ profile, listings, setTab, onAddNew }) => {
-  const active = listings.filter((l) => l.available).length;
+  // "visible in Browse" = available, approved and in an allowed category
+  const active = listings.filter((l) => l.available && isPublicListing(l)).length;
   const sold = listings.filter((l) => !l.available).length;
   const earned = listings
     .filter((l) => !l.available)
@@ -1460,6 +1510,25 @@ const ItemsPanel = ({
         <p className="text-xs text-foreground/60 bg-primary/5 border border-primary/15 rounded-xl px-3.5 py-2.5">
           {locMsg}
         </p>
+      )}
+      {listings.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3.5 text-left">
+          <div>
+            <p className="text-sm font-bold text-foreground">
+              ★ Get more buyers with a Featured listing
+            </p>
+            <p className="text-xs text-foreground/55 mt-0.5">
+              Featured items show first on Browse with a Featured badge for 7
+              days.
+            </p>
+          </div>
+          <Link
+            to="/contact?topic=feature"
+            className="shrink-0 text-xs font-bold px-4 py-2 rounded-full bg-primary text-primary-foreground hover:opacity-90 transition-opacity text-center"
+          >
+            Request featuring
+          </Link>
+        </div>
       )}
       {listings.length > 0 ? (
         <>

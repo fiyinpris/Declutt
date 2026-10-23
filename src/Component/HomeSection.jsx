@@ -578,7 +578,7 @@ const Section4 = () => {
             }}
           >
             <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-widest text-white/70 mb-2">
-              Why Declutт
+              Why Declutt
             </p>
             <h3 className="text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl font-bold text-white leading-snug drop-shadow-lg">
               Everything you need
@@ -667,7 +667,7 @@ const Section4 = () => {
 
 const FAQS = [
   {
-    q: "Is it free to list items on Declutт?",
+    q: "Is it free to list items on Declutt?",
     a: "Yes, completely. Listing your items is 100% free with no hidden charges. You keep everything you earn.",
   },
   {
@@ -675,11 +675,11 @@ const FAQS = [
     a: "You agree on payment directly with the buyer — cash, bank transfer, or any method you both prefer. We don't take a cut.",
   },
   {
-    q: "What can I sell on Declutт?",
-    a: "Almost anything — furniture, electronics, clothes, appliances, books, bikes, and more. As long as it's legal and secondhand, list it.",
+    q: "What can I sell on Declutt?",
+    a: "Furniture, home appliances and electronics — pre-loved and in working order. Other items (like clothes, food, books, sports or music gear) aren't allowed and will be removed.",
   },
   {
-    q: "Is Declutт available outside Ile-Ife?",
+    q: "Is Declutt available outside Ile-Ife?",
     a: "Yes! We started in Ile-Ife and are expanding across Osun State and beyond. Whether you're in Ibadan, Lagos, Abuja, or PH — buyers are near you.",
   },
   {
@@ -856,7 +856,7 @@ const REVIEWS = [
     initials: "AO",
     stars: 5,
     time: "2 days ago",
-    text: "Listed my sofa on Monday, sold it by Tuesday evening. I genuinely couldn't believe how fast it went. Declutт is the real deal.",
+    text: "Listed my sofa on Monday, sold it by Tuesday evening. I genuinely couldn't believe how fast it went. Declutt is the real deal.",
   },
   {
     name: "Tunde Bello",
@@ -884,7 +884,7 @@ const REVIEWS = [
     initials: "DM",
     stars: 5,
     time: "just now",
-    text: "Sold my iPhone 13 within hours. Buyer was verified, payment instant. Absolutely love Declutт.",
+    text: "Sold my iPhone 13 within hours. Buyer was verified, payment instant. Absolutely love Declutt.",
   },
   {
     name: "Ngozi Adeyemi",
@@ -1261,7 +1261,7 @@ const StepsTimeline = () => {
           Up &amp; running in <span className="text-primary">4 steps</span>
         </h2>
         <p className="mt-3 text-sm sm:text-base text-foreground/55 max-w-md mx-auto leading-relaxed">
-          Whether you're buying or selling, getting started on Declutт is
+          Whether you're buying or selling, getting started on Declutt is
           effortless.
         </p>
       </div>
@@ -1571,15 +1571,15 @@ export const HomeSection = () => {
           <OrbitRing />
           <div className="flex-1 text-center md:text-left">
             <p className="text-xs font-semibold uppercase tracking-widest text-primary mb-2 sm:mb-3">
-              Why Declutт?
+              Why Declutt?
             </p>
             <h2 className="text-xl sm:text-2xl lg:text-3xl xl:text-4xl font-bold text-foreground leading-snug">
               Turn unused items into{" "}
               <span className="text-primary">instant cash</span>
             </h2>
             <p className="mt-3 sm:mt-4 text-sm sm:text-base lg:text-lg text-foreground/60 max-w-lg">
-              List anything — furniture, gadgets, clothes, and more. Reach
-              thousands of buyers in your area and close deals fast.
+              List your furniture, appliances and electronics. Reach buyers in
+              your area and close deals fast.
             </p>
             <div className="mt-4 sm:mt-6 flex flex-wrap gap-2 sm:gap-3 justify-center md:justify-start">
               {[

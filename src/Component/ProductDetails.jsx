@@ -25,9 +25,101 @@ import {
 } from "./Chatui";
 import { useBuyerLocation } from "../utils/geo";
 import { cartHelpers } from "../utils/Cart";
+import {
+  isAllowedListing,
+  isPublicListing,
+  listingStatus,
+} from "../utils/categories";
+
+const REPORT_REASONS = [
+  "Not furniture, appliances or electronics",
+  "Looks like a scam",
+  "Wrong price or misleading description",
+  "Item is already sold",
+  "Offensive or inappropriate",
+  "Something else",
+];
+
+/** Lets a signed-in user flag a listing; reports land in the admin dashboard. */
+const ReportModal = ({ listing, reporterUid, onClose, onSent }) => {
+  const [reason, setReason] = useState(REPORT_REASONS[0]);
+  const [details, setDetails] = useState("");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = async () => {
+    setSending(true);
+    setError("");
+    try {
+      await addDoc(collection(db, "reports"), {
+        listingId: listing.id,
+        listingName: listing.name || "",
+        sellerUid: listing.sellerUid || null,
+        reason,
+        details: details.trim().slice(0, 500),
+        reporterUid,
+        status: "open",
+        createdAt: serverTimestamp(),
+      });
+      onSent();
+    } catch (e) {
+      console.error("Report failed:", e);
+      setError("Couldn't send your report. Please try again.");
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full sm:max-w-md bg-card border border-border rounded-t-3xl sm:rounded-2xl shadow-2xl p-5 sm:p-6 text-left">
+        <p className="text-base font-bold text-foreground">Report this listing</p>
+        <p className="mt-1 text-xs text-foreground/50 truncate">{listing.name}</p>
+        <div className="mt-4 space-y-2" role="radiogroup" aria-label="Reason">
+          {REPORT_REASONS.map((r) => (
+            <button
+              key={r}
+              type="button"
+              role="radio"
+              aria-checked={reason === r}
+              onClick={() => setReason(r)}
+              className={`w-full text-left px-3.5 py-2.5 rounded-xl border text-sm transition-colors ${reason === r ? "border-primary bg-primary/8 text-foreground font-semibold" : "border-border text-foreground/65 hover:border-primary/40"}`}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
+        <textarea
+          rows={3}
+          maxLength={500}
+          value={details}
+          onChange={(e) => setDetails(e.target.value)}
+          placeholder="Anything else we should know? (optional)"
+          className="mt-3 w-full resize-none rounded-xl border border-border bg-background px-3.5 py-2.5 text-[16px] sm:text-sm text-foreground placeholder:text-foreground/30 outline-none focus:border-primary/50"
+        />
+        {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
+        <div className="mt-4 flex gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-border text-sm font-semibold text-foreground/65 hover:text-foreground"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={sending}
+            className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-bold hover:bg-red-600 disabled:opacity-60"
+          >
+            {sending ? "Sending…" : "Send report"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 import { DistanceLine } from "./GeoUI";
-import Navbar from "./Navbar";
-import Footer from "./Footer";
 
 export { cartHelpers };
 
@@ -581,7 +673,9 @@ const RelatedItems = ({ currentId, category }) => {
   useEffect(() => {
     getDocs(collection(db, "listings"))
       .then((snap) => {
-        const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const all = snap.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .filter(isPublicListing);
         const sameCategory = all.filter(
           (l) =>
             l.id !== currentId &&
@@ -699,6 +793,7 @@ const ProductDetails = () => {
   const [loading, setLoading] = useState(true);
   const [qty, setQty] = useState(1);
   const [showMsg, setShowMsg] = useState(false);
+  const [showReport, setShowReport] = useState(false);
   const [toast, setToast] = useState({ show: false, msg: "" });
 
   // Live saved list (Firestore-backed, cached locally) — keeps the heart in sync everywhere
@@ -756,6 +851,14 @@ const ProductDetails = () => {
     showToast("Added to cart ✓");
   };
 
+  const openReport = () => {
+    if (!user) {
+      showToast("Sign in to report a listing");
+      return;
+    }
+    setShowReport(true);
+  };
+
   const handleSave = () => {
     if (!uid) {
       showToast("Sign in to save items");
@@ -782,7 +885,6 @@ const ProductDetails = () => {
   if (loading)
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        <Navbar />
         <div className="flex-1 flex items-center justify-center gap-2 text-foreground/40">
           <Spinner size={22} />
           <span className="text-sm">Loading...</span>
@@ -790,13 +892,20 @@ const ProductDetails = () => {
       </div>
     );
 
-  if (!listing)
+  // Waiting for review, rejected, or not furniture/appliances/electronics: only the seller and
+  // admins can open it
+  const isOwner = !!listing && !!uid && listing.sellerUid === uid;
+  const isAdmin = profile?.role === "admin";
+  const hidden = !!listing && !isPublicListing(listing);
+
+  if (!listing || (hidden && !isOwner && !isAdmin))
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        <Navbar />
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center space-y-3">
-            <p className="text-foreground/50 font-bold">Product not found</p>
+            <p className="text-foreground/50 font-bold">
+              {listing ? "This item isn't available" : "Product not found"}
+            </p>
             <button
               onClick={() => navigate("/listings")}
               className="text-primary text-sm font-bold hover:underline"
@@ -805,7 +914,6 @@ const ProductDetails = () => {
             </button>
           </div>
         </div>
-        <Footer />
       </div>
     );
 
@@ -870,6 +978,28 @@ const ProductDetails = () => {
           Share
         </button>
       </div>
+      {!isOwner && (
+        <button
+          type="button"
+          onClick={openReport}
+          className="w-full flex items-center justify-center gap-1.5 pt-1 text-[11px] font-semibold text-foreground/40 hover:text-red-500 transition-colors"
+        >
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+            <line x1="4" y1="22" x2="4" y2="15" />
+          </svg>
+          Report this listing
+        </button>
+      )}
     </div>
   );
 
@@ -878,7 +1008,6 @@ const ProductDetails = () => {
       className="min-h-screen bg-background flex flex-col"
       style={{ overflowX: "clip" }}
     >
-      <Navbar />
 
       {/* Breadcrumb */}
       <div className="border-b border-border bg-card/80 backdrop-blur-sm sticky top-14 sm:top-16 z-30">
@@ -918,6 +1047,15 @@ const ProductDetails = () => {
           </div>
 
           <div className="space-y-4 text-left">
+            {hidden && (
+              <div className="px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-700 dark:text-amber-400">
+                {!isAllowedListing(listing)
+                  ? "Hidden from buyers: Declutt only accepts furniture, appliances and electronics. Edit it and choose one of those categories."
+                  : listingStatus(listing) === "rejected"
+                    ? `Not approved${listing.rejectReason ? `: ${listing.rejectReason}` : "."} Edit the listing to send it for review again.`
+                    : "Waiting for review — buyers will see this once an admin approves it."}
+              </div>
+            )}
             <span
               className={`inline-flex text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full border ${listing.available ? "bg-green-500/10 text-green-600 border-green-500/25" : "bg-red-500/10 text-red-500 border-red-500/20"}`}
             >
@@ -1094,6 +1232,17 @@ const ProductDetails = () => {
           onClose={() => setShowMsg(false)}
           currentUser={user}
           buyerName={buyerName}
+        />
+      )}
+      {showReport && user && (
+        <ReportModal
+          listing={listing}
+          reporterUid={user.uid}
+          onClose={() => setShowReport(false)}
+          onSent={() => {
+            setShowReport(false);
+            showToast("Thanks — we'll review this listing");
+          }}
         />
       )}
       <Toast msg={toast.msg} show={toast.show} />

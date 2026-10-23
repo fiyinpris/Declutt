@@ -8,26 +8,23 @@ import {
   doc,
   updateDoc,
   serverTimestamp,
+  deleteField,
+  Timestamp,
   query,
   orderBy,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
 import { compressToBase64 } from "../utils/images";
+import {
+  CATEGORIES,
+  isAllowedListing,
+  isFeatured,
+  listingStatus,
+  normalizeCategory,
+} from "../utils/categories";
 
 // ── Tiny helpers ────────────────────────────────────────────────────────────
-const CATEGORIES = [
-  "Electronics",
-  "Furniture",
-  "Clothing",
-  "Books",
-  "Appliances",
-  "Bikes & Vehicles",
-  "Sports",
-  "Music",
-  "Kitchen",
-  "Other",
-];
 const LOCATIONS = [
   "OAU Campus",
   "Ile-Ife Town",
@@ -71,7 +68,7 @@ const ListingModal = ({ onClose, onSaved, existing = null }) => {
     name: existing?.name || "",
     description: existing?.description || "",
     price: existing?.price || "",
-    category: existing?.category || CATEGORIES[0],
+    category: normalizeCategory(existing?.category) || CATEGORIES[0],
     condition: existing?.condition || CONDITIONS[0],
     location: existing?.location || LOCATIONS[0],
     sellerName: existing?.sellerName || "",
@@ -119,6 +116,7 @@ const ListingModal = ({ onClose, onSaved, existing = null }) => {
         await addDoc(collection(db, "listings"), {
           ...payload,
           sellerUid: user?.uid, // listings rules require an owner
+          status: "approved", // admins don't need their own listings reviewed
           createdAt: serverTimestamp(),
         });
       }
@@ -363,7 +361,7 @@ const ListingModal = ({ onClose, onSaved, existing = null }) => {
 };
 
 // ── Listing Row / Card ───────────────────────────────────────────────────────
-const ListingRow = ({ listing, onEdit, onDelete }) => (
+const ListingRow = ({ listing, onEdit, onDelete, onFeature }) => (
   <div className="flex items-center gap-4 px-4 py-3.5 rounded-xl bg-card border border-border hover:border-primary/30 transition-all duration-200">
     <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-border/30">
       {listing.imageUrl ? (
@@ -388,15 +386,40 @@ const ListingRow = ({ listing, onEdit, onDelete }) => (
         >
           {listing.available ? "Available" : "Sold"}
         </span>
+        {listingStatus(listing) !== "approved" && (
+          <span
+            className={`text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 border ${listingStatus(listing) === "pending" ? "bg-amber-500/10 text-amber-600 border-amber-500/25" : "bg-red-500/10 text-red-500 border-red-500/25"}`}
+          >
+            {listingStatus(listing) === "pending" ? "Pending review" : "Rejected"}
+          </span>
+        )}
+        {isFeatured(listing) && (
+          <span className="text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 bg-primary text-primary-foreground">
+            ★ Featured
+          </span>
+        )}
       </div>
       <p className="text-xs text-foreground/50 mt-0.5 truncate">
         {listing.category} · {listing.location} · {listing.condition}
+        {!isAllowedListing(listing) && (
+          <span className="ml-2 font-bold text-amber-600">· Not allowed</span>
+        )}
       </p>
     </div>
     <p className="text-sm font-bold text-primary shrink-0">
       ₦{Number(listing.price).toLocaleString()}
     </p>
     <div className="flex gap-1.5 shrink-0">
+      <button
+        onClick={() => onFeature(listing)}
+        title={isFeatured(listing) ? "Stop featuring" : "Feature for 7 days"}
+        aria-label={isFeatured(listing) ? "Stop featuring" : "Feature for 7 days"}
+        className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors ${isFeatured(listing) ? "border-primary bg-primary text-primary-foreground" : "border-border text-foreground/50 hover:text-primary hover:border-primary/40"}`}
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill={isFeatured(listing) ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+        </svg>
+      </button>
       <button
         onClick={() => onEdit(listing)}
         className="w-8 h-8 flex items-center justify-center rounded-lg border border-border text-foreground/50 hover:text-primary hover:border-primary/40 transition-colors"
@@ -436,6 +459,255 @@ const ListingRow = ({ listing, onEdit, onDelete }) => (
     </div>
   </div>
 );
+
+// ── Listings waiting for review (approve before buyers can see them) ─────────
+const ReviewQueue = ({ items, onChanged }) => {
+  const [rejecting, setRejecting] = useState(null); // listing id
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(null);
+
+  const decide = async (l, approve) => {
+    setBusy(l.id);
+    try {
+      await updateDoc(
+        doc(db, "listings", l.id),
+        approve
+          ? { status: "approved", rejectReason: deleteField() }
+          : {
+              status: "rejected",
+              rejectReason:
+                reason.trim() ||
+                "Only furniture, appliances and electronics are allowed.",
+            },
+      );
+      setRejecting(null);
+      setReason("");
+      onChanged();
+    } catch (e) {
+      console.error("Review failed:", e);
+      alert("Couldn't update that listing. Please try again.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="bg-card border border-border rounded-2xl overflow-hidden text-left">
+      <div className="px-4 sm:px-5 py-3.5 border-b border-border/60 flex items-center justify-between">
+        <p className="text-sm font-bold text-foreground">
+          Waiting for review
+          {items.length > 0 && (
+            <span className="ml-2 px-2 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-black align-middle">
+              {items.length}
+            </span>
+          )}
+        </p>
+        <span className="text-[11px] text-foreground/40">
+          Buyers only see approved listings
+        </span>
+      </div>
+      {items.length === 0 ? (
+        <p className="px-5 py-6 text-sm text-foreground/40">
+          Nothing to review right now.
+        </p>
+      ) : (
+        <ul className="divide-y divide-border/60 max-h-[520px] overflow-y-auto">
+          {items.map((l) => (
+            <li key={l.id} className="px-4 sm:px-5 py-4 flex flex-col sm:flex-row gap-4">
+              <div className="w-full sm:w-24 h-40 sm:h-24 rounded-xl overflow-hidden bg-border/30 shrink-0">
+                {l.imageUrl ? (
+                  <img src={l.imageUrl} alt={l.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-xs text-foreground/30">
+                    No photo
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-foreground">{l.name}</p>
+                <p className="text-xs text-foreground/50 mt-0.5">
+                  {normalizeCategory(l.category)} · ₦
+                  {Number(l.price).toLocaleString()} · by{" "}
+                  {l.sellerName || "Seller"}
+                </p>
+                {l.description && (
+                  <p className="text-xs text-foreground/60 mt-1.5 line-clamp-3">
+                    {l.description}
+                  </p>
+                )}
+                {rejecting === l.id ? (
+                  <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                    <input
+                      autoFocus
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                      placeholder="Reason shown to the seller (optional)"
+                      className="flex-1 px-3 py-2 text-sm rounded-lg border border-border bg-background text-foreground outline-none focus:border-primary/50"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => decide(l, false)}
+                        disabled={busy === l.id}
+                        className="px-3 py-2 rounded-lg bg-red-500 text-white text-xs font-bold disabled:opacity-60"
+                      >
+                        Reject
+                      </button>
+                      <button
+                        onClick={() => setRejecting(null)}
+                        className="px-3 py-2 rounded-lg border border-border text-xs font-semibold text-foreground/60"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      onClick={() => decide(l, true)}
+                      disabled={busy === l.id}
+                      className="px-3.5 py-2 rounded-lg bg-green-600 text-white text-xs font-bold disabled:opacity-60"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => {
+                        setRejecting(l.id);
+                        setReason("");
+                      }}
+                      className="px-3.5 py-2 rounded-lg border border-red-500/30 text-red-500 text-xs font-bold"
+                    >
+                      Reject…
+                    </button>
+                    <a
+                      href={`/product/${l.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3.5 py-2 rounded-lg border border-border text-foreground/60 text-xs font-semibold hover:text-primary"
+                    >
+                      View
+                    </a>
+                  </div>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+};
+
+// ── Reports from buyers ("Report this listing" on the product page) ─────────
+const ReportsInbox = ({ onListingRemoved }) => {
+  const [items, setItems] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    let dead = false;
+    getDocs(query(collection(db, "reports"), orderBy("createdAt", "desc")))
+      .then((snap) => {
+        if (!dead) setItems(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      })
+      .catch((e) => {
+        console.error("Reports:", e);
+        if (!dead) setItems([]);
+      });
+    return () => {
+      dead = true;
+    };
+  }, [reloadKey]);
+
+  const resolve = async (r, removeListing) => {
+    try {
+      if (removeListing) {
+        await deleteDoc(doc(db, "listings", r.listingId));
+        onListingRemoved();
+      }
+      await updateDoc(doc(db, "reports", r.id), {
+        status: removeListing ? "removed" : "dismissed",
+      });
+      setReloadKey((k) => k + 1);
+    } catch (e) {
+      console.error("Resolve report failed:", e);
+      alert("Couldn't update that report. Please try again.");
+    }
+  };
+
+  const open = items?.filter((r) => r.status === "open") || [];
+
+  return (
+    <div className="bg-card border border-border rounded-2xl overflow-hidden text-left">
+      <div className="px-4 sm:px-5 py-3.5 border-b border-border/60 flex items-center justify-between">
+        <p className="text-sm font-bold text-foreground">
+          Reported listings
+          {open.length > 0 && (
+            <span className="ml-2 px-2 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-black align-middle">
+              {open.length}
+            </span>
+          )}
+        </p>
+        <button
+          onClick={() => setReloadKey((k) => k + 1)}
+          className="text-xs font-semibold text-foreground/50 hover:text-primary"
+        >
+          Refresh
+        </button>
+      </div>
+      {items === null ? (
+        <div className="flex items-center gap-3 text-foreground/40 px-5 py-6 text-sm">
+          <Spinner /> Loading reports…
+        </div>
+      ) : open.length === 0 ? (
+        <p className="px-5 py-6 text-sm text-foreground/40">No open reports.</p>
+      ) : (
+        <ul className="divide-y divide-border/60 max-h-[420px] overflow-y-auto">
+          {open.map((r) => (
+            <li key={r.id} className="px-4 sm:px-5 py-3.5">
+              <div className="flex items-center justify-between gap-3">
+                <a
+                  href={`/product/${r.listingId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm font-bold text-foreground hover:text-primary truncate"
+                >
+                  {r.listingName || "Listing"}
+                </a>
+                <span className="text-[11px] text-foreground/40 shrink-0">
+                  {r.createdAt?.toDate?.().toLocaleString([], {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })}
+                </span>
+              </div>
+              <p className="text-xs font-semibold text-red-500 mt-0.5">
+                {r.reason}
+              </p>
+              {r.details && (
+                <p className="text-xs text-foreground/60 mt-1 whitespace-pre-wrap break-words">
+                  {r.details}
+                </p>
+              )}
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                <button
+                  onClick={() => resolve(r, true)}
+                  className="px-3 py-1.5 rounded-lg bg-red-500 text-white text-xs font-bold"
+                >
+                  Remove listing
+                </button>
+                <button
+                  onClick={() => resolve(r, false)}
+                  className="px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-foreground/60 hover:text-foreground"
+                >
+                  Dismiss
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+};
 
 // ── Contact messages (from the /contact page) ───────────────────────────────
 const ContactInbox = () => {
@@ -598,6 +870,25 @@ const AdminDashboard = () => {
     fetchListings();
   }, []);
 
+  // Featured = paid promotion: shown first on Browse with a badge for 7 days
+  const toggleFeatured = async (l) => {
+    try {
+      await updateDoc(doc(db, "listings", l.id), {
+        featuredUntil: isFeatured(l)
+          ? deleteField()
+          : Timestamp.fromMillis(Date.now() + 7 * 24 * 3600 * 1000),
+      });
+      fetchListings();
+    } catch (e) {
+      console.error("Feature failed:", e);
+      alert("Couldn't update featuring. Please try again.");
+    }
+  };
+
+  const pendingReview = listings.filter(
+    (l) => isAllowedListing(l) && listingStatus(l) === "pending",
+  );
+
   const handleDelete = async (id) => {
     await deleteDoc(doc(db, "listings", id));
     setDeleteConfirm(null);
@@ -610,7 +901,11 @@ const AdminDashboard = () => {
       l.name?.toLowerCase().includes(q) ||
       l.category?.toLowerCase().includes(q) ||
       l.location?.toLowerCase().includes(q);
-    const matchCat = filterCat === "All" || l.category === filterCat;
+    const matchCat =
+      filterCat === "All" ||
+      (filterCat === "Not allowed"
+        ? !isAllowedListing(l)
+        : normalizeCategory(l.category) === filterCat);
     return matchSearch && matchCat;
   });
 
@@ -682,6 +977,8 @@ const AdminDashboard = () => {
           ))}
         </div>
 
+        <ReviewQueue items={pendingReview} onChanged={fetchListings} />
+        <ReportsInbox onListingRemoved={fetchListings} />
         <ContactInbox />
 
         {/* Controls */}
@@ -720,6 +1017,7 @@ const AdminDashboard = () => {
               {CATEGORIES.map((c) => (
                 <option key={c}>{c}</option>
               ))}
+              <option>Not allowed</option>
             </select>
           </div>
           <button
@@ -777,6 +1075,7 @@ const AdminDashboard = () => {
                   setShowModal(true);
                 }}
                 onDelete={(id) => setDeleteConfirm(id)}
+                onFeature={toggleFeatured}
               />
             ))}
           </div>

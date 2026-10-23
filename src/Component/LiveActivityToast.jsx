@@ -9,6 +9,7 @@ import {
   query,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import { isPublicListing } from "../utils/categories";
 
 /*
  * Home page activity pop-up. Shows REAL recent listings from Firestore (newest first, live):
@@ -64,7 +65,13 @@ const LiveActivityToast = () => {
           setItems(
             snap.docs
               .map((d) => ({ id: d.id, ...d.data() }))
-              .filter((l) => l.available !== false && l.name && tsMs(l.createdAt)),
+              .filter(
+                (l) =>
+                  isPublicListing(l) &&
+                  l.available !== false &&
+                  l.name &&
+                  tsMs(l.createdAt),
+              ),
           ),
         (e) => console.error("Activity pop-up:", e),
       ),

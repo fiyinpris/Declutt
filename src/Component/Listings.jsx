@@ -1,9 +1,15 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { collection, getDocs, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
 import { useBuyerLocation, listingDistance } from "../utils/geo";
 import { cartHelpers } from "../utils/Cart";
+import {
+  CATEGORIES,
+  isFeatured,
+  isPublicListing,
+  normalizeCategory,
+} from "../utils/categories";
 import { useAuth } from "../context/AuthContext";
 import { LocationBanner } from "./GeoUI";
 
@@ -221,12 +227,17 @@ const ListingCard = ({
             </svg>
           </div>
         )}
-        <div className="absolute top-2.5 left-2.5 z-10">
+        <div className="absolute top-2.5 left-2.5 z-10 flex flex-col items-start gap-1">
           <span
             className={`text-[9px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 ${listing.available ? "bg-green-500 text-white" : "bg-red-500/80 text-white"}`}
           >
             {listing.available ? "Available" : "Sold"}
           </span>
+          {isFeatured(listing) && (
+            <span className="text-[9px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 bg-primary text-primary-foreground shadow">
+              ★ Featured
+            </span>
+          )}
         </div>
         {dist && (
           <div
@@ -643,11 +654,18 @@ const Listings = () => {
   // automatically. No orderBy in the query, so listings without a createdAt are no longer dropped.
   useEffect(() => {
     setLoading(true);
-    const byNewest = (a, b) =>
+    // Featured first, then newest
+    const order = (a, b) =>
+      Number(isFeatured(b)) - Number(isFeatured(a)) ||
       (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0);
     const apply = (snap) => {
       setListings(
-        snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort(byNewest),
+        snap.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          // only approved furniture / appliances / electronics reach buyers
+          .filter(isPublicListing)
+          .map((l) => ({ ...l, category: normalizeCategory(l.category) }))
+          .sort(order),
       );
       setLoading(false);
     };
@@ -668,17 +686,7 @@ const Listings = () => {
     return () => unsub();
   }, []);
 
-  const categories = useMemo(() => {
-    const counts = listings.reduce((acc, listing) => {
-      const category = listing.category?.trim();
-      if (!category) return acc;
-      acc[category] = (acc[category] || 0) + 1;
-      return acc;
-    }, {});
-    return Object.entries(counts)
-      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .map(([category]) => category);
-  }, [listings]);
+  const categories = CATEGORIES;
 
   const filtered = listings.filter((l) => {
     const q = search.toLowerCase();

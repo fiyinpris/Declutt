@@ -682,11 +682,6 @@ const TAB_ICONS = {
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
     </TabIcon>
   ),
-  saved: (
-    <TabIcon>
-      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-    </TabIcon>
-  ),
   dashboard: (
     <TabIcon>
       <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -1031,10 +1026,9 @@ const Navbar = () => {
             { id: "home", label: "Home", icon: "home", to: "/" },
             { id: "browse", label: "Browse", icon: "browse", to: "/listings" },
             { id: "messages", label: "Messages", icon: "messages", to: "/buyer?tab=messages", badge: messageCount },
-            { id: "saved", label: "Saved", icon: "saved", to: "/buyer?tab=favourites" },
           ];
 
-  // Every account section, opened from the navbar account icon or the tab bar's Account tab
+  // Every account section, opened from the tab bar's Account tab (Saved Items lives here)
   const accountLinks =
     role === "seller"
       ? [
@@ -1211,7 +1205,6 @@ const Navbar = () => {
           <div className="md:hidden flex items-center gap-1">
             <SearchNavButton onClick={handleSearchClick} />
             {signedIn ? (
-              <>
               <button
                 onClick={() => setCartOpen(true)}
                 aria-label="Cart"
@@ -1238,17 +1231,6 @@ const Navbar = () => {
                   </span>
                 )}
               </button>
-              {/* Same Account sheet as the tab bar's Account tab (phones only; desktop has its dropdown) */}
-              <button
-                onClick={() => setSheetOpen((o) => !o)}
-                aria-label="Account"
-                aria-expanded={sheetOpen}
-                className={`flex items-center justify-center w-10 h-10 rounded-xl transition-colors ${sheetOpen ? "text-primary bg-primary/10" : "text-foreground/70 hover:text-primary hover:bg-primary/10"}`}
-                type="button"
-              >
-                <AccountIcon />
-              </button>
-              </>
             ) : (
               <button
                 onClick={(e) => {

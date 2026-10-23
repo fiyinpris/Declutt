@@ -309,7 +309,7 @@ const MessagingPanel = ({ listing, onClose, currentUser, buyerName }) => {
     };
   }, [listing?.sellerUid, currentUser?.uid]);
 
-  // Panel is open → the seller's messages are READ (blue ticks on their side)
+  // Panel is open → the seller's messages are READ (read ticks on their side)
   useEffect(() => {
     const unread = messages.filter((m) => m.from === "seller" && !m.read);
     if (!unread.length) return;

@@ -56,7 +56,7 @@ export const listTime = (ms) => {
  *  pending   clock        not saved on the server yet
  *  sent      ✓ grey       saved on the server
  *  delivered ✓✓ grey      the other person's app received it
- *  read      ✓✓ BLUE      the other person opened the chat and saw it
+ *  read      ✓✓ brand     the other person opened the chat and saw it (site's light brown)
  */
 export const messageStatus = (m) => {
   if (!m.createdAt) return "pending";
@@ -93,7 +93,7 @@ export const Ticks = ({ status }) => {
       strokeWidth="1.8"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={status === "read" ? "text-sky-500" : "text-foreground/40"}
+      className={status === "read" ? "text-primary" : "text-foreground/40"}
       aria-label={
         status === "read"
           ? "Read"

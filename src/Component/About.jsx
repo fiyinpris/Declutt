@@ -10,6 +10,7 @@ import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
 import { useInView } from "../utils/useInView";
 import Reveal from "./Reveal";
+import HeroGrid from "./HeroGrid";
 import { Ico } from "./Ico";
 import heroImg from "../images/hero-image.avif";
 import storyImg from "../images/image1.avif";
@@ -154,10 +155,11 @@ const About = () => {
   return (
     <div className="text-left">
       {/* ── Hero ── */}
-      <section className="relative overflow-hidden hero-grid">
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/40 to-background pointer-events-none" />
+      <section className="relative overflow-hidden">
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 sm:pt-28 pb-16 sm:pb-20 grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
-          <div>
+          <div className="relative">
+            <HeroGrid />
+            <div className="relative z-10">
             <p className="opacity-0 animate-fade-in text-[11px] font-bold uppercase tracking-[0.2em] text-primary">
               About Declutt
             </p>
@@ -184,6 +186,7 @@ const About = () => {
               >
                 Start selling
               </Link>
+            </div>
             </div>
           </div>
           <div className="opacity-0 animate-zoom-in-delay-1 relative">

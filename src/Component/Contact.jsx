@@ -4,6 +4,7 @@ import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
 import Reveal from "./Reveal";
+import HeroGrid from "./HeroGrid";
 import { Ico, Spin } from "./Ico";
 
 /*
@@ -157,19 +158,24 @@ const Contact = () => {
   return (
     <div className="text-left">
       {/* ── Header ── */}
-      <section className="relative overflow-hidden hero-grid">
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-background/50 to-background pointer-events-none" />
-        <div className="relative max-w-3xl mx-auto px-4 sm:px-6 pt-20 sm:pt-28 pb-12 sm:pb-16 text-center">
-          <p className="opacity-0 animate-fade-in text-[11px] font-bold uppercase tracking-[0.2em] text-primary">
-            Contact us
-          </p>
-          <h1 className="opacity-0 animate-fade-in-delay-1 mt-3 text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground">
-            We'd love to hear from you
-          </h1>
-          <p className="opacity-0 animate-fade-in-delay-2 mt-4 text-base sm:text-lg text-foreground/65">
-            Questions, feedback or a problem with an order or account — send us
-            a message and the Declutt team will get back to you by email.
-          </p>
+      <section className="relative overflow-hidden">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-20 sm:pt-28 pb-12 sm:pb-16 text-center">
+          <div className="relative">
+            <HeroGrid />
+            <div className="relative z-10">
+              <p className="opacity-0 animate-fade-in text-[11px] font-bold uppercase tracking-[0.2em] text-primary">
+                Contact us
+              </p>
+              <h1 className="opacity-0 animate-fade-in-delay-1 mt-3 text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground">
+                We'd love to hear from you
+              </h1>
+              <p className="opacity-0 animate-fade-in-delay-2 mt-4 text-base sm:text-lg text-foreground/65">
+                Questions, feedback or a problem with an order or account —
+                send us a message and the Declutt team will get back to you by
+                email.
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 

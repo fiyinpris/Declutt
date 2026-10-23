@@ -224,7 +224,7 @@ const ChatCenter = ({
       ? draft.listing
       : null;
 
-  // Opening a conversation = reading it → the other person's ticks turn blue
+  // Opening a conversation = reading it → the other person's ticks turn brown (read)
   useEffect(() => {
     if (!active) return;
     const unread = active.messages.filter((m) => m.from !== role && !m.read);

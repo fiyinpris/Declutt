@@ -777,8 +777,15 @@ const Navbar = () => {
     { label: "Contact", to: "/contact" },
   ];
 
-  const isActive = (to) =>
-    to === "/" ? location.pathname === "/" : location.pathname.startsWith(to);
+  const isActive = (to) => {
+    try {
+      const target = new URL(to, window.location.origin);
+      if (target.pathname !== location.pathname) return false;
+      return !target.search || location.search.startsWith(target.search);
+    } catch {
+      return to === "/" ? location.pathname === "/" : location.pathname.startsWith(to);
+    }
+  };
 
   const dashboardPath =
     profile?.role === "seller"
@@ -787,16 +794,34 @@ const Navbar = () => {
         ? "/admin"
         : "/buyer";
 
-  const mobileNavLinks = NAV_LINKS;
-  // During debugging, always render the dashboard link so it's visible
-  // on small screens. We'll restore conditional logic after verification.
-  const mobileDashboardLink = { label: "Dashboard", to: dashboardPath };
+  const isAccountRoute =
+    location.pathname.startsWith("/buyer") ||
+    location.pathname.startsWith("/seller") ||
+    location.pathname.startsWith("/admin");
+
+  const mobileNavLinks = isAccountRoute
+    ? [
+        { label: "Browse", to: "/listings" },
+        { label: "Dashboard", to: dashboardPath },
+        { label: "Messages", to: `${dashboardPath}?tab=messages` },
+        { label: "My Items", to: `${dashboardPath}?tab=listings` },
+        { label: "Orders", to: `${dashboardPath}?tab=orders` },
+        { label: "Notifications", to: `${dashboardPath}?tab=notifications` },
+        { label: "Rewards", to: `${dashboardPath}?tab=rewards` },
+      ]
+    : NAV_LINKS;
+
+  const mobileDashboardLink =
+    isAccountRoute ? null : { label: "Dashboard", to: dashboardPath };
 
   const activeAccountTab =
-    new URLSearchParams(location.search).get("tab") || "";
+    new URLSearchParams(location.search).get("tab") ||
+    (location.pathname === dashboardPath ? "dashboard" : "");
 
   const mobileAccountLinks = [
+    { id: "dashboard", label: "Dashboard", to: dashboardPath },
     { id: "messages", label: "Messages", to: `${dashboardPath}?tab=messages` },
+    { id: "notifications", label: "Notifications", to: `${dashboardPath}?tab=notifications` },
     { id: "listings", label: "My Items", to: `${dashboardPath}?tab=listings` },
     { id: "orders", label: "Orders", to: `${dashboardPath}?tab=orders` },
     { id: "rewards", label: "Rewards", to: `${dashboardPath}?tab=rewards` },

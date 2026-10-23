@@ -199,7 +199,7 @@ const Messages = ({ sellerUid }) => {
 
   return (
     // WhatsApp-style: full viewport height, zero horizontal margins on all screens
-    <div className="flex flex-col h-dvh -mx-0">
+    <div className="flex flex-col min-h-screen h-dvh w-full -mx-0">
       {/* Page header — hidden on mobile once a chat is open */}
       <header
         className={`

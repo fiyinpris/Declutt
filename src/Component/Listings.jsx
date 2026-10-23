@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { collection, getDocs, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
+import { useBuyerLocation, listingDistance } from "../utils/geo";
+import { cartHelpers } from "../utils/cart";
+import { useAuth } from "../context/AuthContext";
+import { LocationBanner } from "./GeoUI";
 
 import image6 from "../images/image3.avif";
 import step3 from "../images/image1.avif";
@@ -28,51 +32,6 @@ const STYLES = `
 }
 `;
 
-/* ── Cart helpers ── */
-const cartHelpers = {
-  get: () => {
-    try {
-      return JSON.parse(localStorage.getItem("declutt_cart") || "[]");
-    } catch {
-      return [];
-    }
-  },
-  set: (items) => localStorage.setItem("declutt_cart", JSON.stringify(items)),
-  add: (listing, qty = 1) => {
-    const cart = cartHelpers.get();
-    const idx = cart.findIndex((i) => i.id === listing.id);
-    if (idx > -1) {
-      cart[idx].quantity = Math.min((cart[idx].quantity || 1) + qty, 99);
-    } else {
-      cart.push({
-        id: listing.id,
-        name: listing.name,
-        price: listing.price,
-        imageUrl: listing.imageUrl || null,
-        category: listing.category || "",
-        quantity: qty,
-      });
-    }
-    cartHelpers.set(cart);
-    window.dispatchEvent(new Event("cart-updated"));
-  },
-};
-
-function getDistanceKm(lat1, lon1, lat2, lon2) {
-  const R = 6371,
-    dLat = ((lat2 - lat1) * Math.PI) / 180,
-    dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-function formatDist(km) {
-  return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
-}
-
 const Spinner = ({ size = 22 }) => (
   <svg
     className="animate-spin"
@@ -95,9 +54,6 @@ const Toast = ({ msg, show }) => (
   </div>
 );
 
-/* ── Category chips will use actual seller categories from listings ── */
-const DEFAULT_CATEGORIES = ["All"];
-
 /* ── Search Bar ── */
 const TopSearchBar = ({
   search,
@@ -109,7 +65,6 @@ const TopSearchBar = ({
   categories,
 }) => (
   <div id="listings-search" className="flex flex-col gap-2">
-    {/* Search input row */}
     <div className="flex gap-2 items-center">
       <div className="relative flex-1">
         <svg
@@ -152,7 +107,6 @@ const TopSearchBar = ({
 
     {/* Category chips with left/right fade edges */}
     <div className="relative mt-3 mb-3">
-      {/* Left fade - matches the sticky bar bg */}
       <div
         className="pointer-events-none absolute left-0 top-0 bottom-0 w-10 z-10"
         style={{
@@ -160,7 +114,6 @@ const TopSearchBar = ({
             "linear-gradient(to right, hsl(var(--background)), transparent)",
         }}
       />
-      {/* Right fade */}
       <div
         className="pointer-events-none absolute right-0 top-0 bottom-0 w-10 z-10"
         style={{
@@ -168,7 +121,6 @@ const TopSearchBar = ({
             "linear-gradient(to left, hsl(var(--background)), transparent)",
         }}
       />
-
       <div
         className="flex gap-3 overflow-x-auto px-1"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
@@ -202,38 +154,43 @@ const TopSearchBar = ({
 /* ── Listing Card ── */
 const ListingCard = ({
   listing,
-  userCoords,
+  loc,
+  uid,
   onSelect,
   onAddToCart,
   animDelay = 0,
 }) => {
-  const [qty, setQty] = useState(0);
-  const dist =
-    userCoords && listing.lat && listing.lng
-      ? getDistanceKm(userCoords.lat, userCoords.lng, listing.lat, listing.lng)
-      : null;
+  // The number on the card always mirrors what is really in the cart
+  const [qty, setQty] = useState(() => cartHelpers.qtyOf(uid, listing.id));
+  useEffect(() => {
+    const sync = () => setQty(cartHelpers.qtyOf(uid, listing.id));
+    sync();
+    window.addEventListener("cart-updated", sync);
+    return () => window.removeEventListener("cart-updated", sync);
+  }, [uid, listing.id]);
+  // Real distance from the buyer's live GPS position to the seller's saved coordinates.
+  // null (no badge) when either side is unknown — we never show a guessed number.
+  const dist = listingDistance(listing, loc);
 
   const handleAddFirst = (e) => {
     e.stopPropagation();
-    setQty(1);
-    cartHelpers.add(listing, 1);
+    cartHelpers.add(uid, listing, 1);
     onAddToCart?.();
   };
   const handleInc = (e) => {
     e.stopPropagation();
-    setQty((q) => Math.min(q + 1, 99));
-    cartHelpers.add(listing, 1);
+    cartHelpers.add(uid, listing, 1);
     onAddToCart?.();
   };
   const handleDec = (e) => {
     e.stopPropagation();
-    setQty((q) => Math.max(q - 1, 0));
+    cartHelpers.decrement(uid, listing.id);
   };
 
-    return (
+  return (
     <div
       data-listing-id={listing.id}
-      className="card-enter bg-card rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-lg flex flex-col border border-border/60 relative group"
+      className="card-enter bg-card rounded-2xl overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-lg flex flex-col border border-border/60 relative group text-left"
       style={{ animationDelay: `${animDelay}ms` }}
     >
       <div
@@ -270,8 +227,11 @@ const ListingCard = ({
             {listing.available ? "Available" : "Sold"}
           </span>
         </div>
-        {dist !== null && (
-          <div className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1 px-2 py-1 rounded-full bg-black/50 backdrop-blur-sm text-white text-[10px] font-bold">
+        {dist && (
+          <div
+            title="Straight-line distance from your current location"
+            className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1 px-2 py-1 rounded-full bg-black/50 backdrop-blur-sm text-white text-[10px] font-bold"
+          >
             <svg
               width="9"
               height="9"
@@ -283,7 +243,7 @@ const ListingCard = ({
               <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
               <circle cx="12" cy="10" r="3" />
             </svg>
-            {formatDist(dist)}
+            {dist.label}
           </div>
         )}
         <div
@@ -332,7 +292,10 @@ const ListingCard = ({
           )}
         </div>
       </div>
-      <div className="p-3 flex flex-col gap-1 min-h-[110px] cursor-pointer" onClick={() => onSelect(listing)}>
+      <div
+        className="p-3 flex flex-col gap-1 min-h-[110px] cursor-pointer"
+        onClick={() => onSelect(listing)}
+      >
         <div className="flex items-start justify-between gap-2">
           <h3 className="text-xs font-bold text-foreground leading-snug line-clamp-2 text-left flex-1">
             {listing.name}
@@ -392,7 +355,6 @@ const PopularCollections = ({ listings }) => {
   /* Non-clickable display tile */
   const CollectionTile = ({ slot, className, style }) => {
     const item = getItem(slot);
-
     return (
       <div
         className={`relative rounded-2xl overflow-hidden select-none pointer-events-none ${className}`}
@@ -434,7 +396,6 @@ const PopularCollections = ({ listings }) => {
         transition: "opacity 0.3s ease",
       }}
     >
-      {/* Edge gradient fade */}
       <div
         className="absolute top-0 bottom-0 w-20"
         style={{
@@ -445,7 +406,6 @@ const PopularCollections = ({ listings }) => {
               : "linear-gradient(to right, hsl(var(--background)), transparent)",
         }}
       />
-      {/* Pulsing arrow dot */}
       <div
         className="arrow-pulse relative z-10 flex items-center justify-center w-8 h-8 rounded-full bg-primary/90 text-primary-foreground shadow-lg"
         style={{
@@ -511,14 +471,15 @@ const PopularCollections = ({ listings }) => {
               key={slot}
               slot={slot}
               className="flex-shrink-0"
-              style={{ width: "168px", height: "224px" }}
+              style={{
+                width: "calc(50vw - 18px)",
+                minWidth: "168px",
+                height: "260px",
+              }}
             />
           ))}
         </div>
-
-        {/* Left hint — appears once user has scrolled right */}
         <ArrowHint direction="left" visible={showLeft} />
-        {/* Right hint — appears on load, hides when at the end */}
         <ArrowHint direction="right" visible={showRight} />
       </div>
     </section>
@@ -632,12 +593,18 @@ const HeroSection = () => {
 const Listings = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
+  const uid = user?.uid || null;
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
-  const [gps, setGps] = useState(null);
   const [toast, setToast] = useState({ show: false, msg: "" });
+  const resultsRef = useRef(null);
+  const didMount = useRef(false);
+
+  // Buyer's live position (watches GPS, so distances update as they move)
+  const loc = useBuyerLocation();
 
   const showToast = (msg) => {
     setToast({ show: true, msg });
@@ -664,22 +631,33 @@ const Listings = () => {
     }
   }, [location.state]);
 
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (p) => setGps({ lat: p.coords.latitude, lng: p.coords.longitude }),
-        () => {},
-        { timeout: 8000 },
-      );
-    }
-  }, []);
-
+  // Live listings: when a seller updates an item's location, buyers' distances recalculate
+  // automatically. No orderBy in the query, so listings without a createdAt are no longer dropped.
   useEffect(() => {
     setLoading(true);
-    getDocs(query(collection(db, "listings"), orderBy("createdAt", "desc")))
-      .then((s) => setListings(s.docs.map((d) => ({ id: d.id, ...d.data() }))))
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    const byNewest = (a, b) =>
+      (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0);
+    const apply = (snap) => {
+      setListings(
+        snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort(byNewest),
+      );
+      setLoading(false);
+    };
+    let unsub = () => {};
+    try {
+      unsub = onSnapshot(collection(db, "listings"), apply, (err) => {
+        console.error("listings listener failed, loading once instead:", err);
+        getDocs(collection(db, "listings"))
+          .then(apply)
+          .catch((e) => {
+            console.error(e);
+            setLoading(false);
+          });
+      });
+    } catch (e) {
+      getDocs(collection(db, "listings")).then(apply).catch(console.error);
+    }
+    return () => unsub();
   }, []);
 
   const categories = useMemo(() => {
@@ -711,6 +689,27 @@ const Listings = () => {
     setSelectedCategory("");
   };
 
+  // After the user searches / picks a category, bring the results into view
+  // (instead of leaving them at the search bar above the hero + collections).
+  useEffect(() => {
+    if (!didMount.current) {
+      didMount.current = true;
+      return;
+    }
+    if (!hasF) return;
+    const t = setTimeout(() => {
+      const el = resultsRef.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top;
+      if (top > 170 || top < 0)
+        window.scrollTo({
+          top: window.scrollY + top - 150,
+          behavior: "smooth",
+        });
+    }, 400);
+    return () => clearTimeout(t);
+  }, [search, selectedCategory]);
+
   const handleSelect = (listing) => {
     try {
       sessionStorage.setItem("listings_scroll", String(window.scrollY || 0));
@@ -738,7 +737,6 @@ const Listings = () => {
       if (!v) return;
       const pos = Number(v);
       if (Number.isFinite(pos)) {
-        // Wait until layout stabilizes
         setTimeout(() => {
           window.scrollTo({ top: pos, behavior: "auto" });
           sessionStorage.removeItem("listings_scroll");
@@ -779,13 +777,16 @@ const Listings = () => {
             <PopularCollections listings={listings} />
           )}
 
-          <div className="flex items-center gap-3 pt-1">
+          <div ref={resultsRef} className="flex items-center gap-3 pt-1">
             <div className="flex-1 h-px bg-border/60" />
             <span className="text-[10px] uppercase tracking-[0.2em] text-foreground/35 font-bold">
               All Listings
             </span>
             <div className="flex-1 h-px bg-border/60" />
           </div>
+
+          {/* Location permission / accuracy notice (only when relevant) */}
+          <LocationBanner loc={loc} />
 
           {loading ? (
             <div className="flex justify-center py-20 gap-2 text-foreground/40">
@@ -820,7 +821,8 @@ const Listings = () => {
                 <ListingCard
                   key={l.id}
                   listing={l}
-                  userCoords={gps}
+                  loc={loc}
+                  uid={uid}
                   onSelect={handleSelect}
                   onAddToCart={() => showToast("Added to cart!")}
                   animDelay={Math.min(i * 60, 600)}

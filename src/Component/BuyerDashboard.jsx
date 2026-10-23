@@ -1,6 +1,13 @@
-import { useState, useEffect, useLayoutEffect } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
+import { useSavedItems } from "../utils/savedItems";
+import ChatCenter from "./ChatCenter";
+import { markDelivered } from "./chatUI";
+import { Ico, Spin } from "./Ico";
+import { useCloseFooterGap } from "../utils/footerGap";
 
 const formatDisplayName = (name) => {
   if (!name) return "there";
@@ -22,102 +29,67 @@ const NAV_ITEMS = [
     id: "overview",
     label: "Dashboard",
     icon: (
-      <svg
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
+      <Ico r>
         <rect x="3" y="3" width="7" height="7" />
         <rect x="14" y="3" width="7" height="7" />
         <rect x="3" y="14" width="7" height="7" />
         <rect x="14" y="14" width="7" height="7" />
-      </svg>
+      </Ico>
+    ),
+  },
+  {
+    id: "messages",
+    label: "Messages",
+    icon: (
+      <Ico r>
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+      </Ico>
     ),
   },
   {
     id: "orders",
     label: "My Orders",
     icon: (
-      <svg
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
+      <Ico r>
         <circle cx="9" cy="21" r="1" />
         <circle cx="20" cy="21" r="1" />
         <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-      </svg>
+      </Ico>
     ),
   },
   {
     id: "favourites",
     label: "Saved Items",
     icon: (
-      <svg
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
+      <Ico r>
         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-      </svg>
+      </Ico>
     ),
   },
   {
     id: "rewards",
     label: "Rewards / Points",
     icon: (
-      <svg
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
+      <Ico r>
         <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-      </svg>
+      </Ico>
     ),
   },
   {
     id: "referrals",
     label: "Referrals",
     icon: (
-      <svg
-        width="18"
-        height="18"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
+      <Ico r>
         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
         <circle cx="9" cy="7" r="4" />
         <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
         <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-      </svg>
+      </Ico>
     ),
   },
 ];
 
+const navIcon = (id) => NAV_ITEMS.find((n) => n.id === id)?.icon;
 const NAVBAR_H = 64;
 
 const StatCard = ({ label, value, icon, accent, sub }) => (
@@ -146,8 +118,8 @@ const StatCard = ({ label, value, icon, accent, sub }) => (
   </div>
 );
 
-/* ── Overview Panel — NO "Fresh in market" section ── */
-const OverviewPanel = ({ profile, setTab }) => {
+/* ── Overview Panel ── */
+const OverviewPanel = ({ profile, setTab, savedCount, unread }) => {
   const firstName = profile?.name?.trim().split(/\s+/)[0] ?? "there";
   const hour = new Date().getHours();
   const greeting =
@@ -175,19 +147,10 @@ const OverviewPanel = ({ profile, setTab }) => {
           to="/listings"
           className="main-button text-sm px-5 py-2.5 inline-flex items-center gap-2 whitespace-nowrap self-start sm:self-auto"
         >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
+          <Ico s={14} w={2.5} r>
             <circle cx="11" cy="11" r="8" />
             <path d="m21 21-4.3-4.3" />
-          </svg>
+          </Ico>
           Browse items
         </Link>
       </div>
@@ -197,31 +160,39 @@ const OverviewPanel = ({ profile, setTab }) => {
           label="Orders placed"
           value="0"
           sub="lifetime total"
-          icon={NAV_ITEMS[1].icon}
+          icon={navIcon("orders")}
         />
         <StatCard
           label="Saved items"
-          value="0"
+          value={savedCount}
           sub="in your wishlist"
-          icon={NAV_ITEMS[2].icon}
+          icon={navIcon("favourites")}
         />
         <StatCard
           label="Reward points"
           value={profile?.rewards ?? 0}
           sub="redeemable"
-          icon={NAV_ITEMS[3].icon}
+          icon={navIcon("rewards")}
           accent
         />
         <StatCard
           label="Referrals made"
           value="0"
           sub="friends invited"
-          icon={NAV_ITEMS[4].icon}
+          icon={navIcon("referrals")}
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {[
+          {
+            label: "Messages",
+            desc:
+              unread > 0
+                ? `${unread} unread from sellers`
+                : "Chat with sellers",
+            tab: "messages",
+          },
           {
             label: "Track your orders",
             desc: "See order status & history",
@@ -245,29 +216,23 @@ const OverviewPanel = ({ profile, setTab }) => {
             style={{ border: "2px solid hsl(var(--border))" }}
           >
             <div className="w-9 h-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-              {NAV_ITEMS.find((n) => n.id === a.tab)?.icon}
+              {navIcon(a.tab)}
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-bold text-foreground">{a.label}</p>
-              <p className="text-xs text-foreground/45">{a.desc}</p>
+              <p className="text-xs text-foreground/45 truncate">{a.desc}</p>
             </div>
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+            <Ico
+              s={14}
+              w={2.5}
+              r
               className="text-foreground/25 ml-auto shrink-0"
             >
               <path d="m9 18 6-6-6-6" />
-            </svg>
+            </Ico>
           </button>
         ))}
       </div>
-      {/* NOTE: "Fresh in market" section removed as requested */}
     </div>
   );
 };
@@ -311,18 +276,11 @@ const OrdersPanel = () => {
       </div>
       <div className="py-16 flex flex-col items-center gap-4 text-center">
         <div className="w-16 h-16 rounded-2xl bg-border/30 flex items-center justify-center text-foreground/20">
-          <svg
-            width="30"
-            height="30"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-          >
+          <Ico s={30} w={1.5}>
             <circle cx="9" cy="21" r="1" />
             <circle cx="20" cy="21" r="1" />
             <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-          </svg>
+          </Ico>
         </div>
         <p className="text-sm font-semibold text-foreground/50">
           No orders yet
@@ -341,34 +299,92 @@ const OrdersPanel = () => {
   );
 };
 
-const FavouritesPanel = () => (
-  <div className="space-y-4">
-    <p className="text-lg font-bold text-foreground">Saved Items</p>
-    <div className="py-16 flex flex-col items-center gap-4 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-border/30 flex items-center justify-center text-foreground/20">
-        <svg
-          width="30"
-          height="30"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-        >
-          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-        </svg>
+/* ── Saved Items (live, Firestore-backed) ── */
+const FavouritesPanel = ({ items, onRemove }) => {
+  const list = [...items].reverse(); // newest first
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-lg font-bold text-foreground">Saved Items</p>
+        <span className="text-xs text-foreground/40 bg-border/40 px-3 py-1 rounded-full">
+          {list.length} item{list.length !== 1 ? "s" : ""}
+        </span>
       </div>
-      <p className="text-sm font-semibold text-foreground/50">
-        Nothing saved yet
-      </p>
-      <p className="text-xs text-foreground/30">
-        Tap the heart icon on any listing to save it here.
-      </p>
-      <Link to="/listings" className="main-button text-sm px-5 py-2.5">
-        Explore listings
-      </Link>
+      {list.length === 0 ? (
+        <div className="py-16 flex flex-col items-center gap-4 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-border/30 flex items-center justify-center text-foreground/20">
+            <Ico s={30} w={1.5}>
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+            </Ico>
+          </div>
+          <p className="text-sm font-semibold text-foreground/50">
+            Nothing saved yet
+          </p>
+          <p className="text-xs text-foreground/30">
+            Tap the heart icon on any listing to save it here.
+          </p>
+          <Link to="/listings" className="main-button text-sm px-5 py-2.5">
+            Explore listings
+          </Link>
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {list.map((item) => (
+            <div
+              key={item.id}
+              className="rounded-2xl overflow-hidden bg-background flex flex-col"
+              style={{ border: "2px solid hsl(var(--border))" }}
+            >
+              <Link to={`/product/${item.id}`} className="block">
+                <div className="aspect-[4/3] bg-border/20 overflow-hidden">
+                  {item.imageUrl ? (
+                    <img
+                      src={item.imageUrl}
+                      alt={item.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-foreground/15 text-xs">
+                      No image
+                    </div>
+                  )}
+                </div>
+                <div className="p-3">
+                  <p className="text-sm font-bold text-foreground truncate">
+                    {item.name}
+                  </p>
+                  {item.category && (
+                    <p className="text-xs text-foreground/40 truncate mt-0.5">
+                      {item.category}
+                    </p>
+                  )}
+                  <p className="text-sm font-black text-primary mt-1">
+                    ₦{Number(item.price).toLocaleString()}
+                  </p>
+                </div>
+              </Link>
+              <div className="flex gap-2 px-3 pb-3 mt-auto">
+                <Link
+                  to={`/product/${item.id}`}
+                  className="flex-1 text-center py-2 rounded-xl bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-colors"
+                >
+                  View
+                </Link>
+                <button
+                  onClick={() => onRemove(item.id)}
+                  className="px-3 py-2 rounded-xl text-xs font-bold text-red-500 hover:bg-red-500/10 transition-colors"
+                  style={{ border: "1.5px solid hsl(var(--border))" }}
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
-  </div>
-);
+  );
+};
 
 const RewardsPanel = ({ profile }) => {
   const pts = profile?.rewards ?? 0;
@@ -385,19 +401,9 @@ const RewardsPanel = ({ profile }) => {
         style={{ border: "2px solid hsl(var(--border))" }}
       >
         <div className="w-14 h-14 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
-          <svg
-            width="28"
-            height="28"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="text-primary"
-          >
+          <Ico s={28} w={1.5} r className="text-primary">
             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-          </svg>
+          </Ico>
         </div>
         <div>
           <p className="text-3xl font-black text-primary">{pts}</p>
@@ -476,50 +482,18 @@ const LogoutButton = ({ onLogout, state }) => (
     disabled={state !== "idle"}
     className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 ${state === "success" ? "bg-green-500 text-white" : state === "loading" ? "bg-red-400 text-white" : "text-white bg-red-500 hover:bg-red-600"} disabled:cursor-not-allowed`}
   >
-    {state === "loading" && (
-      <svg
-        className="animate-spin shrink-0"
-        width="15"
-        height="15"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-      >
-        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-      </svg>
-    )}
+    {state === "loading" && <Spin />}
     {state === "success" && (
-      <svg
-        width="15"
-        height="15"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="shrink-0"
-      >
+      <Ico s={15} w={2.5} r className="shrink-0">
         <polyline points="20 6 9 17 4 12" />
-      </svg>
+      </Ico>
     )}
     {state === "idle" && (
-      <svg
-        width="15"
-        height="15"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="shrink-0"
-      >
+      <Ico s={15} r className="shrink-0">
         <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
         <polyline points="16 17 21 12 16 7" />
         <line x1="21" y1="12" x2="9" y2="12" />
-      </svg>
+      </Ico>
     )}
     {state === "loading"
       ? "Signing out..."
@@ -531,17 +505,52 @@ const LogoutButton = ({ onLogout, state }) => (
 
 /* ── Main BuyerDashboard ── */
 const BuyerDashboard = () => {
-  const { profile, logout } = useAuth();
+  const { user, profile, logout } = useAuth();
+  const uid = user?.uid || profile?.uid || null;
   const navigate = useNavigate();
   const location = useLocation();
   const [tab, setTab] = useState("overview");
+  const rootRef = useRef(null);
+  const pull = useCloseFooterGap(rootRef);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [unread, setUnread] = useState(0);
   const { state: logoutState, handleLogout } = useLogout(logout, navigate);
+  const { items: savedItems, remove: removeSavedItem } = useSavedItems(uid);
 
   useLayoutEffect(() => {
     const p = new URLSearchParams(location.search).get("tab");
     if (p && NAV_ITEMS.find((n) => n.id === p) && p !== tab) setTab(p);
   }, [location.search]);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, [tab]);
+
+  // Unread seller replies → badge
+  useEffect(() => {
+    if (!uid) {
+      setUnread(0);
+      return;
+    }
+    const q = query(
+      collection(db, "messages"),
+      where("buyerUid", "==", uid),
+      where("from", "==", "seller"),
+      where("read", "==", false),
+    );
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setUnread(snap.size);
+        markDelivered(
+          snap.docs.map((d) => ({ id: d.id, ...d.data() })),
+          "buyer",
+        );
+      },
+      (err) => console.error("Unread badge listener:", err),
+    );
+    return () => unsub();
+  }, [uid]);
 
   const initials = getInitials(profile?.name);
   const displayName = formatDisplayName(profile?.name);
@@ -565,18 +574,9 @@ const BuyerDashboard = () => {
             onClick={() => setSidebarOpen(false)}
             className="text-foreground/50 hover:text-foreground transition-colors"
           >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
+            <Ico r>
               <path d="M18 6 6 18M6 6l12 12" />
-            </svg>
+            </Ico>
           </button>
         </div>
       )}
@@ -593,7 +593,19 @@ const BuyerDashboard = () => {
             <span className={tab === item.id ? "opacity-90" : "opacity-55"}>
               {item.icon}
             </span>
-            {item.label}
+            <span className="flex-1 truncate">{item.label}</span>
+            {item.id === "messages" && unread > 0 && (
+              <span className="min-w-[22px] h-5 rounded-full bg-amber-500 text-white text-[10px] font-black flex items-center justify-center px-1.5">
+                {unread > 9 ? "9+" : unread}
+              </span>
+            )}
+            {item.id === "favourites" && savedItems.length > 0 && (
+              <span
+                className={`min-w-[22px] h-5 rounded-full text-[10px] font-black flex items-center justify-center px-1.5 ${tab === item.id ? "bg-white/25 text-primary-foreground" : "bg-primary/15 text-primary"}`}
+              >
+                {savedItems.length > 99 ? "99+" : savedItems.length}
+              </span>
+            )}
           </button>
         ))}
       </nav>
@@ -629,11 +641,12 @@ const BuyerDashboard = () => {
 
   return (
     <div
+      ref={rootRef}
       className="flex-1 min-h-screen bg-background flex flex-col"
-      style={{ paddingTop: `${NAVBAR_H}px` }}
+      style={{ paddingTop: `${NAVBAR_H}px`, marginBottom: -pull }}
     >
       <div className="flex flex-1 min-h-screen items-stretch">
-        {/* Desktop sidebar — FULL HEIGHT, scrolls with page (NOT sticky) */}
+        {/* Desktop sidebar — full height, scrolls with page (not sticky) */}
         <aside
           className="hidden md:flex flex-col w-64 xl:w-72 shrink-0"
           style={{
@@ -679,23 +692,17 @@ const BuyerDashboard = () => {
           >
             <button
               onClick={() => setSidebarOpen(true)}
-              className="flex items-center justify-center w-8 h-8 rounded-xl text-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+              className="relative flex items-center justify-center w-8 h-8 rounded-xl text-foreground hover:text-primary hover:bg-primary/10 transition-colors"
               style={{ border: "1.5px solid hsl(var(--border))" }}
             >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
+              <Ico s={16} r>
                 <line x1="3" y1="6" x2="21" y2="6" />
                 <line x1="3" y1="12" x2="21" y2="12" />
                 <line x1="3" y1="18" x2="21" y2="18" />
-              </svg>
+              </Ico>
+              {unread > 0 && (
+                <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-amber-500" />
+              )}
             </button>
             <span className="text-sm font-bold text-foreground">
               {NAV_ITEMS.find((n) => n.id === tab)?.label}
@@ -711,10 +718,25 @@ const BuyerDashboard = () => {
 
           <div className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-5xl w-full mx-auto">
             {tab === "overview" && (
-              <OverviewPanel profile={profile} setTab={setTab} />
+              <OverviewPanel
+                profile={profile}
+                setTab={setTab}
+                savedCount={savedItems.length}
+                unread={unread}
+              />
+            )}
+            {tab === "messages" && (
+              <ChatCenter
+                role="buyer"
+                uid={uid}
+                selfName={profile?.name || user?.displayName}
+                offset={230}
+              />
             )}
             {tab === "orders" && <OrdersPanel />}
-            {tab === "favourites" && <FavouritesPanel />}
+            {tab === "favourites" && (
+              <FavouritesPanel items={savedItems} onRemove={removeSavedItem} />
+            )}
             {tab === "rewards" && <RewardsPanel profile={profile} />}
             {tab === "referrals" && <ReferralsPanel profile={profile} />}
           </div>

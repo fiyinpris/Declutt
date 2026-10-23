@@ -7,50 +7,22 @@ import {
   addDoc,
   query,
   where,
-  orderBy,
   onSnapshot,
   serverTimestamp,
   getDocs,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
+import { toggleSaved, useSavedItems } from "../utils/savedItems";
+import { tsMs, markDelivered, MessageList, Composer, Avatar } from "./chatUI";
+import { useBuyerLocation } from "../utils/geo";
+import { cartHelpers } from "../utils/cart";
+import { DistanceLine } from "./GeoUI";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
 
-// ── Cart helpers (PER-USER, keyed by uid) ────────────────────────────────────
-export const cartHelpers = {
-  _key: (uid) => (uid ? `declutt_cart_${uid}` : "declutt_cart_guest"),
-  get: (uid) => {
-    try {
-      return JSON.parse(localStorage.getItem(cartHelpers._key(uid)) || "[]");
-    } catch {
-      return [];
-    }
-  },
-  set: (uid, items) =>
-    localStorage.setItem(cartHelpers._key(uid), JSON.stringify(items)),
-  add: (uid, listing, qty = 1) => {
-    const cart = cartHelpers.get(uid);
-    const idx = cart.findIndex((i) => i.id === listing.id);
-    if (idx > -1) {
-      cart[idx].quantity = Math.min(
-        (cart[idx].quantity || 1) + qty,
-        listing.maxQuantity || 99,
-      );
-    } else {
-      cart.push({
-        id: listing.id,
-        name: listing.name,
-        price: listing.price,
-        imageUrl: listing.imageUrl || null,
-        category: listing.category || "",
-        quantity: qty,
-      });
-    }
-    cartHelpers.set(uid, cart);
-    window.dispatchEvent(new CustomEvent("cart-updated", { detail: { uid } }));
-  },
-};
+export { cartHelpers };
 
 const Spinner = ({ size = 20 }) => (
   <svg
@@ -76,136 +48,120 @@ const Toast = ({ msg, show }) => (
 
 /* ── Image Gallery ── */
 const ImageGallery = ({ images, productName }) => {
-  const [selected, setSelected] = useState(0);
-  const [offset, setOffset] = useState(0); // pixel offset during drag
-  const [dragging, setDragging] = useState(false);
-  const slots = [0, 1, 2];
   const realImages = (images || []).filter(Boolean);
-  const hasImages = realImages.length > 0;
-  const containerRef = useRef(null);
-  const [containerWidth, setContainerWidth] = useState(0);
-  const startXRef = useRef(0);
+  const n = realImages.length;
+  const [selected, setSelected] = useState(0);
+  const [offset, setOffset] = useState(0); // live finger-drag distance in px
+  const [dragging, setDragging] = useState(false);
+  const boxRef = useRef(null);
+  const drag = useRef({ active: false, startX: 0, dx: 0 });
 
-  const prev = () =>
-    setSelected((i) => (i - 1 + realImages.length) % realImages.length);
-  const next = () => setSelected((i) => (i + 1) % realImages.length);
+  useEffect(() => {
+    if (selected > Math.max(0, n - 1)) setSelected(0);
+  }, [n, selected]);
 
-  const handleTouchStart = (clientX) => {
-    startXRef.current = clientX;
+  const go = (i) => setSelected(((i % n) + n) % n); // arrows wrap around
+  const prev = () => go(selected - 1);
+  const next = () => go(selected + 1);
+
+  // Swiping — pointer events work for mouse, touch and pen with one code path.
+  const onPointerDown = (e) => {
+    if (n < 2 || (e.pointerType === "mouse" && e.button !== 0)) return;
+    drag.current = { active: true, startX: e.clientX, dx: 0 };
     setDragging(true);
     setOffset(0);
+    e.currentTarget.setPointerCapture?.(e.pointerId);
   };
-  const handleTouchMove = (clientX) => {
-    if (!dragging || !containerRef.current) return;
-    setOffset(clientX - startXRef.current);
+  const onPointerMove = (e) => {
+    const d = drag.current;
+    if (!d.active) return;
+    let dx = e.clientX - d.startX;
+    // Don't let the strip slide past the first / last photo (that is what revealed empty space).
+    if (selected <= 0) dx = Math.min(0, dx);
+    if (selected >= n - 1) dx = Math.max(0, dx);
+    d.dx = dx;
+    setOffset(dx);
   };
-  const handleTouchEnd = () => {
-    if (!dragging) return;
-    const w = containerRef.current?.clientWidth || 1;
-    const dx = offset;
-    const threshold = Math.max(40, w * 0.12);
-    if (dx > threshold) prev();
-    else if (dx < -threshold) next();
+  const endDrag = () => {
+    const d = drag.current;
+    if (!d.active) return;
+    d.active = false;
+    const w = boxRef.current?.clientWidth || 1;
+    const threshold = Math.max(40, w * 0.15);
+    if (d.dx < -threshold && selected < n - 1) setSelected(selected + 1);
+    else if (d.dx > threshold && selected > 0) setSelected(selected - 1);
     setOffset(0);
     setDragging(false);
   };
 
-  // Pointer/mouse handlers
-  const onPointerDown = (e) => {
-    const clientX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
-    handleTouchStart(clientX);
-    try {
-      // try pointer capture for smoother move events
-      if (containerRef.current && e.pointerId != null) {
-        containerRef.current.setPointerCapture?.(e.pointerId);
-        startXRef.current = clientX;
-      }
-    } catch (_) {}
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp);
-  };
-  const onPointerMove = (e) => handleTouchMove(e.clientX);
-  const onPointerUp = () => {
-    handleTouchEnd();
-    try {
-      if (containerRef.current && typeof containerRef.current.releasePointerCapture === "function") {
-        // best-effort release all
-        // Note: can't know pointerId here reliably for touch fallback, but release is optional
-      }
-    } catch (_) {}
-    window.removeEventListener("pointermove", onPointerMove);
-    window.removeEventListener("pointerup", onPointerUp);
-  };
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const setW = () => setContainerWidth(el.clientWidth || 0);
-    setW();
-    window.addEventListener("resize", setW);
-    return () => window.removeEventListener("resize", setW);
-  }, []);
+  const thumbSlots = Math.max(3, n);
 
   return (
-    <div className="w-full max-w-none sm:max-w-[380px] space-y-3">
+    <div className="w-full max-w-full sm:max-w-[380px] space-y-3">
       <div
-        ref={containerRef}
-        className="relative w-full overflow-hidden bg-border/20 border border-border/60 group rounded-none sm:rounded-2xl sm:border-border/60"
-        style={{ aspectRatio: "1/1", touchAction: "pan-y" }}
+        ref={boxRef}
+        className="relative w-full overflow-hidden bg-border/20 border border-border/60 group rounded-none sm:rounded-2xl select-none"
+        style={{
+          aspectRatio: "1/1",
+          touchAction: "pan-y", // vertical scroll stays native; horizontal drags slide the photos
+          isolation: "isolate", // keeps sliding photos clipped inside the box on iOS Safari
+          contain: "paint",
+        }}
         onPointerDown={onPointerDown}
-        onTouchStart={(e) => handleTouchStart(e.touches[0].clientX)}
-        onTouchMove={(e) => handleTouchMove(e.touches[0].clientX)}
-        onTouchEnd={handleTouchEnd}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
       >
-        {hasImages ? (
-          <>
-            {realImages.map((src, i) => {
-              const rel = i - selected;
-              const w = containerWidth || 1;
-              const percent = rel * 100 + (offset / w) * 100;
-              return (
-                <img
-                  key={i}
-                  src={src}
-                  alt={`${productName} ${i + 1}`}
-                  className="absolute inset-0 w-full h-full object-cover transition-transform"
-                  draggable={false}
-                  onDragStart={(ev) => ev.preventDefault()}
-                  style={{
-                    transform: `translateX(${percent}%)`,
-                    transition: dragging ? "none" : "transform 320ms ease",
-                  }}
-                />
-              );
-            })}
-          </>
+        {n > 0 ? (
+          realImages.map((src, i) => {
+            const rel = i - selected;
+            if (Math.abs(rel) > 1) return null; // only the neighbours of the current photo are rendered
+            return (
+              <img
+                key={i}
+                src={src}
+                alt={`${productName} ${i + 1}`}
+                className="absolute inset-0 w-full h-full object-cover"
+                draggable={false}
+                onDragStart={(ev) => ev.preventDefault()}
+                style={{
+                  transform: `translate3d(calc(${rel * 100}% + ${offset}px), 0, 0)`,
+                  transition: dragging ? "none" : "transform 320ms ease",
+                  willChange: "transform",
+                }}
+              />
+            );
+          })
         ) : (
           <div className="w-full h-full flex items-center justify-center text-foreground/20">
             No Image
           </div>
         )}
-        {/* Image count overlay (e.g. 1/3) */}
-        {realImages.length > 0 && (
-          <div className="absolute bottom-3 right-3 bg-black/60 text-white text-xs px-2 py-0.5 rounded-md">
-            {selected + 1}/{realImages.length}
+        {n > 0 && (
+          <div className="absolute bottom-3 right-3 bg-black/60 text-white text-xs px-2 py-0.5 rounded-md pointer-events-none">
+            {selected + 1}/{n}
           </div>
         )}
-        {realImages.length > 1 && (
+        {n > 1 && (
           <>
             <button
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 prev();
               }}
+              aria-label="Previous photo"
               className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
             >
               ‹
             </button>
             <button
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 next();
               }}
+              aria-label="Next photo"
               className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/50 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
             >
               ›
@@ -213,14 +169,14 @@ const ImageGallery = ({ images, productName }) => {
           </>
         )}
       </div>
-      <div className="flex gap-3 justify-center">
-        {slots.map((i) => {
+      <div className="flex gap-2 sm:gap-3 justify-center px-3 sm:px-0">
+        {Array.from({ length: thumbSlots }, (_, i) => {
           const img = realImages[i];
           return (
             <button
               key={i}
               onClick={() => img && setSelected(i)}
-              className={`w-20 h-20 rounded-xl overflow-hidden border-2 transition-all ${
+              className={`w-14 h-14 sm:w-20 sm:h-20 shrink-0 rounded-xl overflow-hidden border-2 transition-all ${
                 selected === i && img
                   ? "border-primary scale-105"
                   : "border-border opacity-70 hover:opacity-100"
@@ -286,74 +242,111 @@ const QtySelector = ({ value, onChange, max = 99 }) => (
   </div>
 );
 
-/* ── Messaging Panel ── */
-const MessagingPanel = ({ listing, onClose, currentUser }) => {
+/* ── Messaging Panel — the ONE conversation between this buyer and this seller ── */
+const MessagingPanel = ({ listing, onClose, currentUser, buyerName }) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [ready, setReady] = useState(false);
-  const bottomRef = useRef(null);
+  const [sendError, setSendError] = useState("");
 
+  // All messages between this buyer and this seller (every item), realtime. Equality filters only
+  // (no composite index); polling fallback if the listener fails.
   useEffect(() => {
-    // Temporary: use polling instead of onSnapshot to avoid Firestore watch-stream INTERNAL ASSERTION errors
-    let mounted = true;
-    let pollId = null;
-    const load = async () => {
-      if (!currentUser?.uid || !listing?.id) {
-        if (mounted) setReady(true);
-        return;
-      }
-      try {
-        const q = query(
-          collection(db, "messages"),
-          where("listingId", "==", listing.id),
-          where("buyerUid", "==", currentUser.uid),
-          orderBy("createdAt", "asc"),
-        );
-        const snap = await getDocs(q);
-        if (!mounted) return;
-        setMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-        setReady(true);
-      } catch (e) {
-        console.error("messages poll error", e);
-        if (mounted) setReady(true);
-      }
+    if (!currentUser?.uid || !listing?.sellerUid) {
+      setReady(true);
+      return;
+    }
+    const q = query(
+      collection(db, "messages"),
+      where("buyerUid", "==", currentUser.uid),
+      where("sellerUid", "==", listing.sellerUid),
+    );
+    let dead = false;
+    let poll = null;
+    let unsub = null;
+    const apply = (snap) => {
+      if (dead) return;
+      const list = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => tsMs(a.createdAt) - tsMs(b.createdAt));
+      setMessages(list);
+      setReady(true);
+      markDelivered(list, "buyer");
     };
-    // initial load
-    load();
-    // poll every 2.5s
-    pollId = window.setInterval(load, 2500);
+    const startPoll = () => {
+      if (poll) return;
+      const run = () =>
+        getDocs(q)
+          .then(apply)
+          .catch((e) => {
+            console.error("messages poll error", e);
+            if (!dead) setReady(true);
+          });
+      run();
+      poll = setInterval(run, 3000);
+    };
+    try {
+      unsub = onSnapshot(q, apply, (e) => {
+        console.error("messages listener error, polling instead", e);
+        startPoll();
+      });
+    } catch (e) {
+      startPoll();
+    }
     return () => {
-      mounted = false;
-      if (pollId) window.clearInterval(pollId);
+      dead = true;
+      if (unsub) unsub();
+      if (poll) clearInterval(poll);
     };
-  }, [listing?.id, currentUser?.uid]);
+  }, [listing?.sellerUid, currentUser?.uid]);
 
+  // Panel is open → the seller's messages are READ (blue ticks on their side)
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const unread = messages.filter((m) => m.from === "seller" && !m.read);
+    if (!unread.length) return;
+    const batch = writeBatch(db);
+    unread
+      .slice(0, 400)
+      .forEach((m) =>
+        batch.update(doc(db, "messages", m.id), {
+          read: true,
+          delivered: true,
+        }),
+      );
+    batch.commit().catch((e) => console.error("mark read failed", e));
   }, [messages]);
 
   const send = async () => {
     if (!input.trim() || !currentUser || sending) return;
+    if (!listing.sellerUid) {
+      setSendError("This listing has no seller attached.");
+      return;
+    }
     const txt = input.trim();
     setInput("");
     setSending(true);
+    setSendError("");
     try {
       await addDoc(collection(db, "messages"), {
-        listingId: listing.id,
         sellerUid: listing.sellerUid,
         buyerUid: currentUser.uid,
-        buyerName: currentUser.displayName || "Buyer",
+        buyerName: buyerName || "Buyer",
         sellerName: listing.sellerName || "Seller",
+        listingId: listing.id,
         listingName: listing.name,
         listingImageUrl: listing.imageUrl || null,
+        listingPrice: Number(listing.price) || null,
         text: txt,
         from: "buyer",
         createdAt: serverTimestamp(),
+        delivered: false,
         read: false,
       });
     } catch (e) {
       console.error(e);
+      setInput(txt);
+      setSendError("Message failed to send. Please try again.");
     }
     setSending(false);
   };
@@ -404,6 +397,13 @@ const MessagingPanel = ({ listing, onClose, currentUser }) => {
     );
   }
 
+  const thisItem = {
+    id: listing.id,
+    name: listing.name,
+    imageUrl: listing.imageUrl,
+    price: Number(listing.price) || null,
+  };
+
   return (
     <div className="fixed inset-0 z-[70] flex justify-end">
       <div
@@ -411,184 +411,71 @@ const MessagingPanel = ({ listing, onClose, currentUser }) => {
         onClick={onClose}
       />
       <div
-        className="relative w-full sm:max-w-md bg-card shadow-2xl flex flex-col"
+        className="relative w-full sm:max-w-md flex flex-col bg-card shadow-2xl text-left"
         style={{ height: "100dvh" }}
       >
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0 bg-card">
-          <div className="w-10 h-10 rounded-full bg-primary/15 text-primary border-2 border-primary/20 flex items-center justify-center text-sm font-bold overflow-hidden shrink-0">
-            {listing.sellerPhotoURL ? (
-              <img
-                src={listing.sellerPhotoURL}
-                alt=""
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              (listing.sellerName?.[0] || "S").toUpperCase()
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-foreground truncate">
-              {listing.sellerName || "Seller"}
-            </p>
-            <div className="flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-              <span className="text-[10px] text-foreground/45">
-                Delivered even when offline
-              </span>
-            </div>
-          </div>
+        <div className="flex items-center gap-3 pl-2 pr-3 py-3 shrink-0 border-b border-border bg-card">
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-xl flex items-center justify-center text-foreground/40 hover:bg-border/50 hover:text-foreground transition-colors shrink-0"
+            aria-label="Close"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-foreground/50 hover:bg-border/40 shrink-0"
           >
             <svg
-              width="14"
-              height="14"
+              width="20"
+              height="20"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth="2.5"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              <path d="M18 6 6 18M6 6l12 12" />
+              <path d="m15 18-6-6 6-6" />
             </svg>
           </button>
-        </div>
-        <div
-          className="flex items-center gap-3 px-4 py-2 border-b border-border/50 shrink-0"
-          style={{ background: "hsl(var(--background))" }}
-        >
-          {listing.imageUrl && (
-            <img
-              src={listing.imageUrl}
-              alt=""
-              className="w-10 h-10 rounded-lg object-cover border border-border shrink-0"
-            />
-          )}
+          <Avatar name={listing.sellerName} size={42} />
           <div className="flex-1 min-w-0">
-            <p className="text-xs text-foreground/50 truncate">
-              {listing.name}
+            <p className="text-sm font-black text-foreground truncate">
+              {listing.sellerName || "Seller"}
             </p>
-            <p className="text-sm font-black text-primary">
-              &#8358;{Number(listing.price).toLocaleString()}
+            <p className="text-[11px] text-foreground/45">
+              <span className="font-bold text-primary">Seller</span> · replies
+              appear here instantly
             </p>
           </div>
         </div>
-        <div
-          className="flex-1 overflow-y-auto px-3 sm:px-4 py-4 space-y-2"
-          style={{ background: "hsl(var(--background)/0.4)" }}
-        >
-          {!ready ? (
-            <div className="flex justify-center py-12 text-foreground/40">
-              <Spinner size={22} />
-            </div>
-          ) : (
-            <>
-              {messages.length === 0 && (
-                <div className="text-center py-8 space-y-3">
-                  <p className="text-xs text-foreground/40">
-                    Ask {listing.sellerName?.split(" ")[0] || "the seller"}{" "}
-                    anything
-                  </p>
-                  <div className="flex flex-wrap gap-2 justify-center">
-                    {[
-                      "Is this still available?",
-                      "What's your best price?",
-                      "Can we meet up?",
-                    ].map((q) => (
-                      <button
-                        key={q}
-                        onClick={() => setInput(q)}
-                        className="text-[11px] font-semibold px-3 py-1.5 rounded-full text-primary border border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors"
-                      >
-                        {q}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {messages.map((m) => {
-                const isMine = m.from === "buyer";
-                return (
-                  <div
-                    key={m.id}
-                    className={`flex ${isMine ? "justify-end" : "justify-start"}`}
-                  >
-                    {!isMine && (
-                      <div className="w-7 h-7 rounded-full bg-primary/15 text-primary border border-primary/20 flex items-center justify-center text-[9px] font-black shrink-0 mr-2 mt-1">
-                        {(listing.sellerName?.[0] || "S").toUpperCase()}
-                      </div>
-                    )}
-                    <div
-                      className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm leading-relaxed ${isMine ? "bg-primary text-primary-foreground rounded-br-sm" : "bg-card text-foreground border border-border rounded-bl-sm"}`}
-                    >
-                      <p>{m.text}</p>
-                      <div
-                        className={`flex items-center gap-1 mt-1 ${isMine ? "justify-end" : ""}`}
-                      >
-                        <p
-                          className={`text-[10px] ${isMine ? "text-primary-foreground/55" : "text-foreground/35"}`}
-                        >
-                          {m.createdAt?.toDate
-                            ? new Date(m.createdAt.toDate()).toLocaleTimeString(
-                                [],
-                                { hour: "2-digit", minute: "2-digit" },
-                              )
-                            : "just now"}
-                        </p>
-                        {isMine && (
-                          <svg
-                            width="11"
-                            height="11"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.5"
-                            className="text-primary-foreground/55"
-                          >
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </>
-          )}
-          <div ref={bottomRef} />
-        </div>
-        <div className="flex items-center gap-2 px-3 py-3 border-t border-border bg-card shrink-0">
-          <input
-            type="text"
-            value={input}
-            autoFocus
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && send()}
-            placeholder="Type a message..."
-            className="flex-1 px-3 sm:px-4 py-2.5 rounded-xl text-sm bg-background border border-border focus:outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/10 text-foreground placeholder:text-foreground/30 transition-all"
+
+        {!ready ? (
+          <div className="flex-1 flex items-center justify-center text-foreground/40 bg-background/60">
+            <Spinner size={22} />
+          </div>
+        ) : (
+          <MessageList
+            messages={messages}
+            role="buyer"
+            peerName={listing.sellerName}
+            pendingListing={thisItem}
+            resetKey={`${listing.sellerUid}-${listing.id}`}
+            emptyNode={null}
           />
-          <button
-            onClick={send}
-            disabled={sending || !input.trim()}
-            className="w-10 h-10 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shrink-0 hover:bg-primary/90 transition-colors disabled:opacity-40"
-          >
-            {sending ? (
-              <Spinner size={16} />
-            ) : (
-              <svg
-                width="15"
-                height="15"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-              >
-                <path d="m22 2-7 20-4-9-9-4Z" />
-                <path d="M22 2 11 13" />
-              </svg>
-            )}
-          </button>
-        </div>
+        )}
+        {sendError && (
+          <p className="px-4 py-1.5 text-xs text-red-500 bg-red-500/10 shrink-0">
+            {sendError}
+          </p>
+        )}
+        <Composer
+          value={input}
+          onChange={setInput}
+          onSend={send}
+          sending={sending}
+          autoFocus
+          quick={[
+            "Is this still available?",
+            "What's your best price?",
+            "Can we meet up?",
+          ]}
+        />
       </div>
     </div>
   );
@@ -667,65 +554,7 @@ const SellerInfo = ({ listing, onMsg }) => (
   </div>
 );
 
-/* ── Saved Items helpers ── */
-const createSaveNotification = async (listing, buyerName, buyerUid) => {
-  try {
-    await addDoc(collection(db, "notifications"), {
-      type: "saved",
-      listingId: listing.id,
-      listingName: listing.name,
-      listingImageUrl: listing.imageUrl || null,
-      sellerUid: listing.sellerUid,
-      sellerName: listing.sellerName || "Seller",
-      buyerUid: buyerUid,
-      buyerName: buyerName || "Buyer",
-      read: false,
-      createdAt: serverTimestamp(),
-    });
-  } catch (e) {
-    console.error("Notification creation error:", e);
-  }
-};
-
-const savedHelpers = {
-  _key: (uid) => (uid ? `declutt_saved_${uid}` : "declutt_saved_guest"),
-  get: (uid) => {
-    try {
-      return JSON.parse(localStorage.getItem(savedHelpers._key(uid)) || "[]");
-    } catch {
-      return [];
-    }
-  },
-  toggle: (uid, listing, buyerName) => {
-    const saved = savedHelpers.get(uid);
-    const idx = saved.findIndex((i) => i.id === listing.id);
-    let next;
-    if (idx > -1) {
-      next = saved.filter((_, i) => i !== idx);
-    } else {
-      next = [
-        ...saved,
-        {
-          id: listing.id,
-          name: listing.name,
-          price: listing.price,
-          imageUrl: listing.imageUrl || null,
-          category: listing.category || "",
-        },
-      ];
-      // Trigger notification creation when item is saved (not unsaved)
-      if (uid) {
-        createSaveNotification(listing, buyerName, uid);
-      }
-    }
-    localStorage.setItem(savedHelpers._key(uid), JSON.stringify(next));
-    window.dispatchEvent(new CustomEvent("saved-updated", { detail: { uid } }));
-    return idx === -1;
-  },
-  has: (uid, id) => savedHelpers.get(uid).some((i) => i.id === id),
-};
-
-/* ── Related Items — FIXED: only same category ── */
+/* ── Related Items — same category first, then other available items ── */
 const RelatedItems = ({ currentId, category }) => {
   const navigate = useNavigate();
   const [items, setItems] = useState([]);
@@ -734,14 +563,12 @@ const RelatedItems = ({ currentId, category }) => {
     getDocs(collection(db, "listings"))
       .then((snap) => {
         const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        // FIX: Only show items from the SAME category, exclude current item
         const sameCategory = all.filter(
           (l) =>
             l.id !== currentId &&
             l.category === category &&
             l.available === true,
         );
-        // If not enough same-category items, fill with other available items
         let result = sameCategory;
         if (result.length < 8) {
           const others = all.filter(
@@ -828,7 +655,9 @@ const ReviewsSection = ({ listing }) => {
             </div>
             <div>
               <p className="text-sm font-bold">{avg.toFixed(1)}</p>
-              <p className="text-xs text-foreground/40">{count} review{count!==1?"s":""}</p>
+              <p className="text-xs text-foreground/40">
+                {count} review{count !== 1 ? "s" : ""}
+              </p>
             </div>
           </div>
         ) : (
@@ -843,24 +672,24 @@ const ReviewsSection = ({ listing }) => {
 const ProductDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const uid = user?.uid || null;
+  const buyerName = profile?.name || user?.displayName || "Buyer";
 
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [qty, setQty] = useState(1);
   const [showMsg, setShowMsg] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
   const [toast, setToast] = useState({ show: false, msg: "" });
 
-  // FIX: Scroll to top when component mounts or id changes
+  // Live saved list (Firestore-backed, cached locally) — keeps the heart in sync everywhere
+  const buyerLoc = useBuyerLocation();
+  const { items: savedItems } = useSavedItems(uid);
+  const isSaved = savedItems.some((i) => i.id === id);
+
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }, [id]);
-
-  useEffect(() => {
-    if (id) setIsSaved(savedHelpers.has(uid, id));
-  }, [uid, id]);
 
   const showToast = (msg) => {
     setToast({ show: true, msg });
@@ -869,9 +698,11 @@ const ProductDetails = () => {
 
   useEffect(() => {
     if (!id) return;
+    setLoading(true);
     getDoc(doc(db, "listings", id))
       .then((snap) => {
         if (snap.exists()) setListing({ id: snap.id, ...snap.data() });
+        else setListing(null);
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -906,9 +737,11 @@ const ProductDetails = () => {
   };
 
   const handleSave = () => {
-    const buyerName = user?.displayName || "Buyer";
-    const nowSaved = savedHelpers.toggle(uid, listing, buyerName);
-    setIsSaved(nowSaved);
+    if (!uid) {
+      showToast("Sign in to save items");
+      return;
+    }
+    const nowSaved = toggleSaved(uid, listing, buyerName);
     showToast(nowSaved ? "Saved ✓" : "Removed from saved");
   };
 
@@ -1021,7 +854,10 @@ const ProductDetails = () => {
   );
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div
+      className="min-h-screen bg-background flex flex-col"
+      style={{ overflowX: "clip" }}
+    >
       <Navbar />
 
       {/* Breadcrumb */}
@@ -1185,6 +1021,8 @@ const ProductDetails = () => {
               </div>
             )}
 
+            <DistanceLine listing={listing} loc={buyerLoc} />
+
             <div className="lg:hidden">
               <PurchaseActions />
             </div>
@@ -1204,10 +1042,8 @@ const ProductDetails = () => {
           </div>
         </div>
 
-        {/* Reviews */}
         <ReviewsSection listing={listing} />
 
-        {/* Related Items */}
         <div className="mt-10 sm:mt-12 border-t border-border pt-8">
           <h2 className="text-base font-bold text-foreground mb-4 text-left">
             Related items
@@ -1215,8 +1051,6 @@ const ProductDetails = () => {
           <RelatedItems currentId={listing.id} category={listing.category} />
         </div>
       </main>
-
-      {/* FIX: Removed duplicate Footer - only one Footer at the bottom */}
 
       {/* Mobile sticky bottom bar */}
       <div className="sm:hidden fixed bottom-0 inset-x-0 z-30 bg-card/95 backdrop-blur-md border-t border-border px-4 py-3 flex gap-2.5">
@@ -1239,6 +1073,7 @@ const ProductDetails = () => {
           listing={listing}
           onClose={() => setShowMsg(false)}
           currentUser={user}
+          buyerName={buyerName}
         />
       )}
       <Toast msg={toast.msg} show={toast.show} />

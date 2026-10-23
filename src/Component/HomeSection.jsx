@@ -404,7 +404,7 @@ const StackedCards = () => {
                 <h3 className="text-[10px] sm:text-[11px] font-bold text-foreground mb-0.5 leading-snug">
                   {step.title}
                 </h3>
-                <p className="text-[8px] sm:text-[9px] text-foreground/65 leading-relaxed line-clamp-3">
+                <p className="hidden sm:block text-[8px] sm:text-[9px] text-foreground/65 leading-relaxed line-clamp-3">
                   {step.desc}
                 </p>
               </div>

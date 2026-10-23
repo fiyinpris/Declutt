@@ -1,7 +1,8 @@
 // src/Component/Footer.jsx
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import DecluttLogo from "./DecluttLogo";
+import { useAuth } from "../context/AuthContext";
 
 /* Icons */
 const SunIcon = () => (
@@ -33,6 +34,10 @@ const MoonIcon = () => (
 
 const Footer = () => {
   const [isDark, setIsDark] = useState(false);
+  const { user } = useAuth();
+  const { pathname } = useLocation();
+  // Signed-in phones get app-style dashboard screens with the tab bar, so no footer under them
+  const appScreen = !!user && /^\/(buyer|seller|admin)/.test(pathname);
 
   useEffect(() => {
     setIsDark(document.documentElement.classList.contains("dark"));
@@ -46,7 +51,9 @@ const Footer = () => {
   };
 
   return (
-    <footer className="border-t border-border bg-background mt-10">
+    <footer
+      className={`border-t border-border bg-background mt-10 ${appScreen ? "hidden md:block" : ""}`}
+    >
       <div className="max-w-6xl mx-auto px-4 py-10">
         {/* Top grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 text-left">

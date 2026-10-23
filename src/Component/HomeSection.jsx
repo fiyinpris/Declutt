@@ -1716,8 +1716,9 @@ export const HomeSection = () => {
       {toastVisible &&
         createPortal(
           <div
-            className="fixed bottom-4 sm:bottom-6 left-3 sm:left-4 lg:left-6 flex items-center gap-2 sm:gap-3 bg-card border border-border/50 rounded-xl sm:rounded-2xl shadow-xl px-3 sm:px-4 py-2 sm:py-3 w-57.5 sm:w-65 lg:w-67.5"
+            className="fixed left-3 sm:left-4 lg:left-6 flex items-center gap-2 sm:gap-3 bg-card border border-border/50 rounded-xl sm:rounded-2xl shadow-xl px-3 sm:px-4 py-2 sm:py-3 w-57.5 sm:w-65 lg:w-67.5"
             style={{
+              bottom: "calc(var(--tabbar-h) + 1rem)",
               zIndex: 99999,
               transform: toastAnimating
                 ? "translateY(0) scale(1)"

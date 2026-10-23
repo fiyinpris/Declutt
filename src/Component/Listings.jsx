@@ -48,7 +48,8 @@ const Spinner = ({ size = 22 }) => (
 
 const Toast = ({ msg, show }) => (
   <div
-    className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[9999] px-5 py-3 rounded-2xl text-sm font-bold shadow-2xl whitespace-nowrap bg-primary text-primary-foreground transition-all duration-300 pointer-events-none ${show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}`}
+    style={{ bottom: "calc(var(--tabbar-h) + 2rem)" }}
+    className={`fixed left-1/2 -translate-x-1/2 z-[9999] px-5 py-3 rounded-2xl text-sm font-bold shadow-2xl whitespace-nowrap bg-primary text-primary-foreground transition-all duration-300 pointer-events-none ${show ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"}`}
   >
     {msg}
   </div>

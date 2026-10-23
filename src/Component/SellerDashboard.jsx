@@ -306,8 +306,8 @@ const ToastContainer = ({ toasts, onDismiss, onMessage }) => {
   if (toasts.length === 0) return null;
   return (
     <div
-      className="fixed bottom-6 right-4 sm:right-6 z-[9999] flex flex-col gap-3 items-end pointer-events-none"
-      style={{ maxWidth: "320px" }}
+      className="fixed right-4 sm:right-6 z-[9999] flex flex-col gap-3 items-end pointer-events-none"
+      style={{ maxWidth: "320px", bottom: "calc(var(--tabbar-h) + 1.5rem)" }}
     >
       {toasts.map((t) => (
         <div key={t.id} className="pointer-events-auto w-full">
@@ -2055,7 +2055,13 @@ const SellerDashboard = () => {
   const { user, profile, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [tab, setTab] = useState("overview");
+  // The URL (?tab=…) is the source of truth, so the phone tab bar and the sidebar always agree
+  const tabParam = new URLSearchParams(location.search).get("tab");
+  const tab = NAV_ITEMS.some((n) => n.id === tabParam) ? tabParam : "overview";
+  const setTab = useCallback(
+    (id) => navigate(id === "overview" ? location.pathname : `?tab=${id}`),
+    [navigate, location.pathname],
+  );
   const rootRef = useRef(null);
   const pull = useCloseFooterGap(rootRef);
   const [listings, setListings] = useState([]);
@@ -2069,11 +2075,6 @@ const SellerDashboard = () => {
   const { state: logoutState, handleLogout } = useLogout(logout, navigate);
   const isFirstNotifLoad = useRef(true);
   const seenNotifIds = useRef(new Set());
-
-  useEffect(() => {
-    const p = new URLSearchParams(location.search).get("tab");
-    if (p && NAV_ITEMS.find((n) => n.id === p)) setTab(p);
-  }, [location.search]);
 
   useEffect(() => {
     if (typeof window !== "undefined")
@@ -2153,7 +2154,7 @@ const SellerDashboard = () => {
       listingPrice: n.listingPrice ?? null,
     });
     setTab("messages");
-  }, []);
+  }, [setTab]);
 
   const fetchListings = async () => {
     if (!user) return;
@@ -2239,10 +2240,10 @@ const SellerDashboard = () => {
   return (
     <div
       ref={rootRef}
-      className="flex-1 min-h-screen bg-background flex flex-col"
+      className="flex-1 md:min-h-screen bg-background flex flex-col"
       style={{ paddingTop: `${NAVBAR_H}px`, marginBottom: -pull }}
     >
-      <div className="flex flex-1 min-h-screen items-stretch">
+      <div className="flex flex-1 md:min-h-screen items-stretch">
         {/* Desktop Sidebar */}
         <aside
           className="hidden md:flex md:flex-col w-64 xl:w-72 shrink-0 bg-card"

@@ -23,6 +23,8 @@ import {
   ProductThumb,
   MessageList,
   Composer,
+  replySnapshot,
+  hiddenFor,
 } from "./Chatui";
 
 export { tsMs }; // other files import tsMs from here
@@ -124,6 +126,7 @@ const ChatCenter = ({
   const [sendError, setSendError] = useState("");
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("all");
+  const [replyTo, setReplyTo] = useState(null);
 
   const otherName = (t) =>
     role === "seller" ? t.buyerName || "Buyer" : t.sellerName || "Seller";
@@ -164,11 +167,14 @@ const ChatCenter = ({
       });
     return Object.values(g)
       .map((t) => {
-        const last = t.messages[t.messages.length - 1];
-        return { ...t, last, lastMs: tsMs(last.createdAt) };
+        // Preview skips messages this user deleted for themselves; ordering uses the real latest
+        const seen = t.messages.filter((m) => !hiddenFor(m, uid));
+        const last = seen[seen.length - 1] || null;
+        const newest = t.messages[t.messages.length - 1];
+        return { ...t, last, lastMs: tsMs(newest.createdAt) };
       })
       .sort((a, b) => b.lastMs - a.lastMs);
-  }, [msgs, role]);
+  }, [msgs, role, uid]);
 
   // Open (or start) a conversation, e.g. from a notification about a saved item
   useEffect(() => {
@@ -249,6 +255,7 @@ const ChatCenter = ({
     setMobileOpen(true);
     setSendError("");
     setText("");
+    setReplyTo(null);
   };
 
   const send = async () => {
@@ -259,9 +266,11 @@ const ChatCenter = ({
       return;
     }
     const about = pendingListing || active.listing; // the item this message is about
+    const quoting = replyTo;
     setSending(true);
     setSendError("");
     setText("");
+    setReplyTo(null);
     try {
       await addDoc(collection(db, "messages"), {
         sellerUid: active.sellerUid,
@@ -280,6 +289,7 @@ const ChatCenter = ({
         listingPrice: about?.price ?? null,
         text: body,
         from: role,
+        replyTo: replySnapshot(quoting),
         createdAt: serverTimestamp(),
         delivered: false,
         read: false,
@@ -287,6 +297,7 @@ const ChatCenter = ({
     } catch (e) {
       console.error("Send failed:", e);
       setText(body);
+      setReplyTo(quoting);
       setSendError("Failed to send. Please try again.");
     }
     setSending(false);
@@ -296,7 +307,7 @@ const ChatCenter = ({
     if (tab === "unread" && !t.unread) return false;
     const q = search.trim().toLowerCase();
     if (!q) return true;
-    return [otherName(t), t.listing?.name, t.last.text].some((f) =>
+    return [otherName(t), t.listing?.name, t.last?.text].some((f) =>
       f?.toLowerCase().includes(q),
     );
   });
@@ -354,11 +365,12 @@ const ChatCenter = ({
           )}
         </div>
       ) : (
+        // Phones: the list is only as tall as its conversations (a chat opens full-screen),
+        // so there's no empty box. Wider screens: fixed-height two-pane layout.
         <div
-          className="grid grid-cols-1 sm:grid-cols-[320px_1fr] overflow-hidden rounded-none sm:rounded-2xl -mx-4 sm:mx-0 bg-card"
+          className="grid grid-cols-1 sm:grid-cols-[320px_1fr] overflow-hidden rounded-none sm:rounded-2xl -mx-4 sm:mx-0 bg-card sm:h-[var(--chat-h)] sm:min-h-[460px]"
           style={{
-            height: `calc(100dvh - ${offset}px)`,
-            minHeight: 460,
+            "--chat-h": `calc(100dvh - ${offset}px - var(--tabbar-h))`,
             border: "1.5px solid hsl(var(--border))",
           }}
         >
@@ -403,7 +415,8 @@ const ChatCenter = ({
               )}
               {shown.map((t) => {
                 const isActive = active?.key === t.key;
-                const mine = t.last.from === role;
+                const mine = t.last?.from === role;
+                const lastDeleted = !!t.last?.deletedForEveryone;
                 return (
                   <button
                     key={t.key}
@@ -447,13 +460,19 @@ const ChatCenter = ({
                           {mine && (
                             <span className="text-foreground/35">You: </span>
                           )}
-                          {t.last.text}
+                          {!t.last ? (
+                            <span className="italic">No messages</span>
+                          ) : lastDeleted ? (
+                            <span className="italic">This message was deleted</span>
+                          ) : (
+                            t.last.text
+                          )}
                         </p>
                         {t.unread > 0 ? (
                           <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-black flex items-center justify-center shrink-0">
                             {t.unread}
                           </span>
-                        ) : mine ? (
+                        ) : mine && !lastDeleted ? (
                           <span className="shrink-0 flex items-center">
                             <Ticks status={messageStatus(t.last)} />
                           </span>
@@ -477,6 +496,7 @@ const ChatCenter = ({
                   onClick={() => {
                     setMobileOpen(false);
                     setActiveKey(null);
+                    setReplyTo(null);
                   }}
                   className="sm:hidden w-10 h-10 rounded-full flex items-center justify-center text-foreground/60 hover:bg-border/40 shrink-0"
                   aria-label="Back"
@@ -503,6 +523,8 @@ const ChatCenter = ({
               <MessageList
                 messages={active.messages}
                 role={role}
+                uid={uid}
+                onReply={setReplyTo}
                 peerName={otherName(active)}
                 pendingListing={pendingListing}
                 resetKey={`${active.key}-${mobileOpen}`}
@@ -526,6 +548,11 @@ const ChatCenter = ({
                 onSend={send}
                 sending={sending}
                 quick={QUICK[role]}
+                replyTo={replyTo}
+                replyLabel={
+                  replyTo?.from === role ? "yourself" : otherName(active)
+                }
+                onCancelReply={() => setReplyTo(null)}
               />
             </div>
           ) : (

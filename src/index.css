@@ -26,6 +26,18 @@
   --animate-shake: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 }
 
+/* Phone tab bar for signed-in users (Navbar.jsx). Pages read --tabbar-h to keep
+   fixed toasts above it; body padding keeps content from hiding behind it. */
+:root {
+  --tabbar-h: 0px;
+}
+@media (max-width: 767.98px) {
+  body.has-tabbar {
+    --tabbar-h: calc(4rem + env(safe-area-inset-bottom));
+    padding-bottom: var(--tabbar-h);
+  }
+}
+
 @keyframes fade-in {
   from {
     opacity: 0;

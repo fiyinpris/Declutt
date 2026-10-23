@@ -647,9 +647,199 @@ const CartDrawer = ({ open, onClose, cartItems = [], onRemove }) => {
 const getCartKey = (uid) =>
   uid ? `declutt_cart_${uid}` : "declutt_cart_guest";
 
+/* ── Phone tab bar (signed-in users) ── */
+const TabIcon = ({ children }) => (
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    {children}
+  </svg>
+);
+
+const TAB_ICONS = {
+  home: (
+    <TabIcon>
+      <path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <path d="M9 22V12h6v10" />
+    </TabIcon>
+  ),
+  browse: (
+    <TabIcon>
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </TabIcon>
+  ),
+  messages: (
+    <TabIcon>
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </TabIcon>
+  ),
+  saved: (
+    <TabIcon>
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+    </TabIcon>
+  ),
+  dashboard: (
+    <TabIcon>
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </TabIcon>
+  ),
+  items: (
+    <TabIcon>
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+      <line x1="7" y1="7" x2="7.01" y2="7" />
+    </TabIcon>
+  ),
+  alerts: (
+    <TabIcon>
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </TabIcon>
+  ),
+  account: (
+    <TabIcon>
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+    </TabIcon>
+  ),
+};
+
+const MobileTabBar = ({ tabs, isCurrent, accountActive, onAccount }) => (
+  <nav
+    className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-card/95 backdrop-blur-md border-t border-border"
+    style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+  >
+    <div className="flex items-stretch h-16">
+      {[...tabs, { id: "account", label: "Account", icon: "account" }].map(
+        (t) => {
+          const active = t.to ? isCurrent(t.to) : accountActive;
+          const body = (
+            <>
+              {active && (
+                <span className="absolute top-0 inset-x-5 h-0.5 rounded-full bg-primary" />
+              )}
+              <span className="relative">
+                {TAB_ICONS[t.icon]}
+                {t.badge > 0 && (
+                  <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-[18px] px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-black flex items-center justify-center border-2 border-card">
+                    {t.badge > 9 ? "9+" : t.badge}
+                  </span>
+                )}
+              </span>
+              <span>{t.label}</span>
+            </>
+          );
+          const cls = `relative flex-1 min-w-0 flex flex-col items-center justify-center gap-1 text-[11px] font-semibold transition-colors ${active ? "text-primary" : "text-foreground/50 hover:text-foreground/80"}`;
+          return t.to ? (
+            <Link key={t.id} to={t.to} className={cls}>
+              {body}
+            </Link>
+          ) : (
+            <button key={t.id} type="button" onClick={onAccount} className={cls}>
+              {body}
+            </button>
+          );
+        },
+      )}
+    </div>
+  </nav>
+);
+
+const AccountSheet = ({
+  open,
+  onClose,
+  profile,
+  links,
+  isCurrent,
+  logoutState,
+  onLogout,
+}) => {
+  const initials =
+    profile?.name
+      ?.split(" ")
+      .map((n) => n[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() ?? "?";
+  return (
+    <>
+      {open && (
+        <div
+          className="md:hidden fixed inset-0 z-60 bg-black/45 backdrop-blur-sm"
+          onClick={onClose}
+        />
+      )}
+      <div
+        className="md:hidden fixed inset-x-0 bottom-0 z-60 flex flex-col bg-card rounded-t-3xl border-t border-border text-left"
+        style={{
+          maxHeight: "85dvh",
+          paddingBottom: "env(safe-area-inset-bottom)",
+          transform: open ? "translateY(0)" : "translateY(100%)",
+          transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
+          boxShadow: open ? "0 -8px 32px rgba(0,0,0,0.18)" : "none",
+        }}
+        aria-hidden={!open}
+      >
+        <div className="flex justify-center pt-3 pb-1 shrink-0">
+          <span className="w-10 h-1 rounded-full bg-border" />
+        </div>
+        <div className="flex items-center gap-3 px-5 py-3 shrink-0 border-b border-border/60">
+          {profile?.photoURL ? (
+            <img
+              src={profile.photoURL}
+              alt=""
+              className="w-12 h-12 rounded-full object-cover border-2 border-primary/30 shrink-0"
+            />
+          ) : (
+            <div className="w-12 h-12 rounded-full bg-primary/15 text-primary flex items-center justify-center text-sm font-black border-2 border-primary/25 shrink-0">
+              {initials}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-foreground truncate">
+              {profile?.name}
+            </p>
+            <p className="text-xs text-foreground/40 truncate">
+              {profile?.email}
+            </p>
+          </div>
+          <span className="shrink-0 text-xs font-bold text-primary px-2.5 py-1 rounded-full bg-primary/10">
+            {profile?.rewards ?? 0} pts
+          </span>
+        </div>
+        <nav className="flex-1 overflow-y-auto px-3 py-2">
+          {links.map((l) => (
+            <Link
+              key={l.to}
+              to={l.to}
+              onClick={onClose}
+              className={`flex items-center px-4 py-3.5 rounded-2xl text-sm font-semibold transition-colors ${isCurrent(l.to) ? "text-primary bg-primary/8" : "text-foreground/75 hover:text-primary hover:bg-primary/8"}`}
+            >
+              {l.label}
+            </Link>
+          ))}
+        </nav>
+        <div className="shrink-0 px-3 pt-2 pb-4 border-t border-border/60">
+          <LogoutButton onLogout={onLogout} state={logoutState} />
+        </div>
+      </div>
+    </>
+  );
+};
+
 const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [accountOpen, setAccountOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const { user, profile, logout } = useAuth();
@@ -734,21 +924,21 @@ const Navbar = () => {
   }, []);
 
   useEffect(() => {
-    const overflow = menuOpen || accountOpen || cartOpen ? "hidden" : "";
+    const overflow = menuOpen || sheetOpen || cartOpen ? "hidden" : "";
     document.body.style.overflow = overflow;
     document.documentElement.style.overflow = overflow;
     return () => {
       document.body.style.overflow = "";
       document.documentElement.style.overflow = "";
     };
-  }, [menuOpen, accountOpen, cartOpen]);
+  }, [menuOpen, sheetOpen, cartOpen]);
 
   useLayoutEffect(() => {
     // close drawers async after navigation to avoid synchronous setState in layout effect
     setTimeout(() => {
       try {
         setMenuOpen(false);
-        setAccountOpen(false);
+        setSheetOpen(false);
       } catch (e) {
         console.error("closing drawers async error:", e);
       }
@@ -787,53 +977,84 @@ const Navbar = () => {
     }
   };
 
-  const dashboardPath =
-    profile?.role === "seller"
-      ? "/seller"
-      : profile?.role === "admin"
-        ? "/admin"
-        : "/buyer";
+  const role = profile?.role;
+  const signedIn = !!(user && profile);
 
-  const isAccountRoute =
-    location.pathname.startsWith("/buyer") ||
-    location.pathname.startsWith("/seller") ||
-    location.pathname.startsWith("/admin");
-
-  const mobileNavLinks = isAccountRoute
-    ? [
-        { label: "Browse", to: "/listings" },
-        { label: "Dashboard", to: dashboardPath },
-        { label: "Messages", to: `${dashboardPath}?tab=messages` },
-        { label: "My Items", to: `${dashboardPath}?tab=listings` },
-        { label: "Orders", to: `${dashboardPath}?tab=orders` },
-        { label: "Notifications", to: `${dashboardPath}?tab=notifications` },
-        { label: "Rewards", to: `${dashboardPath}?tab=rewards` },
-      ]
-    : NAV_LINKS;
-
-  const mobileDashboardLink =
-    isAccountRoute ? null : { label: "Dashboard", to: dashboardPath };
-
-  const activeAccountTab =
-    new URLSearchParams(location.search).get("tab") ||
-    (location.pathname === dashboardPath ? "dashboard" : "");
-
-  const mobileAccountLinks = [
-    { id: "dashboard", label: "Dashboard", to: dashboardPath },
-    { id: "messages", label: "Messages", to: `${dashboardPath}?tab=messages` },
-    { id: "notifications", label: "Notifications", to: `${dashboardPath}?tab=notifications` },
-    { id: "listings", label: "My Items", to: `${dashboardPath}?tab=listings` },
-    { id: "orders", label: "Orders", to: `${dashboardPath}?tab=orders` },
-    { id: "rewards", label: "Rewards", to: `${dashboardPath}?tab=rewards` },
-    {
-      id: "referrals",
-      label: "Referrals",
-      to: `${dashboardPath}?tab=referrals`,
-    },
-    { id: "profile", label: "My Profile", to: `${dashboardPath}?tab=profile` },
-  ];
+  // Exact match for the phone tab bar / account sheet: same page and same ?tab (none = overview)
+  const currentTab = new URLSearchParams(location.search).get("tab") || "";
+  const isCurrent = (to) => {
+    const target = new URL(to, window.location.origin);
+    return (
+      target.pathname === location.pathname &&
+      (target.searchParams.get("tab") || "") === currentTab
+    );
+  };
 
   const [messageCount, setMessageCount] = useState(0);
+  const [notifCount, setNotifCount] = useState(0);
+
+  const tabBarTabs =
+    role === "seller"
+      ? [
+          { id: "dashboard", label: "Dashboard", icon: "dashboard", to: "/seller" },
+          { id: "listings", label: "My Items", icon: "items", to: "/seller?tab=listings" },
+          { id: "messages", label: "Messages", icon: "messages", to: "/seller?tab=messages", badge: messageCount },
+          { id: "notifications", label: "Alerts", icon: "alerts", to: "/seller?tab=notifications", badge: notifCount },
+        ]
+      : role === "admin"
+        ? [
+            { id: "home", label: "Home", icon: "home", to: "/" },
+            { id: "browse", label: "Browse", icon: "browse", to: "/listings" },
+            { id: "dashboard", label: "Dashboard", icon: "dashboard", to: "/admin" },
+          ]
+        : [
+            { id: "home", label: "Home", icon: "home", to: "/" },
+            { id: "browse", label: "Browse", icon: "browse", to: "/listings" },
+            { id: "messages", label: "Messages", icon: "messages", to: "/buyer?tab=messages", badge: messageCount },
+            { id: "saved", label: "Saved", icon: "saved", to: "/buyer?tab=favourites" },
+          ];
+
+  // Everything that doesn't fit in the tab bar lives in the Account sheet
+  const accountLinks =
+    role === "seller"
+      ? [
+          { label: "Home", to: "/" },
+          { label: "Browse items", to: "/listings" },
+          { label: "Orders", to: "/seller?tab=orders" },
+          { label: "Rewards", to: "/seller?tab=rewards" },
+          { label: "Referrals", to: "/seller?tab=referrals" },
+          { label: "My Profile", to: "/seller?tab=profile" },
+        ]
+      : role === "admin"
+        ? []
+        : [
+            { label: "Dashboard", to: "/buyer" },
+            { label: "My Orders", to: "/buyer?tab=orders" },
+            { label: "Rewards / Points", to: "/buyer?tab=rewards" },
+            { label: "Referrals", to: "/buyer?tab=referrals" },
+          ];
+
+  // The product page has its own bottom buy bar, so the tab bar steps aside there
+  const showTabBar = signedIn && !location.pathname.startsWith("/product/");
+
+  useEffect(() => {
+    document.body.classList.toggle("has-tabbar", showTabBar);
+    return () => document.body.classList.remove("has-tabbar");
+  }, [showTabBar]);
+
+  useEffect(() => {
+    if (!user || role !== "seller") return;
+    const q = query(
+      collection(db, "notifications"),
+      where("sellerUid", "==", user.uid),
+      where("read", "==", false),
+    );
+    return onSnapshot(
+      q,
+      (snap) => setNotifCount(snap.size),
+      (error) => console.error("Notification badge listener error:", error),
+    );
+  }, [user, role]);
 
   useEffect(() => {
     if (!user || !profile?.role) return;
@@ -959,35 +1180,50 @@ const Navbar = () => {
             )}
           </div>
 
-          {/* Mobile right side: search + hamburger */}
+          {/* Mobile right side: search + cart when signed in (navigation is in the tab bar),
+              search + hamburger when signed out */}
           <div className="md:hidden flex items-center gap-1">
             <SearchNavButton onClick={handleSearchClick} />
-            {user && profile && (
+            {signedIn ? (
+              <button
+                onClick={() => setCartOpen(true)}
+                aria-label="Cart"
+                className="relative flex items-center justify-center w-10 h-10 rounded-xl text-foreground/70 hover:text-primary hover:bg-primary/10 transition-colors"
+                type="button"
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="9" cy="21" r="1" />
+                  <circle cx="20" cy="21" r="1" />
+                  <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                </svg>
+                {cartItems.length > 0 && (
+                  <span className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] font-black flex items-center justify-center">
+                    {cartItems.length}
+                  </span>
+                )}
+              </button>
+            ) : (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  setAccountOpen(!accountOpen);
-                  setMenuOpen(false);
+                  setMenuOpen(!menuOpen);
                 }}
-                aria-label="Account"
+                aria-label="Menu"
                 className="flex items-center justify-center w-10 h-10 rounded-xl text-foreground hover:text-primary hover:bg-primary/10 transition-colors z-100"
                 type="button"
               >
-                <AccountIcon />
+                {menuOpen ? <CloseIcon /> : <MenuIcon />}
               </button>
             )}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setMenuOpen(!menuOpen);
-                setAccountOpen(false);
-              }}
-              aria-label="Menu"
-              className="flex items-center justify-center w-10 h-10 rounded-xl text-foreground hover:text-primary hover:bg-primary/10 transition-colors z-100"
-              type="button"
-            >
-              {menuOpen ? <CloseIcon /> : <MenuIcon />}
-            </button>
           </div>
         </div>
       </header>
@@ -999,8 +1235,8 @@ const Navbar = () => {
         onRemove={removeFromCart}
       />
 
-      {/* Mobile menu overlay - only covers content below header */}
-      {menuOpen && (
+      {/* Signed-out phones: hamburger menu. Signed-in phones use the tab bar below instead. */}
+      {!signedIn && menuOpen && (
         <div
           className="fixed left-0 right-0 bottom-0 z-40 bg-black/45 backdrop-blur-sm md:hidden"
           style={{ top: "56px" }}
@@ -1008,124 +1244,80 @@ const Navbar = () => {
         />
       )}
 
-      {/* Mobile menu drawer */}
-      <div
-        className="md:hidden fixed right-0 bottom-0 z-60 flex flex-col bg-background"
-        style={{
-          top: "56px",
-          width: "78vw",
-          maxWidth: "320px",
-          borderLeft: "1px solid hsl(var(--border)/0.5)",
-          transform: menuOpen ? "translateX(0)" : "translateX(100%)",
-          transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
-          boxShadow: menuOpen ? "-4px 0 28px rgba(0,0,0,0.13)" : "none",
-        }}
-      >
-        <div className="flex-1 overflow-y-auto">
-          <nav className="flex flex-col px-4 py-5 gap-3">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-foreground/30 px-4 pb-1">
-              Navigation
-            </p>
-            {mobileNavLinks.map((l) => (
-              <Link
-                key={l.label}
-                to={l.to}
-                onClick={() => setMenuOpen(false)}
-                className={`flex items-center px-4 py-4 rounded-2xl text-sm font-semibold transition-all ${isActive(l.to) ? "text-primary bg-primary/8" : "text-foreground/70 hover:text-primary hover:bg-primary/8"}`}
-                style={{
-                  border: isActive(l.to)
-                    ? "1.5px solid hsl(var(--primary)/0.2)"
-                    : "1.5px solid transparent",
-                }}
-              >
-                {l.label}
-              </Link>
-            ))}
-          </nav>
-        </div>
-        {mobileDashboardLink && (
-          <div className="px-4 py-4 border-t border-border">
+      {!signedIn && (
+        <div
+          className="md:hidden fixed right-0 bottom-0 z-60 flex flex-col bg-background"
+          style={{
+            top: "56px",
+            width: "78vw",
+            maxWidth: "320px",
+            borderLeft: "1px solid hsl(var(--border)/0.5)",
+            transform: menuOpen ? "translateX(0)" : "translateX(100%)",
+            transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
+            boxShadow: menuOpen ? "-4px 0 28px rgba(0,0,0,0.13)" : "none",
+          }}
+        >
+          <div className="flex-1 overflow-y-auto">
+            <nav className="flex flex-col px-4 py-5 gap-3">
+              <p className="text-[11px] font-bold uppercase tracking-widest text-foreground/30 px-4 pb-1">
+                Navigation
+              </p>
+              {NAV_LINKS.map((l) => (
+                <Link
+                  key={l.label}
+                  to={l.to}
+                  onClick={() => setMenuOpen(false)}
+                  className={`flex items-center px-4 py-4 rounded-2xl text-sm font-semibold transition-all ${isActive(l.to) ? "text-primary bg-primary/8" : "text-foreground/70 hover:text-primary hover:bg-primary/8"}`}
+                  style={{
+                    border: isActive(l.to)
+                      ? "1.5px solid hsl(var(--primary)/0.2)"
+                      : "1.5px solid transparent",
+                  }}
+                >
+                  {l.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
+          <div className="px-4 py-4 border-t border-border flex flex-col gap-2.5">
             <Link
-              to={mobileDashboardLink.to}
+              to="/login"
               onClick={() => setMenuOpen(false)}
-              className={`flex items-center justify-center w-full rounded-2xl px-4 py-4 text-sm font-semibold transition-all ${isActive(mobileDashboardLink.to) ? "text-primary bg-primary/8" : "text-foreground/70 hover:text-primary hover:bg-primary/8"}`}
-              style={{
-                border: isActive(mobileDashboardLink.to)
-                  ? "1.5px solid hsl(var(--primary)/0.2)"
-                  : "1.5px solid transparent",
-              }}
+              className="flex items-center justify-center w-full rounded-2xl px-4 py-3.5 text-sm font-semibold text-foreground/75 hover:text-primary transition-colors"
+              style={{ border: "2px solid hsl(var(--border))" }}
             >
-              {mobileDashboardLink.label}
+              Log in
+            </Link>
+            <Link
+              to="/signup"
+              onClick={() => setMenuOpen(false)}
+              className="main-button flex items-center justify-center w-full px-4 py-3.5 text-sm font-semibold"
+            >
+              Get Started
             </Link>
           </div>
-        )}
-      </div>
-
-      {accountOpen && (
-        <div
-          className="fixed left-0 right-0 bottom-0 z-40 bg-black/45 backdrop-blur-sm md:hidden"
-          style={{ top: "56px" }}
-          onClick={() => setAccountOpen(false)}
-        />
+        </div>
       )}
 
-      {/* Mobile account drawer */}
-      <div
-        className="md:hidden fixed left-0 bottom-0 z-60 flex flex-col justify-between bg-background"
-        style={{
-          top: "56px",
-          width: "78vw",
-          maxWidth: "320px",
-          borderRight: "1px solid hsl(var(--border)/0.5)",
-          transform: accountOpen ? "translateX(0)" : "translateX(-100%)",
-          transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
-          boxShadow: accountOpen ? "4px 0 28px rgba(0,0,0,0.13)" : "none",
-        }}
-      >
-        <div className="flex-1 overflow-y-auto px-4 py-5">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-foreground/30 px-1 pb-2">
-            Account
-          </p>
-          <div className="flex flex-col gap-3">
-            {mobileAccountLinks.map((item) => (
-              <Link
-                key={item.id}
-                to={item.to}
-                onClick={() => setAccountOpen(false)}
-                className={`flex items-center px-4 py-4 rounded-2xl text-sm font-semibold transition-all ${activeAccountTab === item.id ? "text-primary bg-primary/8" : "text-foreground/65 hover:text-primary hover:bg-primary/8"}`}
-              >
-                <span>{item.label}</span>
-                {item.id === "messages" && messageCount > 0 && (
-                  <span className="ml-auto inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-primary-foreground text-[10px] font-black">
-                    {messageCount}
-                  </span>
-                )}
-              </Link>
-            ))}
-          </div>
-        </div>
-        <div className="shrink-0 px-4 py-4 border-t border-border">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-11 h-11 rounded-full bg-primary/15 text-primary flex items-center justify-center text-sm font-black border border-primary/25">
-              {profile?.name
-                ?.split(" ")
-                .map((n) => n[0])
-                .slice(0, 2)
-                .join("")
-                .toUpperCase()}
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-bold text-foreground truncate">
-                {profile?.name}
-              </p>
-              <p className="text-xs text-foreground/40 truncate">
-                {profile?.email}
-              </p>
-            </div>
-          </div>
-          <LogoutButton onLogout={handleLogout} state={logoutState} />
-        </div>
-      </div>
+      {showTabBar && (
+        <MobileTabBar
+          tabs={tabBarTabs}
+          isCurrent={isCurrent}
+          accountActive={sheetOpen}
+          onAccount={() => setSheetOpen((o) => !o)}
+        />
+      )}
+      {signedIn && (
+        <AccountSheet
+          open={sheetOpen}
+          onClose={() => setSheetOpen(false)}
+          profile={profile}
+          links={accountLinks}
+          isCurrent={isCurrent}
+          logoutState={logoutState}
+          onLogout={handleLogout}
+        />
+      )}
     </>
   );
 };

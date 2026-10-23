@@ -15,7 +15,14 @@ import {
 import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
 import { toggleSaved, useSavedItems } from "../utils/savedItems";
-import { tsMs, markDelivered, MessageList, Composer, Avatar } from "./Chatui";
+import {
+  tsMs,
+  markDelivered,
+  MessageList,
+  Composer,
+  Avatar,
+  replySnapshot,
+} from "./Chatui";
 import { useBuyerLocation } from "../utils/geo";
 import { cartHelpers } from "../utils/Cart";
 import { DistanceLine } from "./GeoUI";
@@ -249,6 +256,7 @@ const MessagingPanel = ({ listing, onClose, currentUser, buyerName }) => {
   const [sending, setSending] = useState(false);
   const [ready, setReady] = useState(false);
   const [sendError, setSendError] = useState("");
+  const [replyTo, setReplyTo] = useState(null);
 
   // All messages between this buyer and this seller (every item), realtime. Equality filters only
   // (no composite index); polling fallback if the listener fails.
@@ -324,7 +332,9 @@ const MessagingPanel = ({ listing, onClose, currentUser, buyerName }) => {
       return;
     }
     const txt = input.trim();
+    const quoting = replyTo;
     setInput("");
+    setReplyTo(null);
     setSending(true);
     setSendError("");
     try {
@@ -339,6 +349,7 @@ const MessagingPanel = ({ listing, onClose, currentUser, buyerName }) => {
         listingPrice: Number(listing.price) || null,
         text: txt,
         from: "buyer",
+        replyTo: replySnapshot(quoting),
         createdAt: serverTimestamp(),
         delivered: false,
         read: false,
@@ -346,6 +357,7 @@ const MessagingPanel = ({ listing, onClose, currentUser, buyerName }) => {
     } catch (e) {
       console.error(e);
       setInput(txt);
+      setReplyTo(quoting);
       setSendError("Message failed to send. Please try again.");
     }
     setSending(false);
@@ -453,6 +465,8 @@ const MessagingPanel = ({ listing, onClose, currentUser, buyerName }) => {
           <MessageList
             messages={messages}
             role="buyer"
+            uid={currentUser.uid}
+            onReply={setReplyTo}
             peerName={listing.sellerName}
             pendingListing={thisItem}
             resetKey={`${listing.sellerUid}-${listing.id}`}
@@ -470,6 +484,11 @@ const MessagingPanel = ({ listing, onClose, currentUser, buyerName }) => {
           onSend={send}
           sending={sending}
           autoFocus
+          replyTo={replyTo}
+          replyLabel={
+            replyTo?.from === "buyer" ? "yourself" : listing.sellerName || "Seller"
+          }
+          onCancelReply={() => setReplyTo(null)}
           quick={[
             "Is this still available?",
             "What's your best price?",

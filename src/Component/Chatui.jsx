@@ -1,6 +1,12 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
-import { doc, writeBatch } from "firebase/firestore";
+import {
+  doc,
+  writeBatch,
+  updateDoc,
+  arrayUnion,
+  deleteField,
+} from "firebase/firestore";
 import { db } from "../firebase";
 
 /* All colours come from the site's own theme tokens (primary / card / background / border /
@@ -118,6 +124,36 @@ export const markDelivered = (list, role) => {
   }
 };
 
+/* ───────────── reply / delete ─────────────
+ *  replyTo              snapshot of the quoted message, stored on the reply
+ *  deletedFor: [uid]    "delete for me" — hidden only for those users
+ *  deletedForEveryone   "delete for everyone" — text wiped, shown as "This message was deleted"
+ */
+export const replySnapshot = (m) =>
+  m ? { id: m.id, text: (m.text || "").slice(0, 200), from: m.from } : null;
+
+export const hiddenFor = (m, uid) => !!uid && !!m.deletedFor?.includes(uid);
+
+const deleteForMe = (m, uid) =>
+  updateDoc(doc(db, "messages", m.id), { deletedFor: arrayUnion(uid) });
+
+const deleteForEveryone = (m) =>
+  updateDoc(doc(db, "messages", m.id), {
+    deletedForEveryone: true,
+    text: "",
+    replyTo: deleteField(),
+  });
+
+const MenuChip = ({ danger = false, onClick, children }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`px-3 py-1.5 rounded-full text-xs font-bold border bg-card shadow-sm transition-colors ${danger ? "text-red-500 border-red-500/30 hover:bg-red-500/10" : "text-foreground/70 border-border hover:text-primary hover:border-primary/40"}`}
+  >
+    {children}
+  </button>
+);
+
 /* ───────────── small pieces ───────────── */
 export const Avatar = ({ name, size = 44 }) => (
   <div
@@ -194,18 +230,54 @@ export const ProductCard = ({ listing, label, pending = false }) => (
 
 /* ───────────── message list ───────────── */
 export const MessageList = ({
-  messages,
+  messages: allMessages,
   role,
+  uid,
   peerName,
   resetKey,
   emptyNode,
   pendingListing,
+  onReply,
 }) => {
   const ref = useRef(null);
   const near = useRef(true);
   const lastKey = useRef(null);
   const lastLen = useRef(0);
   const [showJump, setShowJump] = useState(false);
+  const [menu, setMenu] = useState(null); // { id, step: "actions" | "delete" }
+  const [flash, setFlash] = useState(null);
+
+  // Memoised so the auto-scroll effect below only re-runs when messages actually change
+  const messages = useMemo(
+    () => allMessages.filter((m) => !hiddenFor(m, uid)),
+    [allMessages, uid],
+  );
+  const byId = useMemo(
+    () => Object.fromEntries(allMessages.map((m) => [m.id, m])),
+    [allMessages],
+  );
+  const peerFirst = (peerName || (role === "buyer" ? "Seller" : "Buyer")).split(
+    " ",
+  )[0];
+
+  const runDelete = async (fn) => {
+    setMenu(null);
+    try {
+      await fn();
+    } catch (e) {
+      console.error("Delete failed:", e);
+      alert("Couldn't delete that message. Please try again.");
+    }
+  };
+
+  // Tapping a quote jumps to the original message and briefly highlights it
+  const jumpTo = (id) => {
+    const el = ref.current?.querySelector(`#msg-${CSS.escape(id)}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    setFlash(id);
+    setTimeout(() => setFlash((f) => (f === id ? null : f)), 1400);
+  };
 
   const toBottom = (smooth) => {
     const el = ref.current;
@@ -257,6 +329,9 @@ export const MessageList = ({
       <div
         ref={ref}
         onScroll={onScroll}
+        onClick={(e) => {
+          if (!e.target.closest("[data-bubble]")) setMenu(null);
+        }}
         className="absolute inset-0 overflow-y-auto px-3 sm:px-6 py-3 bg-background/60 text-left"
         style={{
           scrollbarWidth: "thin",
@@ -276,6 +351,9 @@ export const MessageList = ({
             const groupStart =
               newDay || newTopic || !prev || prev.from !== m.from;
             const end = groupEnds(i);
+            const deleted = !!m.deletedForEveryone;
+            const original = m.replyTo && (byId[m.replyTo.id] || m.replyTo);
+            const open = menu?.id === m.id;
             return (
               <div key={m.id}>
                 {newDay && (
@@ -305,17 +383,98 @@ export const MessageList = ({
                   />
                 )}
                 <div
+                  id={`msg-${m.id}`}
+                  data-bubble
                   className={`flex flex-col ${mine ? "items-end" : "items-start"} ${groupStart ? "mt-3" : "mt-1"}`}
                 >
                   <div
-                    className={`max-w-[85%] sm:max-w-[70%] px-3.5 py-2 text-sm leading-relaxed rounded-2xl whitespace-pre-wrap break-words ${
-                      mine
-                        ? `bg-primary text-primary-foreground ${end ? "rounded-br-md" : ""}`
-                        : `bg-card text-foreground border border-border ${end ? "rounded-bl-md" : ""}`
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Message options"
+                    onClick={() => {
+                      // only messages already saved on the server can be replied to / deleted
+                      if (m.createdAt)
+                        setMenu(open ? null : { id: m.id, step: "actions" });
+                    }}
+                    className={`max-w-[85%] sm:max-w-[70%] px-3.5 py-2 text-sm leading-relaxed rounded-2xl whitespace-pre-wrap break-words cursor-pointer transition-shadow ${flash === m.id || open ? "ring-2 ring-primary/50" : ""} ${
+                      deleted
+                        ? "italic bg-transparent text-foreground/45 border border-dashed border-border"
+                        : mine
+                          ? `bg-primary text-primary-foreground ${end ? "rounded-br-md" : ""}`
+                          : `bg-card text-foreground border border-border ${end ? "rounded-bl-md" : ""}`
                     }`}
                   >
-                    {m.text}
+                    {original && !deleted && (
+                      <span
+                        role="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          jumpTo(m.replyTo.id);
+                        }}
+                        className={`block mb-1.5 px-2.5 py-1.5 rounded-lg border-l-[3px] text-xs whitespace-normal ${mine ? "bg-black/15 border-primary-foreground/70" : "bg-primary/8 border-primary"}`}
+                      >
+                        <span
+                          className={`block font-bold ${mine ? "text-primary-foreground" : "text-primary"}`}
+                        >
+                          {original.from === role ? "You" : peerFirst}
+                        </span>
+                        <span className="block truncate opacity-80">
+                          {original.deletedForEveryone
+                            ? "This message was deleted"
+                            : original.text}
+                        </span>
+                      </span>
+                    )}
+                    {deleted
+                      ? mine
+                        ? "You deleted this message"
+                        : "This message was deleted"
+                      : m.text}
                   </div>
+                  {open && (
+                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                      {menu.step === "actions" ? (
+                        <>
+                          {!deleted && onReply && (
+                            <MenuChip
+                              onClick={() => {
+                                onReply(m);
+                                setMenu(null);
+                              }}
+                            >
+                              Reply
+                            </MenuChip>
+                          )}
+                          <MenuChip
+                            danger
+                            onClick={() => setMenu({ id: m.id, step: "delete" })}
+                          >
+                            Delete
+                          </MenuChip>
+                        </>
+                      ) : (
+                        <>
+                          {uid && (
+                            <MenuChip
+                              danger
+                              onClick={() => runDelete(() => deleteForMe(m, uid))}
+                            >
+                              Delete for me
+                            </MenuChip>
+                          )}
+                          {mine && !deleted && (
+                            <MenuChip
+                              danger
+                              onClick={() => runDelete(() => deleteForEveryone(m))}
+                            >
+                              Delete for everyone
+                            </MenuChip>
+                          )}
+                          <MenuChip onClick={() => setMenu(null)}>Cancel</MenuChip>
+                        </>
+                      )}
+                    </div>
+                  )}
                   {end && (
                     <div className="flex items-center gap-1.5 mt-1 px-1 text-[11px] text-foreground/40">
                       <span>{fmtTime(ms) || "sending…"}</span>
@@ -369,6 +528,9 @@ export const Composer = ({
   sending,
   quick = [],
   autoFocus,
+  replyTo = null,
+  replyLabel = "",
+  onCancelReply,
 }) => {
   const ta = useRef(null);
   useEffect(() => {
@@ -380,11 +542,46 @@ export const Composer = ({
     el.style.overflowY = h > 120 ? "auto" : "hidden"; // no stray scrollbar/arrows for short text
   }, [value]);
 
+  useEffect(() => {
+    if (replyTo) ta.current?.focus();
+  }, [replyTo]);
+
   const canSend = value.trim() && !sending;
   return (
     <div className="shrink-0 bg-card border-t border-border text-left">
       <div className="mx-auto w-full max-w-3xl">
-        {quick.length > 0 && !value && (
+        {replyTo && (
+          <div className="flex items-center gap-2 mx-3 mt-3 pl-3 pr-1.5 py-2 rounded-xl bg-background border-l-[3px] border-primary">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold text-primary">
+                Replying to {replyLabel}
+              </p>
+              <p className="text-xs text-foreground/55 truncate">
+                {replyTo.text}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onCancelReply}
+              aria-label="Cancel reply"
+              className="w-8 h-8 rounded-full flex items-center justify-center text-foreground/45 hover:text-foreground hover:bg-border/40 shrink-0"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M18 6 6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
+        {quick.length > 0 && !value && !replyTo && (
           <div
             className="flex items-center gap-2 px-3 pt-3 overflow-x-auto"
             style={{ scrollbarWidth: "none" }}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
@@ -509,18 +509,16 @@ const BuyerDashboard = () => {
   const uid = user?.uid || profile?.uid || null;
   const navigate = useNavigate();
   const location = useLocation();
-  const [tab, setTab] = useState("overview");
+  // The URL (?tab=…) is the source of truth, so the phone tab bar and the sidebar always agree
+  const tabParam = new URLSearchParams(location.search).get("tab");
+  const tab = NAV_ITEMS.some((n) => n.id === tabParam) ? tabParam : "overview";
+  const setTab = (id) =>
+    navigate(id === "overview" ? location.pathname : `?tab=${id}`);
   const rootRef = useRef(null);
   const pull = useCloseFooterGap(rootRef);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [unread, setUnread] = useState(0);
   const { state: logoutState, handleLogout } = useLogout(logout, navigate);
   const { items: savedItems, remove: removeSavedItem } = useSavedItems(uid);
-
-  useLayoutEffect(() => {
-    const p = new URLSearchParams(location.search).get("tab");
-    if (p && NAV_ITEMS.find((n) => n.id === p) && p !== tab) setTab(p);
-  }, [location.search]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -555,39 +553,13 @@ const BuyerDashboard = () => {
   const initials = getInitials(profile?.name);
   const displayName = formatDisplayName(profile?.name);
 
-  const renderSidebar = (mobile = false) => (
+  const renderSidebar = () => (
     <div className="flex flex-col h-full bg-card">
-      {mobile && (
-        <div
-          className="px-5 py-4 shrink-0 flex items-center justify-between"
-          style={{ borderBottom: "1px solid hsl(var(--border)/0.4)" }}
-        >
-          <Link
-            to="/"
-            className="text-lg font-bold"
-            onClick={() => setSidebarOpen(false)}
-          >
-            <span className="text-foreground">De</span>
-            <span className="text-primary">clutt</span>
-          </Link>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="text-foreground/50 hover:text-foreground transition-colors"
-          >
-            <Ico r>
-              <path d="M18 6 6 18M6 6l12 12" />
-            </Ico>
-          </button>
-        </div>
-      )}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto mb-auto">
         {NAV_ITEMS.map((item) => (
           <button
             key={item.id}
-            onClick={() => {
-              setTab(item.id);
-              if (mobile) setSidebarOpen(false);
-            }}
+            onClick={() => setTab(item.id)}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-left transition-all duration-150 ${tab === item.id ? "bg-primary text-primary-foreground shadow-sm" : "text-foreground/60 hover:text-primary hover:bg-primary/8"}`}
           >
             <span className={tab === item.id ? "opacity-90" : "opacity-55"}>
@@ -642,10 +614,10 @@ const BuyerDashboard = () => {
   return (
     <div
       ref={rootRef}
-      className="flex-1 min-h-screen bg-background flex flex-col"
+      className="flex-1 md:min-h-screen bg-background flex flex-col"
       style={{ paddingTop: `${NAVBAR_H}px`, marginBottom: -pull }}
     >
-      <div className="flex flex-1 min-h-screen items-stretch">
+      <div className="flex flex-1 md:min-h-screen items-stretch">
         {/* Desktop sidebar — full height, scrolls with page (not sticky) */}
         <aside
           className="hidden md:flex flex-col w-64 xl:w-72 shrink-0"
@@ -661,61 +633,8 @@ const BuyerDashboard = () => {
           {renderSidebar()}
         </aside>
 
-        {/* Mobile sidebar overlay */}
-        {sidebarOpen && (
-          <div
-            className="md:hidden fixed inset-0 z-40 bg-black/45 backdrop-blur-sm"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
-        <div
-          className="md:hidden fixed left-0 bottom-0 z-50 w-72 flex flex-col bg-card"
-          style={{
-            top: `${NAVBAR_H}px`,
-            transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
-            transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
-            boxShadow: sidebarOpen ? "4px 0 24px rgba(0,0,0,0.12)" : "none",
-            borderRight: "1px solid hsl(var(--border)/0.4)",
-          }}
-        >
-          {renderSidebar(true)}
-        </div>
-
+        {/* Phones navigate with the tab bar in Navbar.jsx — no sidebar or hamburger here */}
         <main className="flex-1 min-w-0 flex flex-col">
-          {/* Mobile top bar */}
-          <div
-            className="md:hidden sticky z-30 bg-background/90 backdrop-blur-md px-4 h-12 flex items-center justify-between gap-3"
-            style={{
-              top: `${NAVBAR_H}px`,
-              borderBottom: "1px solid hsl(var(--border)/0.4)",
-            }}
-          >
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="relative flex items-center justify-center w-8 h-8 rounded-xl text-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-              style={{ border: "1.5px solid hsl(var(--border))" }}
-            >
-              <Ico s={16} r>
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <line x1="3" y1="12" x2="21" y2="12" />
-                <line x1="3" y1="18" x2="21" y2="18" />
-              </Ico>
-              {unread > 0 && (
-                <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-amber-500" />
-              )}
-            </button>
-            <span className="text-sm font-bold text-foreground">
-              {NAV_ITEMS.find((n) => n.id === tab)?.label}
-            </span>
-            <Link
-              to="/listings"
-              className="text-xs font-semibold text-primary px-3 py-1.5 rounded-xl"
-              style={{ border: "1.5px solid hsl(var(--primary)/0.3)" }}
-            >
-              Browse
-            </Link>
-          </div>
-
           <div className="flex-1 px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-5xl w-full mx-auto">
             {tab === "overview" && (
               <OverviewPanel

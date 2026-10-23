@@ -10,6 +10,14 @@
   <link rel="icon" type="image/png" sizes="32x32" href="/images/decluttlogo3.png?v=2" />
   <link rel="apple-touch-icon" sizes="180x180" href="/images/decluttlogo3.png?v=2" />
 
+  <!-- Page background before the stylesheet loads. Class-based (not an inline style) so it
+       follows theme changes; colours = --background in src/index.css. -->
+  <style>
+    html { background-color: hsl(30 14% 80%); }
+    html.dark { background-color: hsl(30 28% 8%); }
+  </style>
+  <meta name="theme-color" content="hsl(30 14% 80%)" />
+
   <!-- Theme script -->
   <script>
     (function () {
@@ -19,11 +27,9 @@
 
       if (isDark) {
         document.documentElement.classList.add("dark");
+        // browser toolbar colour (mobile) — kept in sync by src/utils/theme.js
+        document.querySelector('meta[name="theme-color"]').content = "hsl(30 28% 8%)";
       }
-
-      document.documentElement.style.backgroundColor = isDark
-        ? "hsl(30, 28%, 8%)"
-        : "hsl(38, 60%, 97%)";
     })();
   </script>
 

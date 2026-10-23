@@ -20,6 +20,8 @@ import { markDelivered } from "./Chatui";
 import { Ico, Spin } from "./Ico";
 import { useCloseFooterGap } from "../utils/footerGap";
 import { captureBestPosition, describeGeoError, getCoords } from "../utils/geo";
+import { compressToBase64 } from "../utils/images";
+import ProfilePhotoCard from "./ProfilePhotoCard";
 
 const NAVBAR_H = 64;
 
@@ -619,32 +621,6 @@ const Field = ({ label, children, hint, error, htmlFor }) => (
     {error && <p className="text-[11px] text-red-500">{error}</p>}
   </div>
 );
-
-const compressToBase64 = (file) =>
-  new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      const MAX = 800;
-      let { width, height } = img;
-      if (width > MAX) {
-        height = Math.round((height * MAX) / width);
-        width = MAX;
-      }
-      if (height > MAX) {
-        width = Math.round((width * MAX) / height);
-        height = MAX;
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL("image/jpeg", 0.75));
-    };
-    img.onerror = reject;
-    img.src = url;
-  });
 
 // ── Listing Modal ─────────────────────────────────────────────────────────────
 const ListingModal = ({
@@ -1756,11 +1732,6 @@ const PField = ({ label, error, children, hint, htmlFor }) => (
 );
 
 const ProfilePanel = ({ profile }) => {
-  const photoRef = useRef();
-  const [photoPreview, setPhotoPreview] = useState(profile?.photoURL || null);
-  const [photoFile, setPhotoFile] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [uploadDone, setUploadDone] = useState(false);
   const [form, setForm] = useState({
     phone: profile?.phone || "",
     whatsapp: profile?.whatsapp || "",
@@ -1775,27 +1746,6 @@ const ProfilePanel = ({ profile }) => {
   const set = (k, v) => {
     setForm((f) => ({ ...f, [k]: v }));
     setErrors((e) => ({ ...e, [k]: "" }));
-  };
-  const handlePhoto = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setPhotoFile(file);
-    setPhotoPreview(URL.createObjectURL(file));
-  };
-  const uploadPhoto = async () => {
-    if (!photoFile) return;
-    setUploading(true);
-    try {
-      const base64 = await compressToBase64(photoFile);
-      await updateDoc(doc(db, "users", profile.uid), { photoURL: base64 });
-      setUploadDone(true);
-      setTimeout(() => setUploadDone(false), 2500);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setUploading(false);
-      setPhotoFile(null);
-    }
   };
   const validate = () => {
     const e = {};
@@ -1834,7 +1784,6 @@ const ProfilePanel = ({ profile }) => {
   };
   const inputCls =
     "w-full px-3.5 py-2.5 rounded-xl border bg-background text-sm text-foreground placeholder:text-foreground/30 focus:outline-none focus:border-primary/60 focus:ring-2 focus:ring-primary/10 transition-all";
-  const initials = getInitials(profile?.name);
   return (
     <div className="flex flex-col items-center w-full">
       <div className="w-full max-w-xl space-y-6">
@@ -1844,72 +1793,7 @@ const ProfilePanel = ({ profile }) => {
             Keep your info up to date so buyers can reach you.
           </p>
         </div>
-        <div
-          className="p-5 rounded-2xl bg-card space-y-4"
-          style={{ border: "1.5px solid hsl(var(--border))" }}
-        >
-          <p className="text-sm font-bold text-foreground text-center">
-            Profile Photo
-          </p>
-          <div className="flex flex-col items-center gap-4">
-            <div className="relative">
-              <div className="w-24 h-24 rounded-full overflow-hidden bg-primary/15 text-primary flex items-center justify-center text-2xl font-black border-2 border-primary/25">
-                {photoPreview ? (
-                  <img
-                    src={photoPreview}
-                    alt="avatar"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  initials
-                )}
-              </div>
-              <button
-                onClick={() => photoRef.current?.click()}
-                className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md hover:bg-primary/90 transition-colors"
-              >
-                <Ico s={12} w={2.5} r>
-                  <path d="M12 5v14M5 12h14" />
-                </Ico>
-              </button>
-            </div>
-            <div className="flex flex-col items-center gap-2">
-              <p className="text-xs text-foreground/50">
-                JPG, PNG, WEBP · Any size
-              </p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => photoRef.current?.click()}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-foreground/70 hover:text-foreground transition-all"
-                  style={{ border: "1.5px solid hsl(var(--border))" }}
-                >
-                  Choose photo
-                </button>
-                {photoFile && (
-                  <button
-                    onClick={uploadPhoto}
-                    disabled={uploading}
-                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${uploadDone ? "bg-green-500 text-white" : "main-button"}`}
-                  >
-                    {uploading && <Spin s={12} />}
-                    {uploadDone
-                      ? "Saved!"
-                      : uploading
-                        ? "Uploading…"
-                        : "Save photo"}
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-          <input
-            ref={photoRef}
-            type="file"
-            accept="image/*"
-            onChange={handlePhoto}
-            className="hidden"
-          />
-        </div>
+        <ProfilePhotoCard />
         <div
           className="p-5 rounded-2xl bg-card space-y-4"
           style={{ border: "1.5px solid hsl(var(--border))" }}
@@ -2078,7 +1962,7 @@ const SellerDashboard = () => {
 
   useEffect(() => {
     if (typeof window !== "undefined")
-      window.scrollTo({ top: 0, behavior: "auto" });
+      window.scrollTo({ top: 0, behavior: "instant" });
   }, [tab]);
 
   // Unread message badge

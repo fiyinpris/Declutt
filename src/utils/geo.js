@@ -27,11 +27,11 @@ export const distanceKm = (a, b) => {
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
 };
 
-/** "Nearby", "850 m", "3.2 km". Prefixed with "~" when either position is rough (> 1 km). */
+/** Always an actual distance in km: "0.03 km", "0.85 km", "3.2 km", "120 km".
+ *  Prefixed with "~" when either position is rough (> 1 km). */
 export const formatDistance = (km, accuracyM = 0) => {
   const approx = accuracyM > 1000 ? "~" : "";
-  if (km < 0.05) return approx ? "~Nearby" : "Nearby";
-  if (km < 1) return `${approx}${Math.round(km * 1000)} m`;
+  if (km < 1) return `${approx}${Math.max(km, 0.01).toFixed(2)} km`;
   return `${approx}${km < 100 ? km.toFixed(1) : Math.round(km)} km`;
 };
 

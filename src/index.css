@@ -202,6 +202,9 @@
   }
   html {
     @apply scroll-smooth;
+    /* The page canvas shows wherever body doesn't paint (mobile toolbar show/hide, overscroll).
+       It must follow the theme, otherwise a light strip flashes under the navbar while scrolling. */
+    background-color: hsl(var(--background));
   }
   body {
     @apply bg-background text-foreground transition-colors duration-300;
@@ -278,11 +281,15 @@
   padding: 0;
   text-align: center;
   overflow-x: hidden;
+  overflow-x: clip;
 }
 
+/* "clip" stops sideways overflow without turning html/body into scroll containers
+   ("hidden" does, which makes mobile scrolling and the fixed navbar janky). */
 html,
 body {
   overflow-x: hidden;
+  overflow-x: clip;
   max-width: 100%;
 }
 /* ── Paste these keyframes into your existing index.css ──────────────────── */

@@ -19,7 +19,7 @@ import {
   Ticks,
   messageStatus,
   markDelivered,
-  Avatar,
+  PeerAvatar,
   ProductThumb,
   MessageList,
   Composer,
@@ -130,6 +130,7 @@ const ChatCenter = ({
 
   const otherName = (t) =>
     role === "seller" ? t.buyerName || "Buyer" : t.sellerName || "Seller";
+  const otherUid = (t) => (role === "seller" ? t.buyerUid : t.sellerUid);
 
   const threads = useMemo(() => {
     const g = {};
@@ -423,7 +424,7 @@ const ChatCenter = ({
                     onClick={() => openThread(t)}
                     className={`w-full flex items-start gap-3 p-3 text-left rounded-xl border transition-all ${isActive ? "bg-primary/10 border-primary/25" : "border-transparent hover:bg-border/30"}`}
                   >
-                    <Avatar name={otherName(t)} size={46} />
+                    <PeerAvatar uid={otherUid(t)} name={otherName(t)} size={46} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-sm font-bold text-foreground truncate">
@@ -505,7 +506,7 @@ const ChatCenter = ({
                     <path d="m15 18-6-6 6-6" />
                   </Ico>
                 </button>
-                <Avatar name={otherName(active)} size={42} />
+                <PeerAvatar uid={otherUid(active)} name={otherName(active)} size={42} />
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-black text-foreground truncate">
                     {otherName(active)}

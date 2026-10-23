@@ -8,6 +8,7 @@ import {
   deleteField,
 } from "firebase/firestore";
 import { db } from "../firebase";
+import { usePublicProfile } from "../utils/publicProfile";
 
 /* All colours come from the site's own theme tokens (primary / card / background / border /
  * foreground), so the chat matches the rest of the website in light and dark mode. */
@@ -155,14 +156,36 @@ const MenuChip = ({ danger = false, onClick, children }) => (
 );
 
 /* ───────────── small pieces ───────────── */
-export const Avatar = ({ name, size = 44 }) => (
-  <div
-    className="rounded-full bg-primary/15 text-primary border-2 border-primary/20 font-black flex items-center justify-center shrink-0 select-none"
-    style={{ width: size, height: size, fontSize: size * 0.38 }}
-  >
-    {(name?.[0] || "?").toUpperCase()}
-  </div>
-);
+/** Profile photo when there is one (and it loads), otherwise the initial-letter avatar. */
+export const Avatar = ({ name, size = 44, src = null }) => {
+  const [failed, setFailed] = useState(null); // the src that failed to load
+  const showPhoto = src && failed !== src;
+  return (
+    <div
+      className="rounded-full overflow-hidden bg-primary/15 text-primary border-2 border-primary/20 font-black flex items-center justify-center shrink-0 select-none"
+      style={{ width: size, height: size, fontSize: size * 0.38 }}
+    >
+      {showPhoto ? (
+        <img
+          src={src}
+          alt={name ? `${name}'s photo` : ""}
+          referrerPolicy="no-referrer"
+          loading="lazy"
+          onError={() => setFailed(src)}
+          className="w-full h-full object-cover"
+        />
+      ) : (
+        (name?.[0] || "?").toUpperCase()
+      )}
+    </div>
+  );
+};
+
+/** Avatar for another user, using their public profile photo (same photo in every chat). */
+export const PeerAvatar = ({ uid, name, size }) => {
+  const pub = usePublicProfile(uid);
+  return <Avatar name={name} size={size} src={pub?.photoURL} />;
+};
 
 export const ProductThumb = ({ src, size = 44, className = "rounded-xl" }) =>
   src ? (

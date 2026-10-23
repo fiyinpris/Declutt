@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../utils/theme";
 
 const MenuIcon = () => (
   <svg
@@ -764,6 +765,7 @@ const AccountSheet = ({
   logoutState,
   onLogout,
 }) => {
+  const { isDark, toggleTheme } = useTheme();
   const initials =
     profile?.name
       ?.split(" ")
@@ -826,10 +828,28 @@ const AccountSheet = ({
               className={`flex items-center px-4 py-3.5 rounded-2xl text-sm font-semibold transition-colors ${isCurrent(l.to) ? "text-primary bg-primary/8" : "text-foreground/75 hover:text-primary hover:bg-primary/8"}`}
             >
               {l.label}
+              {l.badge > 0 && (
+                <span className="ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-black flex items-center justify-center">
+                  {l.badge > 9 ? "9+" : l.badge}
+                </span>
+              )}
             </Link>
           ))}
         </nav>
-        <div className="shrink-0 px-3 pt-2 pb-4 border-t border-border/60">
+        <div className="shrink-0 px-3 pt-2 pb-4 border-t border-border/60 space-y-1">
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-semibold text-foreground/75 hover:bg-primary/8 transition-colors"
+          >
+            {isDark ? "Dark mode" : "Light mode"}
+            <span className="relative w-11 h-6 rounded-full border border-border bg-background shrink-0">
+              <span
+                className="absolute top-0.5 w-[18px] h-[18px] rounded-full bg-primary transition-all"
+                style={{ left: isDark ? "calc(100% - 20px)" : "2px" }}
+              />
+            </span>
+          </button>
           <LogoutButton onLogout={onLogout} state={logoutState} />
         </div>
       </div>
@@ -919,7 +939,7 @@ const Navbar = () => {
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 10);
-    window.addEventListener("scroll", fn);
+    window.addEventListener("scroll", fn, { passive: true });
     return () => window.removeEventListener("scroll", fn);
   }, []);
 
@@ -943,7 +963,7 @@ const Navbar = () => {
         console.error("closing drawers async error:", e);
       }
     }, 0);
-    window.scrollTo({ top: 0, behavior: "auto" });
+    window.scrollTo({ top: 0, behavior: "instant" });
   }, [location.pathname, location.search]);
 
   /* ── Search click: focus input if on /listings, else navigate with state ── */
@@ -1014,22 +1034,28 @@ const Navbar = () => {
             { id: "saved", label: "Saved", icon: "saved", to: "/buyer?tab=favourites" },
           ];
 
-  // Everything that doesn't fit in the tab bar lives in the Account sheet
+  // Every account section, opened from the navbar account icon or the tab bar's Account tab
   const accountLinks =
     role === "seller"
       ? [
-          { label: "Home", to: "/" },
-          { label: "Browse items", to: "/listings" },
+          { label: "My Profile", to: "/seller?tab=profile" },
+          { label: "Dashboard", to: "/seller" },
+          { label: "Messages", to: "/seller?tab=messages", badge: messageCount },
+          { label: "Notifications", to: "/seller?tab=notifications", badge: notifCount },
+          { label: "My Items", to: "/seller?tab=listings" },
           { label: "Orders", to: "/seller?tab=orders" },
           { label: "Rewards", to: "/seller?tab=rewards" },
           { label: "Referrals", to: "/seller?tab=referrals" },
-          { label: "My Profile", to: "/seller?tab=profile" },
+          { label: "Browse items", to: "/listings" },
         ]
       : role === "admin"
-        ? []
+        ? [{ label: "Admin dashboard", to: "/admin" }]
         : [
+            { label: "My Profile", to: "/buyer?tab=profile" },
             { label: "Dashboard", to: "/buyer" },
+            { label: "Messages", to: "/buyer?tab=messages", badge: messageCount },
             { label: "My Orders", to: "/buyer?tab=orders" },
+            { label: "Saved Items", to: "/buyer?tab=favourites" },
             { label: "Rewards / Points", to: "/buyer?tab=rewards" },
             { label: "Referrals", to: "/buyer?tab=referrals" },
           ];
@@ -1092,7 +1118,7 @@ const Navbar = () => {
   return (
     <>
       <header
-        className={`fixed top-0 left-0 right-0 z-50 h-14 sm:h-16 transition-all duration-300 ${scrolled ? "bg-background backdrop-blur-md" : "bg-transparent"}`}
+        className={`fixed top-0 left-0 right-0 z-50 h-14 sm:h-16 transition-[background-color,box-shadow] duration-300 ${scrolled ? "bg-background" : "bg-transparent"}`}
         style={{
           borderBottom: scrolled ? "1px solid hsl(var(--border)/0.4)" : "none",
           boxShadow: scrolled ? "0 1px 12px rgba(0,0,0,0.06)" : "none",
@@ -1185,6 +1211,7 @@ const Navbar = () => {
           <div className="md:hidden flex items-center gap-1">
             <SearchNavButton onClick={handleSearchClick} />
             {signedIn ? (
+              <>
               <button
                 onClick={() => setCartOpen(true)}
                 aria-label="Cart"
@@ -1211,6 +1238,17 @@ const Navbar = () => {
                   </span>
                 )}
               </button>
+              {/* Same Account sheet as the tab bar's Account tab (phones only; desktop has its dropdown) */}
+              <button
+                onClick={() => setSheetOpen((o) => !o)}
+                aria-label="Account"
+                aria-expanded={sheetOpen}
+                className={`flex items-center justify-center w-10 h-10 rounded-xl transition-colors ${sheetOpen ? "text-primary bg-primary/10" : "text-foreground/70 hover:text-primary hover:bg-primary/10"}`}
+                type="button"
+              >
+                <AccountIcon />
+              </button>
+              </>
             ) : (
               <button
                 onClick={(e) => {

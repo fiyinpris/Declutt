@@ -9,24 +9,7 @@ import stepImg3 from "../images/step3.jpg";
 import stepImg4 from "../images/step4.jpg";
 import featureImg from "../images/image4.avif";
 import phoneImg from "../images/image5.png";
-
-const useInView = (threshold = 0.15) => {
-  const ref = useRef(null);
-  const [inView, setInView] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      ([e]) => {
-        if (e.isIntersecting) setInView(true);
-      },
-      { threshold },
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [threshold]);
-  return [ref, inView];
-};
+import { useInView } from "../utils/useInView";
 
 const useScrollProgress = () => {
   const ref = useRef(null);
@@ -34,16 +17,26 @@ const useScrollProgress = () => {
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const onScroll = () => {
+    // At most one measurement per frame, and only re-render when the value moves visibly
+    let raf = 0;
+    const measure = () => {
+      raf = 0;
       const rect = el.getBoundingClientRect();
       const winH = window.innerHeight;
       const elementCenter = rect.top + rect.height / 2;
       const raw = (winH - elementCenter) / (winH * 0.5);
-      setProgress(Math.min(1, Math.max(0, raw)));
+      const next = Math.round(Math.min(1, Math.max(0, raw)) * 100) / 100;
+      setProgress((p) => (p === next ? p : next));
+    };
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(measure);
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
-    return () => window.removeEventListener("scroll", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(raf);
+    };
   }, []);
   return [ref, progress];
 };
@@ -1719,7 +1712,7 @@ export const HomeSection = () => {
             className="fixed left-3 sm:left-4 lg:left-6 flex items-center gap-2 sm:gap-3 bg-card border border-border/50 rounded-xl sm:rounded-2xl shadow-xl px-3 sm:px-4 py-2 sm:py-3 w-57.5 sm:w-65 lg:w-67.5"
             style={{
               bottom: "calc(var(--tabbar-h) + 1rem)",
-              zIndex: 99999,
+              zIndex: 45, // above page content and the tab bar, below open menus/drawers (z-60+)
               transform: toastAnimating
                 ? "translateY(0) scale(1)"
                 : "translateY(20px) scale(0.95)",

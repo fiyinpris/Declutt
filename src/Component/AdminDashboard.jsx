@@ -445,6 +445,138 @@ const ListingRow = ({ listing, onEdit, onDelete }) => (
   </div>
 );
 
+// ── Contact messages (from the /contact page) ───────────────────────────────
+const ContactInbox = () => {
+  const [items, setItems] = useState(null);
+  const [error, setError] = useState("");
+  const [open, setOpen] = useState(null);
+
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    let dead = false;
+    getDocs(
+      query(collection(db, "contactMessages"), orderBy("createdAt", "desc")),
+    )
+      .then((snap) => {
+        if (dead) return;
+        setItems(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setError("");
+      })
+      .catch((e) => {
+        console.error("Contact inbox:", e);
+        if (dead) return;
+        setError("Couldn't load contact messages.");
+        setItems([]);
+      });
+    return () => {
+      dead = true;
+    };
+  }, [reloadKey]);
+
+  const markRead = async (m) => {
+    if (m.read) return;
+    await updateDoc(doc(db, "contactMessages", m.id), { read: true });
+    setItems((list) =>
+      list.map((x) => (x.id === m.id ? { ...x, read: true } : x)),
+    );
+  };
+  const remove = async (id) => {
+    await deleteDoc(doc(db, "contactMessages", id));
+    setItems((list) => list.filter((x) => x.id !== id));
+  };
+
+  const unread = items?.filter((m) => !m.read).length || 0;
+
+  return (
+    <div className="bg-card border border-border rounded-2xl overflow-hidden text-left">
+      <div className="px-4 sm:px-5 py-3.5 border-b border-border/60 flex items-center justify-between gap-3">
+        <p className="text-sm font-bold text-foreground">
+          Contact messages
+          {unread > 0 && (
+            <span className="ml-2 px-2 py-0.5 rounded-full bg-primary text-primary-foreground text-[10px] font-black align-middle">
+              {unread} new
+            </span>
+          )}
+        </p>
+        <button
+          onClick={() => setReloadKey((k) => k + 1)}
+          className="text-xs font-semibold text-foreground/50 hover:text-primary transition-colors"
+        >
+          Refresh
+        </button>
+      </div>
+      {items === null ? (
+        <div className="flex items-center gap-3 text-foreground/40 px-5 py-6 text-sm">
+          <Spinner /> Loading messages…
+        </div>
+      ) : error ? (
+        <p className="px-5 py-6 text-sm text-red-500">{error}</p>
+      ) : items.length === 0 ? (
+        <p className="px-5 py-6 text-sm text-foreground/40">
+          No messages yet. Messages sent from the Contact page appear here.
+        </p>
+      ) : (
+        <ul className="divide-y divide-border/60 max-h-[420px] overflow-y-auto">
+          {items.map((m) => {
+            const expanded = open === m.id;
+            const when = m.createdAt?.toDate?.().toLocaleString([], {
+              dateStyle: "medium",
+              timeStyle: "short",
+            });
+            return (
+              <li key={m.id} className={m.read ? "" : "bg-primary/5"}>
+                <button
+                  onClick={() => {
+                    setOpen(expanded ? null : m.id);
+                    markRead(m).catch((e) => console.error(e));
+                  }}
+                  className="w-full px-4 sm:px-5 py-3 flex items-start gap-3 text-left"
+                >
+                  <span
+                    className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${m.read ? "bg-transparent" : "bg-primary"}`}
+                  />
+                  <span className="flex-1 min-w-0">
+                    <span className="flex items-center justify-between gap-3">
+                      <span className="text-sm font-bold text-foreground truncate">
+                        {m.name} · {m.subject}
+                      </span>
+                      <span className="text-[11px] text-foreground/40 shrink-0">
+                        {when}
+                      </span>
+                    </span>
+                    <span
+                      className={`block text-xs text-foreground/55 mt-0.5 ${expanded ? "whitespace-pre-wrap break-words" : "truncate"}`}
+                    >
+                      {m.message}
+                    </span>
+                  </span>
+                </button>
+                {expanded && (
+                  <div className="px-4 sm:px-5 pb-3 pl-9 sm:pl-10 flex flex-wrap items-center gap-2">
+                    <a
+                      href={`mailto:${m.email}?subject=${encodeURIComponent(`Re: ${m.subject}`)}`}
+                      className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-bold"
+                    >
+                      Reply to {m.email}
+                    </a>
+                    <button
+                      onClick={() => remove(m.id).catch((e) => console.error(e))}
+                      className="px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-foreground/60 hover:text-red-500 hover:border-red-500/30 transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+};
+
 // ── Main AdminDashboard ──────────────────────────────────────────────────────
 const AdminDashboard = () => {
   const { profile, logout } = useAuth();
@@ -557,6 +689,8 @@ const AdminDashboard = () => {
             </div>
           ))}
         </div>
+
+        <ContactInbox />
 
         {/* Controls */}
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">

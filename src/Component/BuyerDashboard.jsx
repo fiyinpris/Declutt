@@ -8,6 +8,7 @@ import ChatCenter from "./ChatCenter";
 import { markDelivered } from "./Chatui";
 import { Ico, Spin } from "./Ico";
 import { useCloseFooterGap } from "../utils/footerGap";
+import ProfilePhotoCard from "./ProfilePhotoCard";
 
 const formatDisplayName = (name) => {
   if (!name) return "there";
@@ -84,6 +85,16 @@ const NAV_ITEMS = [
         <circle cx="9" cy="7" r="4" />
         <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
         <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      </Ico>
+    ),
+  },
+  {
+    id: "profile",
+    label: "My Profile",
+    icon: (
+      <Ico r>
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+        <circle cx="12" cy="7" r="4" />
       </Ico>
     ),
   },
@@ -463,6 +474,52 @@ const ReferralsPanel = ({ profile }) => {
   );
 };
 
+const ProfilePanel = ({ profile }) => {
+  const since = profile?.createdAt
+    ? new Date(profile.createdAt).toLocaleDateString([], {
+        month: "long",
+        year: "numeric",
+      })
+    : null;
+  const rows = [
+    ["Name", profile?.name],
+    ["Email", profile?.email],
+    ["Account type", "Buyer"],
+    ["Member since", since],
+  ].filter(([, v]) => v);
+  return (
+    <div className="flex flex-col items-center w-full">
+      <div className="w-full max-w-xl space-y-6">
+        <div className="text-center">
+          <p className="text-2xl font-black text-foreground">My Profile</p>
+          <p className="text-sm text-foreground/50 mt-0.5">
+            Your photo is shown to sellers you chat with.
+          </p>
+        </div>
+        <ProfilePhotoCard />
+        <div
+          className="p-5 rounded-2xl bg-card divide-y divide-border/60 text-left"
+          style={{ border: "1.5px solid hsl(var(--border))" }}
+        >
+          {rows.map(([label, value]) => (
+            <div
+              key={label}
+              className="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
+            >
+              <span className="text-xs font-bold uppercase tracking-widest text-foreground/40">
+                {label}
+              </span>
+              <span className="text-sm font-semibold text-foreground truncate">
+                {value}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const useLogout = (logoutFn, navigate) => {
   const [state, setState] = useState("idle");
   const handleLogout = async () => {
@@ -521,7 +578,7 @@ const BuyerDashboard = () => {
   const { items: savedItems, remove: removeSavedItem } = useSavedItems(uid);
 
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: "auto" });
+    window.scrollTo({ top: 0, behavior: "instant" });
   }, [tab]);
 
   // Unread seller replies → badge
@@ -658,6 +715,7 @@ const BuyerDashboard = () => {
             )}
             {tab === "rewards" && <RewardsPanel profile={profile} />}
             {tab === "referrals" && <ReferralsPanel profile={profile} />}
+            {tab === "profile" && <ProfilePanel profile={profile} />}
           </div>
         </main>
       </div>

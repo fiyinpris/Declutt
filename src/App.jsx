@@ -15,6 +15,8 @@ import AdminDashboard from "./Component/AdminDashboard";
 import ResetPassword from "./Component/ResetPassword";
 import ProtectedRoute from "./Component/ProtectedRoute";
 import Messages from "./Component/Messages";
+import About from "./Component/About";
+import Contact from "./Component/Contact";
 
 function App() {
   return (
@@ -27,6 +29,8 @@ function App() {
             <Routes>
             <Route path="/" element={<HomeSection />} />
             <Route path="/listings" element={<Listings />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/contact" element={<Contact />} />
 
             {/* Product Detail Page Route */}
             <Route path="/product/:id" element={<ProductDetails />} />

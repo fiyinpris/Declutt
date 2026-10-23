@@ -20,7 +20,7 @@ import {
   markDelivered,
   MessageList,
   Composer,
-  Avatar,
+  PeerAvatar,
   replySnapshot,
 } from "./Chatui";
 import { useBuyerLocation } from "../utils/geo";
@@ -445,7 +445,7 @@ const MessagingPanel = ({ listing, onClose, currentUser, buyerName }) => {
               <path d="m15 18-6-6 6-6" />
             </svg>
           </button>
-          <Avatar name={listing.sellerName} size={42} />
+          <PeerAvatar uid={listing.sellerUid} name={listing.sellerName} size={42} />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-black text-foreground truncate">
               {listing.sellerName || "Seller"}

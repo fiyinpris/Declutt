@@ -10,6 +10,13 @@ import {
 } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
+import { syncPublicProfile } from "../utils/publicProfile";
+
+// Uploaded photo first, else the Google account photo
+const publicBits = (prof, firebaseUser) => ({
+  name: prof?.name,
+  photoURL: prof?.photoURL || firebaseUser?.photoURL || null,
+});
 
 const AuthContext = createContext(null);
 
@@ -55,6 +62,7 @@ export const AuthProvider = ({ children }) => {
     const data = buildProfile(cred.user.uid, email, name, role);
     await setDoc(doc(db, "users", cred.user.uid), data);
     setProfile(data);
+    syncPublicProfile(cred.user.uid, publicBits(data, cred.user));
     return { cred, role };
   };
 
@@ -96,18 +104,31 @@ export const AuthProvider = ({ children }) => {
     const data = buildProfile(uid, cred.user.email, name, roleIfNew);
     await setDoc(doc(db, "users", uid), data);
     setProfile(data);
+    syncPublicProfile(uid, publicBits(data, cred.user));
     return { cred, role: roleIfNew, isNew: true };
   };
 
   /* ── Logout ── */
   const logout = () => signOut(auth);
 
+  /* ── Re-read the profile after it changes (e.g. a new photo) ── */
+  const refreshProfile = async () => {
+    const u = auth.currentUser;
+    if (!u) return null;
+    const prof = await loadProfile(u.uid);
+    if (prof) syncPublicProfile(u.uid, publicBits(prof, u));
+    return prof;
+  };
+
   /* ── Auth state listener ── */
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
-      if (firebaseUser) await loadProfile(firebaseUser.uid);
-      else setProfile(null);
+      if (firebaseUser) {
+        const prof = await loadProfile(firebaseUser.uid);
+        // keeps existing accounts' public photo/name up to date (no write if unchanged)
+        if (prof) syncPublicProfile(firebaseUser.uid, publicBits(prof, firebaseUser));
+      } else setProfile(null);
       setLoading(false);
     });
     return unsub;
@@ -124,6 +145,7 @@ export const AuthProvider = ({ children }) => {
         resetPassword,
         loginWithGoogle,
         logout,
+        refreshProfile,
       }}
     >
       {!loading && children}

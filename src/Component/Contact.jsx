@@ -4,7 +4,6 @@ import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
 import Reveal from "./Reveal";
-import HeroGrid from "./HeroGrid";
 import { Ico, Spin } from "./Ico";
 
 /*
@@ -24,9 +23,27 @@ const SUBJECTS = [
   "Buying an item",
   "Selling an item",
   "My account",
-  "Report a problem or user",
+  "Report a problem",
   "Partnerships",
-  "Other",
+];
+
+const FAQS = [
+  {
+    q: "How do I ask about a specific item?",
+    a: "Open the item and tap “Message Seller”. The chat lives in your Messages tab, and you'll see when the seller has read your message.",
+  },
+  {
+    q: "How do I start selling?",
+    a: "Create a seller account, then go to My Items and tap “Add new item”. Add photos, a price and your location — listing is free.",
+  },
+  {
+    q: "How do I report a user or a listing?",
+    a: "Use the form on this page and choose “Report a problem”. Include the item name or the person's name so we can find it quickly.",
+  },
+  {
+    q: "I can't sign in to my account.",
+    a: "Use “Forgot password?” on the login page to reset it. If that doesn't work, send us a message with “My account” and the email you signed up with.",
+  },
 ];
 
 const LIMITS = { name: 100, email: 200, messageMin: 10, messageMax: 2000 };
@@ -72,24 +89,55 @@ const Field = ({ id, label, error, hint, children }) => (
   </div>
 );
 
-const InfoCard = ({ icon, title, children, delay }) => (
-  <Reveal
-    delay={delay}
-    className="flex gap-4 p-5 rounded-2xl bg-card border border-border"
-  >
-    <span className="w-11 h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-      <Ico s={20} r>
+/** One line in the coloured side panel. */
+const Way = ({ icon, title, children }) => (
+  <li className="flex gap-3.5">
+    <span className="w-10 h-10 rounded-xl bg-primary-foreground/15 flex items-center justify-center shrink-0">
+      <Ico s={18} r>
         {icon}
       </Ico>
     </span>
     <div className="min-w-0">
-      <p className="text-sm font-bold text-foreground">{title}</p>
-      <div className="mt-1 text-sm text-foreground/60 break-words">
+      <p className="text-sm font-bold">{title}</p>
+      <div className="text-sm text-primary-foreground/80 break-words">
         {children}
       </div>
     </div>
-  </Reveal>
+  </li>
 );
+
+const Faq = ({ q, a }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="border-b border-border/70">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="w-full flex items-center justify-between gap-4 py-4 text-left"
+      >
+        <span className="text-sm sm:text-base font-semibold text-foreground">
+          {q}
+        </span>
+        <span
+          className={`w-7 h-7 rounded-full border border-border flex items-center justify-center shrink-0 text-foreground/60 transition-transform duration-300 ${open ? "rotate-45 text-primary border-primary/40" : ""}`}
+        >
+          <Ico s={14} w={2.4} r>
+            <path d="M12 5v14M5 12h14" />
+          </Ico>
+        </span>
+      </button>
+      <div
+        className="grid transition-[grid-template-rows] duration-300 ease-out"
+        style={{ gridTemplateRows: open ? "1fr" : "0fr" }}
+      >
+        <p className="overflow-hidden text-sm text-foreground/60 leading-relaxed pr-10">
+          <span className="block pb-4">{a}</span>
+        </p>
+      </div>
+    </div>
+  );
+};
 
 const Contact = () => {
   const { user, profile } = useAuth();
@@ -106,12 +154,13 @@ const Contact = () => {
   const [status, setStatus] = useState("idle"); // idle | sending | sent | error
   const [sentTo, setSentTo] = useState(null);
 
-  const set = (k) => (e) => {
-    const next = { ...form, [k]: e.target.value };
+  const update = (k, v) => {
+    const next = { ...form, [k]: v };
     setForm(next);
     if (touched[k]) setErrors(validate(next));
     if (status === "error") setStatus("idle");
   };
+  const set = (k) => (e) => update(k, e.target.value);
   const blur = (k) => () => {
     setTouched((t) => ({ ...t, [k]: true }));
     setErrors(validate(form));
@@ -156,132 +205,112 @@ const Contact = () => {
   const msgLen = form.message.trim().length;
 
   return (
-    <div className="text-left">
-      {/* ── Header ── */}
-      <section className="relative overflow-hidden">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-20 sm:pt-28 pb-12 sm:pb-16 text-center">
+    <div className="text-left max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 sm:pt-32 pb-6">
+      {/* ── Heading ── */}
+      <div className="max-w-2xl">
+        <p className="opacity-0 animate-fade-in text-[11px] font-bold uppercase tracking-[0.22em] text-primary">
+          Contact
+        </p>
+        <h1 className="opacity-0 animate-fade-in-delay-1 mt-3 text-4xl sm:text-5xl font-bold tracking-tight text-foreground">
+          Let's talk.
+        </h1>
+        <p className="opacity-0 animate-fade-in-delay-2 mt-4 text-base sm:text-lg text-foreground/65">
+          Questions, feedback or a problem with an order or your account — send
+          us a message and we'll reply by email.
+        </p>
+      </div>
+
+      {/* ── Card: coloured side panel + form ── */}
+      <Reveal className="mt-10 sm:mt-12 grid lg:grid-cols-[0.85fr_1.4fr] rounded-[2rem] overflow-hidden border border-border bg-card shadow-sm">
+        <aside className="relative overflow-hidden bg-primary text-primary-foreground p-6 sm:p-10">
+          <span className="absolute -right-16 -bottom-16 w-56 h-56 rounded-full bg-primary-foreground/10" />
+          <span className="absolute right-10 bottom-24 w-20 h-20 rounded-full bg-primary-foreground/10" />
           <div className="relative">
-            <HeroGrid />
-            <div className="relative z-10">
-              <p className="opacity-0 animate-fade-in text-[11px] font-bold uppercase tracking-[0.2em] text-primary">
-                Contact us
-              </p>
-              <h1 className="opacity-0 animate-fade-in-delay-1 mt-3 text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground">
-                We'd love to hear from you
-              </h1>
-              <p className="opacity-0 animate-fade-in-delay-2 mt-4 text-base sm:text-lg text-foreground/65">
-                Questions, feedback or a problem with an order or account —
-                send us a message and the Declutt team will get back to you by
-                email.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-6 grid lg:grid-cols-[1fr_1.4fr] gap-6 lg:gap-10 items-start">
-        {/* ── Ways to reach us ── */}
-        <div className="space-y-4 order-2 lg:order-1">
-          <InfoCard
-            delay={0}
-            title="Questions about an item?"
-            icon={
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            }
-          >
-            The fastest way is to ask the seller: open the item and tap{" "}
-            <span className="font-semibold text-foreground/80">
-              Message Seller
-            </span>
-            .{" "}
-            <Link
-              to="/listings"
-              className="font-semibold text-primary hover:underline"
-            >
-              Browse items
-            </Link>
-          </InfoCard>
-          <InfoCard
-            delay={80}
-            title="Account or safety issue?"
-            icon={
-              <>
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                <path d="M12 8v4M12 16h.01" />
-              </>
-            }
-          >
-            Use the form and choose “My account” or “Report a problem or user”.
-            Include the email you use on Declutt so we can find your account.
-          </InfoCard>
-          {CONTACT_DETAILS.email && (
-            <InfoCard
-              delay={160}
-              title="Email"
-              icon={
-                <>
-                  <rect x="2" y="4" width="20" height="16" rx="2" />
-                  <path d="m22 7-10 6L2 7" />
-                </>
-              }
-            >
-              <a
-                href={`mailto:${CONTACT_DETAILS.email}`}
-                className="font-semibold text-primary hover:underline"
+            <h2 className="text-2xl font-bold">Ways to reach us</h2>
+            <p className="mt-2 text-sm text-primary-foreground/80">
+              Pick whatever's quickest for you.
+            </p>
+            <ul className="mt-8 space-y-6">
+              <Way
+                title="About an item?"
+                icon={
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                }
               >
-                {CONTACT_DETAILS.email}
-              </a>
-            </InfoCard>
-          )}
-          {CONTACT_DETAILS.phone && (
-            <InfoCard
-              delay={200}
-              title="Phone"
-              icon={
-                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
-              }
-            >
-              <a
-                href={`tel:${CONTACT_DETAILS.phone.replace(/\s+/g, "")}`}
-                className="font-semibold text-primary hover:underline"
+                Message the seller from the item page —{" "}
+                <Link to="/listings" className="font-bold underline underline-offset-2">
+                  browse items
+                </Link>
+                .
+              </Way>
+              <Way
+                title="Everything else"
+                icon={
+                  <>
+                    <path d="m22 2-7 20-4-9-9-4Z" />
+                    <path d="M22 2 11 13" />
+                  </>
+                }
               >
-                {CONTACT_DETAILS.phone}
-              </a>
-              {CONTACT_DETAILS.hours && (
-                <p className="text-xs mt-0.5">{CONTACT_DETAILS.hours}</p>
+                Use this form. Every message reaches the Declutt team.
+              </Way>
+              {CONTACT_DETAILS.email && (
+                <Way
+                  title="Email"
+                  icon={
+                    <>
+                      <rect x="2" y="4" width="20" height="16" rx="2" />
+                      <path d="m22 7-10 6L2 7" />
+                    </>
+                  }
+                >
+                  <a href={`mailto:${CONTACT_DETAILS.email}`} className="font-bold underline underline-offset-2">
+                    {CONTACT_DETAILS.email}
+                  </a>
+                </Way>
               )}
-            </InfoCard>
-          )}
-          {CONTACT_DETAILS.address && (
-            <InfoCard
-              delay={240}
-              title="Address"
-              icon={
-                <>
-                  <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
-                  <circle cx="12" cy="10" r="3" />
-                </>
-              }
-            >
-              {CONTACT_DETAILS.address}
-            </InfoCard>
-          )}
-        </div>
+              {CONTACT_DETAILS.phone && (
+                <Way
+                  title="Phone"
+                  icon={
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
+                  }
+                >
+                  <a href={`tel:${CONTACT_DETAILS.phone.replace(/\s+/g, "")}`} className="font-bold underline underline-offset-2">
+                    {CONTACT_DETAILS.phone}
+                  </a>
+                  {CONTACT_DETAILS.hours && (
+                    <span className="block text-xs mt-0.5">{CONTACT_DETAILS.hours}</span>
+                  )}
+                </Way>
+              )}
+              {CONTACT_DETAILS.address && (
+                <Way
+                  title="Address"
+                  icon={
+                    <>
+                      <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                      <circle cx="12" cy="10" r="3" />
+                    </>
+                  }
+                >
+                  {CONTACT_DETAILS.address}
+                </Way>
+              )}
+            </ul>
+          </div>
+        </aside>
 
-        {/* ── Form ── */}
-        <Reveal
-          delay={100}
-          className="order-1 lg:order-2 rounded-3xl bg-card border border-border p-5 sm:p-8 shadow-sm"
-        >
+        <div className="p-6 sm:p-10">
           {status === "sent" ? (
-            <div className="py-10 sm:py-14 flex flex-col items-center text-center">
+            <div className="h-full min-h-[380px] flex flex-col items-center justify-center text-center">
               <span className="opacity-0 animate-bounce-in w-16 h-16 rounded-full bg-green-500/15 text-green-500 flex items-center justify-center">
                 <Ico s={30} w={2.5} r>
                   <polyline points="20 6 9 17 4 12" />
                 </Ico>
               </span>
               <h2 className="mt-5 text-xl sm:text-2xl font-bold text-foreground">
-                Thanks, {sentTo?.name}! Your message is on its way.
+                Thanks, {sentTo?.name}! Message sent.
               </h2>
               <p className="mt-2 text-sm text-foreground/60 max-w-sm">
                 We've received it and will reply to{" "}
@@ -300,16 +329,7 @@ const Contact = () => {
               </button>
             </div>
           ) : (
-            <form onSubmit={submit} noValidate className="space-y-5">
-              <div>
-                <h2 className="text-xl font-bold text-foreground">
-                  Send us a message
-                </h2>
-                <p className="mt-1 text-sm text-foreground/50">
-                  All fields are required.
-                </p>
-              </div>
-
+            <form onSubmit={submit} noValidate className="space-y-6">
               {status === "error" && (
                 <div
                   role="alert"
@@ -319,6 +339,38 @@ const Contact = () => {
                   and try again.
                 </div>
               )}
+
+              <fieldset>
+                <legend
+                  id="contact-subject"
+                  tabIndex={-1}
+                  className="block text-xs font-bold uppercase tracking-widest text-foreground/50 mb-3"
+                >
+                  What's it about?
+                </legend>
+                <div className="flex flex-wrap gap-2" role="radiogroup" aria-labelledby="contact-subject">
+                  {SUBJECTS.map((s) => {
+                    const on = form.subject === s;
+                    return (
+                      <button
+                        key={s}
+                        type="button"
+                        role="radio"
+                        aria-checked={on}
+                        onClick={() => update("subject", s)}
+                        className={`px-3.5 py-2 rounded-full text-xs sm:text-sm font-semibold border transition-colors ${on ? "bg-primary text-primary-foreground border-primary" : "border-border text-foreground/65 hover:border-primary/40 hover:text-primary"}`}
+                      >
+                        {s}
+                      </button>
+                    );
+                  })}
+                </div>
+                {err("subject") && (
+                  <p role="alert" className="mt-1.5 text-xs text-red-500">
+                    {err("subject")}
+                  </p>
+                )}
+              </fieldset>
 
               <div className="grid sm:grid-cols-2 gap-5">
                 <Field id="contact-name" label="Your name" error={err("name")}>
@@ -354,20 +406,6 @@ const Contact = () => {
                 </Field>
               </div>
 
-              <Field id="contact-subject" label="Topic" error={err("subject")}>
-                <select
-                  id="contact-subject"
-                  value={form.subject}
-                  onChange={set("subject")}
-                  onBlur={blur("subject")}
-                  className={inputCls(err("subject"))}
-                >
-                  {SUBJECTS.map((s) => (
-                    <option key={s}>{s}</option>
-                  ))}
-                </select>
-              </Field>
-
               <Field
                 id="contact-message"
                 label="Message"
@@ -383,8 +421,8 @@ const Contact = () => {
                   maxLength={LIMITS.messageMax}
                   aria-invalid={!!err("message")}
                   aria-describedby={err("message") ? "contact-message-error" : undefined}
-                  placeholder="How can we help?"
-                  className={`${inputCls(err("message"))} resize-y min-h-[140px]`}
+                  placeholder="Tell us what's going on…"
+                  className={`${inputCls(err("message"))} resize-y min-h-[150px]`}
                 />
               </Field>
 
@@ -400,27 +438,49 @@ const Contact = () => {
                 className="absolute -left-[9999px] w-px h-px opacity-0"
               />
 
-              <button
-                type="submit"
-                disabled={status === "sending"}
-                className="main-button w-full sm:w-auto px-8 py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60 disabled:hover:scale-100"
-              >
-                {status === "sending" ? (
-                  <>
-                    <Spin s={16} /> Sending…
-                  </>
-                ) : (
-                  <>
-                    Send message
-                    <Ico s={16} r>
-                      <path d="m22 2-7 20-4-9-9-4Z" />
-                      <path d="M22 2 11 13" />
-                    </Ico>
-                  </>
-                )}
-              </button>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <p className="text-xs text-foreground/40">
+                  We only use your details to reply to this message.
+                </p>
+                <button
+                  type="submit"
+                  disabled={status === "sending"}
+                  className="main-button px-8 py-3 text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-60 disabled:hover:scale-100"
+                >
+                  {status === "sending" ? (
+                    <>
+                      <Spin s={16} /> Sending…
+                    </>
+                  ) : (
+                    <>
+                      Send message
+                      <Ico s={16} r>
+                        <path d="m22 2-7 20-4-9-9-4Z" />
+                        <path d="M22 2 11 13" />
+                      </Ico>
+                    </>
+                  )}
+                </button>
+              </div>
             </form>
           )}
+        </div>
+      </Reveal>
+
+      {/* ── Quick answers ── */}
+      <section className="mt-16 sm:mt-20 grid lg:grid-cols-[0.85fr_1.4fr] gap-6 lg:gap-12">
+        <Reveal>
+          <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-primary">
+            Quick answers
+          </p>
+          <h2 className="mt-3 text-2xl sm:text-3xl font-bold text-foreground">
+            You might not need to wait for us
+          </h2>
+        </Reveal>
+        <Reveal delay={100} className="border-t border-border/70">
+          {FAQS.map((f) => (
+            <Faq key={f.q} q={f.q} a={f.a} />
+          ))}
         </Reveal>
       </section>
     </div>

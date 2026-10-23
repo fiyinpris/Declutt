@@ -10,19 +10,69 @@ import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
 import { useInView } from "../utils/useInView";
 import Reveal from "./Reveal";
-import HeroGrid from "./HeroGrid";
 import { Ico } from "./Ico";
-import heroImg from "../images/hero-image.avif";
-import storyImg from "../images/image1.avif";
-import step1 from "../images/step1.jpg";
-import step2 from "../images/step2.jpg";
-import step3 from "../images/step3.jpg";
-import step4 from "../images/step4.jpg";
+import vaseImg from "../images/vase.jpg";
+import lampsImg from "../images/chandelier.jpg";
+import bedImg from "../images/bed.jpg";
 
-const FEATURES = [
+// Same categories sellers choose from when listing
+const CATEGORIES = [
+  "Electronics",
+  "Furniture",
+  "Clothing",
+  "Books",
+  "Appliances",
+  "Bikes & Vehicles",
+  "Sports",
+  "Music",
+  "Kitchen",
+];
+
+const STORY = [
   {
-    title: "Find things close to you",
-    desc: "Every listing shows how far it is from you, so you can pick items up the same day instead of waiting on delivery.",
+    title: "The problem",
+    text: "Homes fill up with things that still work — a lamp from the last move, a chair that no longer fits, a gadget that was replaced. Most of it ends up stored away or thrown out.",
+  },
+  {
+    title: "The idea",
+    text: "Someone a few streets away is usually looking for exactly that item. Declutt was built to connect those two people quickly, without fees or complicated forms.",
+  },
+  {
+    title: "Today",
+    text: "Sellers list in minutes, buyers see what's close to them and chat in real time, and every item that changes hands gets a second life instead of a landfill.",
+  },
+];
+
+const VALUES = [
+  {
+    title: "Reuse comes first",
+    text: "The greenest item is one that already exists. Every sale keeps something useful in use.",
+  },
+  {
+    title: "Local by design",
+    text: "Distances are shown on every listing, so deals happen close to home and same-day pickups are easy.",
+  },
+  {
+    title: "Honest and simple",
+    text: "Clear prices, no listing fees, and conversations that happen directly between buyer and seller.",
+  },
+  {
+    title: "Trust you can check",
+    text: "Sellers complete a verification step, and every conversation stays on record inside Declutt.",
+  },
+];
+
+const SAFETY = [
+  {
+    title: "Keep the chat on Declutt",
+    text: "Your messages stay in one place, with read receipts, so there's a record of what was agreed.",
+    icon: (
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    ),
+  },
+  {
+    title: "Meet somewhere public",
+    text: "Pick a busy, well-lit spot for the hand-over, and bring a friend if you can.",
     icon: (
       <>
         <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
@@ -31,66 +81,24 @@ const FEATURES = [
     ),
   },
   {
-    title: "Chat in real time",
-    desc: "Message sellers directly, reply to specific messages and see when they've been read. Agree on price, then meet.",
-    icon: (
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-    ),
-  },
-  {
-    title: "Verified sellers",
-    desc: "Sellers complete a verification step with their contact details and ID, so you know who you're dealing with.",
+    title: "Inspect before you pay",
+    text: "Check the item works and matches the photos before any money changes hands.",
     icon: (
       <>
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-        <path d="m9 12 2 2 4-4" />
+        <circle cx="11" cy="11" r="8" />
+        <path d="m21 21-4.3-4.3" />
       </>
     ),
   },
   {
-    title: "Save, earn & share",
-    desc: "Save items you love, collect reward points as you use Declutt, and invite friends with your own referral link.",
+    title: "Report anything odd",
+    text: "If something doesn't feel right, tell us through the contact page and we'll look into it.",
     icon: (
-      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+      <>
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        <path d="M12 8v4M12 16h.01" />
+      </>
     ),
-  },
-];
-
-const STEPS = [
-  {
-    img: step1,
-    title: "List your item",
-    desc: "Snap a photo, set your price and you're live in minutes — listing is free.",
-  },
-  {
-    img: step2,
-    title: "Buyers find you",
-    desc: "People nearby browse, search and save the things they want.",
-  },
-  {
-    img: step3,
-    title: "Chat & agree",
-    desc: "Talk directly in the app, agree on a price and a place to meet.",
-  },
-  {
-    img: step4,
-    title: "Hand it over",
-    desc: "Cash in hand, clutter gone — and your item gets a second life.",
-  },
-];
-
-const VALUES = [
-  {
-    title: "Reuse first",
-    desc: "The greenest item is the one that already exists. Every sale keeps something useful out of the bin.",
-  },
-  {
-    title: "Community",
-    desc: "Declutt connects neighbours. Deals happen between real people, close to home.",
-  },
-  {
-    title: "Simple & fair",
-    desc: "No complicated forms or hidden listing fees — just clear prices and honest conversations.",
   },
 ];
 
@@ -113,18 +121,10 @@ const CountUp = ({ value }) => {
   return <span ref={ref}>{shown.toLocaleString()}</span>;
 };
 
-const SectionTitle = ({ eyebrow, title, sub }) => (
-  <Reveal className="text-center max-w-2xl mx-auto mb-10 sm:mb-12">
-    <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary">
-      {eyebrow}
-    </p>
-    <h2 className="mt-2 text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground">
-      {title}
-    </h2>
-    {sub && (
-      <p className="mt-3 text-sm sm:text-base text-foreground/60">{sub}</p>
-    )}
-  </Reveal>
+const Eyebrow = ({ children }) => (
+  <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-primary">
+    {children}
+  </p>
 );
 
 const About = () => {
@@ -154,74 +154,152 @@ const About = () => {
 
   return (
     <div className="text-left">
-      {/* ── Hero ── */}
-      <section className="relative overflow-hidden">
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 sm:pt-28 pb-16 sm:pb-20 grid lg:grid-cols-2 gap-10 lg:gap-14 items-center">
-          <div className="relative">
-            <HeroGrid />
-            <div className="relative z-10">
-            <p className="opacity-0 animate-fade-in text-[11px] font-bold uppercase tracking-[0.2em] text-primary">
-              About Declutt
-            </p>
-            <h1 className="opacity-0 animate-fade-in-delay-1 mt-3 text-3xl sm:text-4xl lg:text-5xl font-bold leading-tight text-foreground">
-              Giving the things you no longer need a{" "}
-              <span className="text-primary">second home</span>.
-            </h1>
-            <p className="opacity-0 animate-fade-in-delay-2 mt-5 text-base sm:text-lg text-foreground/65 max-w-xl">
-              Declutt is a marketplace for buying and selling pre-loved items
-              with people near you. Clear space, earn a little extra, and help
-              good things get used again.
-            </p>
-            <div className="opacity-0 animate-fade-in-delay-3 mt-8 flex flex-wrap gap-3">
-              <Link
-                to="/listings"
-                className="main-button px-6 py-3 text-sm font-semibold"
-              >
-                Browse items
-              </Link>
-              <Link
-                to={sellLink}
-                className="px-6 py-3 rounded-full text-sm font-semibold text-foreground/75 hover:text-primary transition-colors"
-                style={{ border: "2px solid hsl(var(--border))" }}
-              >
-                Start selling
-              </Link>
-            </div>
-            </div>
+      {/* ── Intro: statement + photo collage ── */}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 sm:pt-32 pb-14 sm:pb-20 grid lg:grid-cols-[1.1fr_1fr] gap-12 lg:gap-16 items-center">
+        <div>
+          <div className="opacity-0 animate-fade-in">
+            <Eyebrow>About Declutt</Eyebrow>
           </div>
-          <div className="opacity-0 animate-zoom-in-delay-1 relative">
-            <div className="absolute -inset-3 rounded-[2rem] bg-primary/10 blur-2xl pointer-events-none" />
+          <h1 className="opacity-0 animate-fade-in-delay-1 mt-4 text-4xl sm:text-5xl lg:text-6xl font-bold leading-[1.05] tracking-tight text-foreground">
+            We help good things find their{" "}
+            <span className="italic font-light text-primary">next</span> home.
+          </h1>
+          <div className="opacity-0 animate-fade-in-delay-2 mt-6 h-px w-24 bg-primary" />
+          <p className="opacity-0 animate-fade-in-delay-2 mt-6 text-base sm:text-lg text-foreground/65 max-w-lg leading-relaxed">
+            Declutt is a local marketplace for pre-loved items. We make it easy
+            to pass on what you no longer need to someone nearby who does —
+            and to find great things without paying for new.
+          </p>
+        </div>
+
+        {/* Collage */}
+        <div className="relative h-[340px] sm:h-[440px]">
+          <Reveal
+            delay={150}
+            className="absolute right-0 top-0 w-[46%] h-full"
+          >
             <img
-              src={heroImg}
-              alt="A bright living room furnished with pre-loved pieces"
-              className="relative w-full aspect-[4/3] object-cover rounded-3xl border border-border shadow-2xl"
+              src={lampsImg}
+              alt="Copper pendant lamps"
+              className="w-full h-full object-cover rounded-[2rem] border border-border shadow-xl"
             />
-          </div>
+          </Reveal>
+          <Reveal
+            delay={0}
+            className="absolute left-0 top-[6%] w-[58%] h-[44%]"
+          >
+            <img
+              src={vaseImg}
+              alt="Glass and ceramic vases on a table"
+              className="w-full h-full object-cover rounded-[2rem] border border-border shadow-xl"
+            />
+          </Reveal>
+          <Reveal
+            delay={300}
+            className="absolute left-[8%] bottom-0 w-[50%] h-[42%]"
+          >
+            <img
+              src={bedImg}
+              alt="A furnished bedroom"
+              className="w-full h-full object-cover rounded-[2rem] border-4 border-background shadow-2xl"
+            />
+          </Reveal>
+          <Reveal
+            delay={450}
+            className="absolute left-[46%] top-[47%] -translate-x-1/2 z-10"
+          >
+            <span className="flex items-center gap-2 px-4 py-2 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-lg whitespace-nowrap">
+              <Ico s={14} r>
+                <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+                <path d="M3 3v5h5" />
+              </Ico>
+              Pre-loved, re-homed
+            </span>
+          </Reveal>
         </div>
       </section>
 
-      {/* ── Live stats ── */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 -mt-4">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-          {[
-            { label: "Items listed on Declutt", value: stats?.total },
-            { label: "Available right now", value: stats?.live },
-            { label: "Listing fees", text: "₦0" },
-          ].map((s, i) => (
-            <Reveal
-              key={s.label}
-              delay={i * 100}
-              className="rounded-2xl bg-card border border-border px-5 py-5 text-center"
+      {/* ── Category band ── */}
+      <div
+        className="border-y border-border/70 bg-card/40 overflow-hidden py-4"
+        aria-label="Categories on Declutt"
+      >
+        <div className="marquee-track flex w-max gap-10 whitespace-nowrap">
+          {[...CATEGORIES, ...CATEGORIES].map((c, i) => (
+            <span
+              key={i}
+              aria-hidden={i >= CATEGORIES.length}
+              className="flex items-center gap-10 text-sm sm:text-base font-semibold text-foreground/55"
             >
-              <p className="text-3xl font-black text-primary">
+              {c}
+              <span className="w-1.5 h-1.5 rounded-full bg-primary/60" />
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Mission ── */}
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 py-16 sm:py-24 text-center">
+        <Reveal>
+          <Eyebrow>Our mission</Eyebrow>
+          <p className="mt-5 text-2xl sm:text-3xl lg:text-4xl font-semibold leading-snug text-foreground">
+            Perfectly good things are thrown away every day while someone
+            nearby goes looking for{" "}
+            <span className="text-primary">exactly that</span>. Declutt exists
+            to close that gap —{" "}
+            <span className="text-primary">locally, simply and fairly</span>.
+          </p>
+        </Reveal>
+      </section>
+
+      {/* ── Story timeline ── */}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 sm:pb-24 grid lg:grid-cols-[1fr_1.6fr] gap-10 lg:gap-16">
+        <Reveal className="lg:sticky lg:top-28 self-start">
+          <Eyebrow>Our story</Eyebrow>
+          <h2 className="mt-3 text-3xl sm:text-4xl font-bold text-foreground leading-tight">
+            Why we started Declutt
+          </h2>
+          <p className="mt-4 text-sm sm:text-base text-foreground/60 max-w-sm">
+            A simple observation that turned into a marketplace for the things
+            people already own.
+          </p>
+        </Reveal>
+        <ol className="relative border-l-2 border-border/70 ml-3 space-y-10">
+          {STORY.map((s, i) => (
+            <Reveal as="li" key={s.title} delay={i * 120} className="pl-8 relative">
+              <span className="absolute -left-[11px] top-1 w-5 h-5 rounded-full bg-background border-[3px] border-primary" />
+              <p className="text-xs font-bold text-primary/80">
+                0{i + 1}
+              </p>
+              <h3 className="mt-1 text-xl font-bold text-foreground">
+                {s.title}
+              </h3>
+              <p className="mt-2 text-sm sm:text-base text-foreground/65 leading-relaxed">
+                {s.text}
+              </p>
+            </Reveal>
+          ))}
+        </ol>
+      </section>
+
+      {/* ── Live numbers ── */}
+      <section className="border-y border-border/70 bg-card/40">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border/70">
+          {[
+            { label: "Items listed so far", value: stats?.total },
+            { label: "Available right now", value: stats?.live },
+            { label: "To list an item", text: "₦0" },
+          ].map((s, i) => (
+            <Reveal key={s.label} delay={i * 100} className="py-8 sm:py-12 text-center">
+              <p className="text-4xl sm:text-5xl font-black text-foreground">
                 {s.text ??
                   (s.value == null ? (
-                    <span className="inline-block w-12 h-8 rounded-lg bg-border/50 animate-pulse align-middle" />
+                    <span className="inline-block w-16 h-10 rounded-lg bg-border/50 animate-pulse align-middle" />
                   ) : (
                     <CountUp value={s.value} />
                   ))}
               </p>
-              <p className="mt-1 text-xs sm:text-sm text-foreground/55">
+              <p className="mt-2 text-xs sm:text-sm font-semibold uppercase tracking-widest text-foreground/45">
                 {s.label}
               </p>
             </Reveal>
@@ -229,148 +307,86 @@ const About = () => {
         </div>
       </section>
 
-      {/* ── Story ── */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24 grid md:grid-cols-2 gap-10 lg:gap-16 items-center">
-        <Reveal className="order-2 md:order-1">
-          <img
-            src={storyImg}
-            alt="Pre-loved home items ready for a new owner"
-            loading="lazy"
-            className="w-full aspect-[5/4] object-cover rounded-3xl border border-border"
-          />
-        </Reveal>
-        <Reveal delay={120} className="order-1 md:order-2">
-          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-primary">
-            Our story
-          </p>
-          <h2 className="mt-2 text-2xl sm:text-3xl lg:text-4xl font-bold text-foreground">
-            Clutter for one person is treasure for another
-          </h2>
-          <div className="mt-5 space-y-4 text-sm sm:text-base text-foreground/65 leading-relaxed">
-            <p>
-              Most homes are full of things that are still perfectly good — a
-              lamp from the last move, a chair that no longer fits, a gadget
-              that was replaced. Meanwhile, someone a few streets away is
-              searching for exactly that.
-            </p>
-            <p>
-              Declutt brings those two people together. Sellers list in a few
-              taps, buyers see what's available close by, and the conversation
-              happens right in the app until the item changes hands.
-            </p>
-          </div>
-        </Reveal>
-      </section>
-
-      {/* ── What makes us different ── */}
-      <section className="bg-card/40 border-y border-border/60 py-16 sm:py-24">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <SectionTitle
-            eyebrow="Why Declutt"
-            title="Built for buying and selling locally"
-            sub="Everything you need to clear space or find a bargain, in one place."
-          />
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {FEATURES.map((f, i) => (
-              <Reveal
-                key={f.title}
-                delay={i * 90}
-                className="group rounded-2xl bg-background border border-border p-5 sm:p-6 hover:border-primary/40 hover:-translate-y-1 transition-[border-color,transform] duration-300"
-              >
-                <span className="w-11 h-11 rounded-xl bg-primary/10 text-primary flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors duration-300">
-                  <Ico s={20} r>
-                    {f.icon}
-                  </Ico>
-                </span>
-                <h3 className="mt-4 text-base font-bold text-foreground">
-                  {f.title}
-                </h3>
-                <p className="mt-2 text-sm text-foreground/60 leading-relaxed">
-                  {f.desc}
-                </p>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── How it works ── */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
-        <SectionTitle
-          eyebrow="How it works"
-          title="From clutter to cash in four steps"
-        />
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {STEPS.map((s, i) => (
-            <Reveal key={s.title} delay={i * 100} className="group">
-              <div className="relative overflow-hidden rounded-2xl border border-border aspect-[4/3]">
-                <img
-                  src={s.img}
-                  alt=""
-                  loading="lazy"
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                />
-                <span className="absolute top-3 left-3 w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-black flex items-center justify-center shadow-lg">
-                  {i + 1}
-                </span>
-              </div>
-              <h3 className="mt-4 text-base font-bold text-foreground">
-                {s.title}
-              </h3>
-              <p className="mt-1.5 text-sm text-foreground/60">{s.desc}</p>
-            </Reveal>
-          ))}
-        </div>
-      </section>
-
       {/* ── Values ── */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 sm:pb-24">
-        <SectionTitle eyebrow="What we believe" title="Our values" />
-        <div className="grid md:grid-cols-3 gap-4">
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
+        <Reveal className="max-w-xl">
+          <Eyebrow>What we stand for</Eyebrow>
+          <h2 className="mt-3 text-3xl sm:text-4xl font-bold text-foreground">
+            Four things we won't compromise on
+          </h2>
+        </Reveal>
+        <div className="mt-10 border-t border-border/70">
           {VALUES.map((v, i) => (
             <Reveal
               key={v.title}
-              delay={i * 100}
-              className="rounded-2xl p-6 bg-primary/6 border border-primary/20"
+              delay={i * 80}
+              className="group grid sm:grid-cols-[80px_1fr_1.4fr] gap-2 sm:gap-8 py-6 sm:py-8 border-b border-border/70"
             >
-              <p className="text-3xl font-black text-primary/40">0{i + 1}</p>
-              <h3 className="mt-2 text-lg font-bold text-foreground">
+              <span className="text-sm font-black text-foreground/30 group-hover:text-primary transition-colors">
+                0{i + 1}
+              </span>
+              <h3 className="text-lg sm:text-xl font-bold text-foreground group-hover:text-primary transition-colors">
                 {v.title}
               </h3>
-              <p className="mt-2 text-sm text-foreground/60 leading-relaxed">
-                {v.desc}
+              <p className="text-sm sm:text-base text-foreground/60 leading-relaxed">
+                {v.text}
               </p>
             </Reveal>
           ))}
         </div>
       </section>
 
-      {/* ── Call to action ── */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-6">
-        <Reveal className="relative overflow-hidden rounded-3xl bg-primary px-6 py-12 sm:px-12 sm:py-16 text-center">
-          <div className="absolute inset-0 hero-grid opacity-40 pointer-events-none" />
-          <div className="relative">
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-primary-foreground">
-              Ready to clear some space?
+      {/* ── Safety ── */}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 sm:pb-24">
+        <div className="rounded-[2rem] bg-card border border-border p-6 sm:p-10 lg:p-12">
+          <Reveal className="max-w-xl">
+            <Eyebrow>Buying & selling safely</Eyebrow>
+            <h2 className="mt-3 text-2xl sm:text-3xl font-bold text-foreground">
+              A few habits that keep every deal smooth
             </h2>
-            <p className="mt-3 text-sm sm:text-base text-primary-foreground/80 max-w-xl mx-auto">
-              List your first item in minutes, or see what people near you are
-              selling today.
-            </p>
-            <div className="mt-8 flex flex-wrap justify-center gap-3">
-              <Link
-                to={sellLink}
-                className="px-6 py-3 rounded-full bg-primary-foreground text-primary text-sm font-bold hover:scale-105 active:scale-95 transition-transform"
-              >
-                Start selling
-              </Link>
-              <Link
-                to="/contact"
-                className="px-6 py-3 rounded-full text-sm font-bold text-primary-foreground border-2 border-primary-foreground/40 hover:border-primary-foreground transition-colors"
-              >
-                Contact us
-              </Link>
-            </div>
+          </Reveal>
+          <div className="mt-8 grid sm:grid-cols-2 gap-x-10 gap-y-7">
+            {SAFETY.map((s, i) => (
+              <Reveal key={s.title} delay={i * 90} className="flex gap-4">
+                <span className="w-10 h-10 rounded-full bg-primary/12 text-primary flex items-center justify-center shrink-0">
+                  <Ico s={18} r>
+                    {s.icon}
+                  </Ico>
+                </span>
+                <div>
+                  <h3 className="text-base font-bold text-foreground">
+                    {s.title}
+                  </h3>
+                  <p className="mt-1 text-sm text-foreground/60 leading-relaxed">
+                    {s.text}
+                  </p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Close ── */}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
+        <Reveal className="flex flex-col md:flex-row md:items-end justify-between gap-8 border-t border-border/70 pt-10 sm:pt-14">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground leading-tight max-w-xl">
+            Got something to pass on, or something to find?
+          </h2>
+          <div className="flex flex-wrap gap-3 shrink-0">
+            <Link
+              to={sellLink}
+              className="main-button px-6 py-3 text-sm font-semibold"
+            >
+              Start selling
+            </Link>
+            <Link
+              to="/listings"
+              className="px-6 py-3 rounded-full text-sm font-semibold text-foreground/75 hover:text-primary transition-colors"
+              style={{ border: "2px solid hsl(var(--border))" }}
+            >
+              Browse items
+            </Link>
           </div>
         </Reveal>
       </section>

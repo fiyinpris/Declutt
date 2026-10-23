@@ -1,10 +1,18 @@
 // src/Component/Navbar.jsx
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  getDoc,
+} from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../utils/theme";
+import { cartHelpers, syncCart, useCartItems } from "../utils/Cart";
 
 const MenuIcon = () => (
   <svg
@@ -456,6 +464,66 @@ const AccountDropdown = ({ profile, logoutState, onLogout }) => {
   );
 };
 
+/* Navbar cart icon with item count (shown signed in and signed out) */
+const CartButton = ({ count, onClick, className = "" }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-label={count ? `Cart (${count})` : "Cart"}
+    className={`relative flex items-center justify-center rounded-xl text-foreground/65 hover:text-primary hover:bg-primary/10 transition-colors ${className}`}
+  >
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="9" cy="21" r="1" />
+      <circle cx="20" cy="21" r="1" />
+      <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+    </svg>
+    {count > 0 && (
+      <span className="absolute top-0 right-0 min-w-4 h-4 px-1 rounded-full bg-primary text-primary-foreground text-[9px] font-black flex items-center justify-center">
+        {count > 99 ? "99+" : count}
+      </span>
+    )}
+  </button>
+);
+
+/* Cart photo; carts saved to the account keep only web photo links, so a missing one is
+   loaded from the listing (once per item per visit). */
+const listingPhotos = new Map(); // listing id → Promise<imageUrl|null>
+const CartThumb = ({ item }) => {
+  const [loaded, setLoaded] = useState(null);
+  useEffect(() => {
+    if (item.imageUrl) return;
+    let alive = true;
+    if (!listingPhotos.has(item.id))
+      listingPhotos.set(
+        item.id,
+        getDoc(doc(db, "listings", item.id))
+          .then((s) => (s.exists() ? s.data().imageUrl || null : null))
+          .catch(() => null),
+      );
+    listingPhotos.get(item.id).then((url) => alive && setLoaded(url));
+    return () => {
+      alive = false;
+    };
+  }, [item.id, item.imageUrl]);
+  const src = item.imageUrl || loaded;
+  return src ? (
+    <img src={src} alt={item.name} className="w-full h-full object-cover" />
+  ) : (
+    <div className="w-full h-full flex items-center justify-center text-foreground/15 text-xs">
+      No img
+    </div>
+  );
+};
+
 /* ── Cart Drawer ── */
 const CartDrawer = ({ open, onClose, cartItems = [], onRemove }) => {
   const total = cartItems.reduce(
@@ -511,6 +579,7 @@ const CartDrawer = ({ open, onClose, cartItems = [], onRemove }) => {
           </div>
           <button
             onClick={onClose}
+            aria-label="Close cart"
             className="w-8 h-8 flex items-center justify-center rounded-xl text-foreground/40 hover:text-foreground hover:bg-border/50 transition-colors"
           >
             <svg
@@ -576,17 +645,7 @@ const CartDrawer = ({ open, onClose, cartItems = [], onRemove }) => {
                   style={{ border: "1.5px solid hsl(var(--border))" }}
                 >
                   <div className="w-14 h-14 rounded-lg overflow-hidden bg-border/20 shrink-0">
-                    {item.imageUrl ? (
-                      <img
-                        src={item.imageUrl}
-                        alt={item.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-foreground/15 text-xs">
-                        No img
-                      </div>
-                    )}
+                    <CartThumb item={item} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground truncate">
@@ -597,10 +656,16 @@ const CartDrawer = ({ open, onClose, cartItems = [], onRemove }) => {
                     </p>
                     <p className="text-sm font-bold text-primary mt-0.5">
                       ₦{Number(item.price).toLocaleString()}
+                      {(item.quantity || 1) > 1 && (
+                        <span className="ml-1.5 text-xs font-semibold text-foreground/45">
+                          × {item.quantity}
+                        </span>
+                      )}
                     </p>
                   </div>
                   <button
                     onClick={() => onRemove?.(item.id)}
+                    aria-label={`Remove ${item.name} from cart`}
                     className="w-7 h-7 flex items-center justify-center rounded-lg text-foreground/30 hover:text-red-500 hover:bg-red-500/8 transition-colors shrink-0"
                   >
                     <svg
@@ -645,8 +710,6 @@ const CartDrawer = ({ open, onClose, cartItems = [], onRemove }) => {
   );
 };
 
-const getCartKey = (uid) =>
-  uid ? `declutt_cart_${uid}` : "declutt_cart_guest";
 
 /* ── Phone tab bar (signed-in users) ── */
 const TabIcon = ({ children }) => (
@@ -869,68 +932,10 @@ const Navbar = () => {
     location.pathname === "/listings" ||
     location.pathname.startsWith("/listings/");
 
-  const [cartItems, setCartItems] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem(getCartKey(uid)) || "[]");
-    } catch {
-      return [];
-    }
-  });
-
-  useEffect(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem(getCartKey(uid)) || "[]");
-      // schedule update asynchronously to avoid synchronous setState inside effect
-      setTimeout(() => {
-        try {
-          setCartItems((prev) => {
-            try {
-              return JSON.stringify(prev) === JSON.stringify(stored)
-                ? prev
-                : stored;
-            } catch {
-              return stored;
-            }
-          });
-        } catch (e) {
-          console.error("setCartItems async error:", e);
-        }
-      }, 0);
-    } catch {
-      setTimeout(() => setCartItems([]), 0);
-    }
-  }, [uid]);
-
-  useEffect(() => {
-    const sync = (e) => {
-      if (e.detail?.uid !== uid && e.detail?.uid !== undefined) return;
-      try {
-        setCartItems(JSON.parse(localStorage.getItem(getCartKey(uid)) || "[]"));
-      } catch {
-        setCartItems([]);
-      }
-    };
-    const storageSync = () => {
-      try {
-        setCartItems(JSON.parse(localStorage.getItem(getCartKey(uid)) || "[]"));
-      } catch {
-        setCartItems([]);
-      }
-    };
-    window.addEventListener("cart-updated", sync);
-    window.addEventListener("storage", storageSync);
-    return () => {
-      window.removeEventListener("cart-updated", sync);
-      window.removeEventListener("storage", storageSync);
-    };
-  }, [uid]);
-
-  const removeFromCart = (id) => {
-    const updated = cartItems.filter((i) => i.id !== id);
-    localStorage.setItem(getCartKey(uid), JSON.stringify(updated));
-    setCartItems(updated);
-    window.dispatchEvent(new CustomEvent("cart-updated", { detail: { uid } }));
-  };
+  // Same cart the listing cards and product page use; saved to the account when signed in
+  const cartItems = useCartItems(uid);
+  useEffect(() => syncCart(uid), [uid]);
+  const removeFromCart = (id) => cartHelpers.remove(uid, id);
 
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 10);
@@ -1147,32 +1152,11 @@ const Navbar = () => {
             {user && profile ? (
               <>
                 <SearchNavButton onClick={handleSearchClick} />
-
-                <button
+                <CartButton
+                  count={cartItems.length}
                   onClick={() => setCartOpen(true)}
-                  aria-label="Cart"
-                  className="relative flex items-center justify-center w-9 h-9 rounded-xl text-foreground/60 hover:text-primary hover:bg-primary/10 transition-all duration-200"
-                >
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <circle cx="9" cy="21" r="1" />
-                    <circle cx="20" cy="21" r="1" />
-                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-                  </svg>
-                  {cartItems.length > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] font-black flex items-center justify-center">
-                      {cartItems.length}
-                    </span>
-                  )}
-                </button>
+                  className="w-9 h-9"
+                />
                 <AccountDropdown
                   profile={profile}
                   logoutState={logoutState}
@@ -1182,6 +1166,11 @@ const Navbar = () => {
             ) : (
               <>
                 <SearchNavButton onClick={handleSearchClick} />
+                <CartButton
+                  count={cartItems.length}
+                  onClick={() => setCartOpen(true)}
+                  className="w-9 h-9"
+                />
 
                 <Link
                   to="/login"
@@ -1200,38 +1189,16 @@ const Navbar = () => {
             )}
           </div>
 
-          {/* Mobile right side: search + cart when signed in (navigation is in the tab bar),
-              search + hamburger when signed out */}
+          {/* Mobile right side: search + cart (+ hamburger when signed out;
+              signed-in navigation is in the tab bar) */}
           <div className="md:hidden flex items-center gap-1">
             <SearchNavButton onClick={handleSearchClick} />
-            {signedIn ? (
-              <button
-                onClick={() => setCartOpen(true)}
-                aria-label="Cart"
-                className="relative flex items-center justify-center w-10 h-10 rounded-xl text-foreground/70 hover:text-primary hover:bg-primary/10 transition-colors"
-                type="button"
-              >
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <circle cx="9" cy="21" r="1" />
-                  <circle cx="20" cy="21" r="1" />
-                  <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-                </svg>
-                {cartItems.length > 0 && (
-                  <span className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] font-black flex items-center justify-center">
-                    {cartItems.length}
-                  </span>
-                )}
-              </button>
-            ) : (
+            <CartButton
+              count={cartItems.length}
+              onClick={() => setCartOpen(true)}
+              className="w-10 h-10"
+            />
+            {!signedIn && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();

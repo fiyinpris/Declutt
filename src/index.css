@@ -26,6 +26,25 @@
   --animate-shake: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
 }
 
+/* Endless sideways scroll (About page category band). Content is rendered twice, so moving
+   by -50% loops seamlessly. Paused for people who prefer reduced motion. */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+.marquee-track {
+  animation: marquee 45s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none;
+  }
+}
+
 /* Phone tab bar for signed-in users (Navbar.jsx). Pages read --tabbar-h to keep
    fixed toasts above it; body padding keeps content from hiding behind it. */
 :root {

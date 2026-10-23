@@ -12,6 +12,7 @@ import {
   serverTimestamp,
   onSnapshot,
   writeBatch,
+  deleteField,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
@@ -1737,8 +1738,6 @@ const ProfilePanel = ({ profile }) => {
     whatsapp: profile?.whatsapp || "",
     state: profile?.state || "",
     address: profile?.address || "",
-    nin: profile?.nin || "",
-    bvn: profile?.bvn || "",
   });
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
@@ -1756,10 +1755,6 @@ const ProfilePanel = ({ profile }) => {
     if (!form.state) e.state = "Please select your state";
     if (!form.address.trim() || form.address.trim().length < 10)
       e.address = "Enter your full address (at least 10 characters)";
-    if (form.nin && !form.nin.match(/^\d{11}$/))
-      e.nin = "NIN must be exactly 11 digits";
-    if (form.bvn && !form.bvn.match(/^\d{11}$/))
-      e.bvn = "BVN must be exactly 11 digits";
     return e;
   };
   const handleSave = async () => {
@@ -1772,6 +1767,9 @@ const ProfilePanel = ({ profile }) => {
     try {
       await updateDoc(doc(db, "users", profile.uid), {
         ...form,
+        // NIN/BVN are no longer collected — clear any saved earlier
+        nin: deleteField(),
+        bvn: deleteField(),
         verifiedAt: new Date().toISOString(),
       });
       setSaved(true);
@@ -1868,50 +1866,6 @@ const ProfilePanel = ({ profile }) => {
                 placeholder="12 Akin Street, Ile-Ife"
               />
             </PField>
-          </div>
-          <div className="pt-2 border-t border-border/50">
-            <p className="text-xs font-bold text-foreground/50 uppercase tracking-wide mb-3">
-              Identity verification{" "}
-              <span className="text-foreground/30 normal-case font-normal">
-                (optional but recommended)
-              </span>
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <PField
-                label="NIN"
-                error={errors.nin}
-                hint="11-digit number on your NIN slip"
-                htmlFor="prof-nin"
-              >
-                <input
-                  id="prof-nin"
-                  className={`${inputCls} ${errors.nin ? "border-red-500/60" : "border-border"}`}
-                  value={form.nin}
-                  onChange={(e) =>
-                    set("nin", e.target.value.replace(/\D/g, "").slice(0, 11))
-                  }
-                  placeholder="12345678901"
-                  maxLength={11}
-                />
-              </PField>
-              <PField
-                label="BVN"
-                error={errors.bvn}
-                hint="11-digit number from your bank"
-                htmlFor="prof-bvn"
-              >
-                <input
-                  id="prof-bvn"
-                  className={`${inputCls} ${errors.bvn ? "border-red-500/60" : "border-border"}`}
-                  value={form.bvn}
-                  onChange={(e) =>
-                    set("bvn", e.target.value.replace(/\D/g, "").slice(0, 11))
-                  }
-                  placeholder="12345678901"
-                  maxLength={11}
-                />
-              </PField>
-            </div>
           </div>
           <div className="flex justify-center pt-2">
             <button

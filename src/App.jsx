@@ -1,22 +1,39 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./context/AuthContext";
+import { lazy, Suspense } from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 
 import Navbar from "./Component/Navbar";
 import Footer from "./Component/Footer";
-
-import Login from "./Component/Login";
-import Signup from "./Component/Signup";
 import { HomeSection } from "./Component/HomeSection";
-import Listings from "./Component/Listings";
-import ProductDetails from "./Component/ProductDetails";
-import SellerDashboard from "./Component/SellerDashboard";
-import BuyerDashboard from "./Component/BuyerDashboard";
-import AdminDashboard from "./Component/AdminDashboard";
-import ResetPassword from "./Component/ResetPassword";
 import ProtectedRoute from "./Component/ProtectedRoute";
-import Messages from "./Component/Messages";
-import About from "./Component/About";
-import Contact from "./Component/Contact";
+
+// Other pages load on demand, so the first visit only downloads what it shows
+const Login = lazy(() => import("./Component/Login"));
+const Signup = lazy(() => import("./Component/Signup"));
+const Listings = lazy(() => import("./Component/Listings"));
+const ProductDetails = lazy(() => import("./Component/ProductDetails"));
+const SellerDashboard = lazy(() => import("./Component/SellerDashboard"));
+const BuyerDashboard = lazy(() => import("./Component/BuyerDashboard"));
+const AdminDashboard = lazy(() => import("./Component/AdminDashboard"));
+const ResetPassword = lazy(() => import("./Component/ResetPassword"));
+const About = lazy(() => import("./Component/About"));
+const Contact = lazy(() => import("./Component/Contact"));
+
+const PageLoading = () => (
+  <div className="min-h-[60vh] flex items-center justify-center" role="status">
+    <span className="w-8 h-8 rounded-full border-2 border-primary/25 border-t-primary animate-spin" />
+    <span className="sr-only">Loading…</span>
+  </div>
+);
+
+const MessagesRedirect = () => {
+  const { profile } = useAuth();
+  const to =
+    profile?.role === "admin"
+      ? "/admin"
+      : `/${profile?.role === "seller" ? "seller" : "buyer"}?tab=messages`;
+  return <Navigate to={to} replace />;
+};
 
 function App() {
   return (
@@ -26,6 +43,7 @@ function App() {
           <Navbar />
 
           <main className="flex-1 pt-4">
+            <Suspense fallback={<PageLoading />}>
             <Routes>
             <Route path="/" element={<HomeSection />} />
             <Route path="/listings" element={<Listings />} />
@@ -66,12 +84,12 @@ function App() {
               }
             />
 
-            {/* Messages route (fixed position) */}
+            {/* Old /messages links → the signed-in user's Messages tab */}
             <Route
               path="/messages"
               element={
                 <ProtectedRoute>
-                  <Messages />
+                  <MessagesRedirect />
                 </ProtectedRoute>
               }
             />
@@ -81,6 +99,7 @@ function App() {
               element={<h1 className="text-center mt-20">Page Not Found</h1>}
             />
           </Routes>
+            </Suspense>
         </main>
 
         <Footer />

@@ -11,13 +11,9 @@ import {
   query,
   orderBy,
 } from "firebase/firestore";
-import {
-  ref as storageRef,
-  uploadBytes,
-  getDownloadURL,
-} from "firebase/storage";
-import { db, storage } from "../firebase";
+import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
+import { compressToBase64 } from "../utils/images";
 
 // ── Tiny helpers ────────────────────────────────────────────────────────────
 const CATEGORIES = [
@@ -69,6 +65,7 @@ const Badge = ({ label, color = "primary" }) => (
 
 // ── Add / Edit Listing Modal ─────────────────────────────────────────────────
 const ListingModal = ({ onClose, onSaved, existing = null }) => {
+  const { user } = useAuth();
   const fileRef = useRef();
   const [form, setForm] = useState({
     name: existing?.name || "",
@@ -108,14 +105,8 @@ const ListingModal = ({ onClose, onSaved, existing = null }) => {
     setSaving(true);
     try {
       let imageUrl = existing?.imageUrl || "";
-      if (imageFile) {
-        const sRef = storageRef(
-          storage,
-          `listings/${Date.now()}_${imageFile.name}`,
-        );
-        await uploadBytes(sRef, imageFile);
-        imageUrl = await getDownloadURL(sRef);
-      }
+      // Same as sellers: compressed photo saved with the listing (no Storage bucket needed)
+      if (imageFile) imageUrl = await compressToBase64(imageFile);
       const payload = {
         ...form,
         price: Number(form.price),
@@ -127,6 +118,7 @@ const ListingModal = ({ onClose, onSaved, existing = null }) => {
       } else {
         await addDoc(collection(db, "listings"), {
           ...payload,
+          sellerUid: user?.uid, // listings rules require an owner
           createdAt: serverTimestamp(),
         });
       }
@@ -633,9 +625,9 @@ const AdminDashboard = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Top bar */}
-      <div className="sticky top-0 z-40 bg-background/90 backdrop-blur-md border-b border-border/60">
+    <div className="min-h-screen bg-background pt-14 sm:pt-16">
+      {/* Top bar — sits just under the fixed site navbar (h-14 / sm:h-16) */}
+      <div className="sticky top-14 sm:top-16 z-40 bg-background border-b border-border/60">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-7 h-7 rounded-lg bg-primary/20 text-primary flex items-center justify-center">

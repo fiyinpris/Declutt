@@ -13,14 +13,22 @@ service cloud.firestore {
     match /listings/{listingId} {
       allow read: if true;
       allow create: if request.auth != null && request.resource.data.sellerUid == request.auth.uid;
-      allow update, delete: if request.auth != null && resource.data.sellerUid == request.auth.uid;
+      // owners manage their own listings; admins can manage any (admin dashboard)
+      allow update, delete: if request.auth != null && (
+        resource.data.sellerUid == request.auth.uid
+        || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+      );
     }
     match /messages/{messageId} {
       allow read: if request.auth != null && (
         request.auth.uid == resource.data.sellerUid || 
         request.auth.uid == resource.data.buyerUid
       );
-      allow create: if request.auth != null;
+      // you can only send as yourself (from == your side of the conversation)
+      allow create: if request.auth != null && (
+        (request.resource.data.from == 'buyer' && request.resource.data.buyerUid == request.auth.uid)
+        || (request.resource.data.from == 'seller' && request.resource.data.sellerUid == request.auth.uid)
+      );
       allow update: if request.auth != null && (
         request.auth.uid == resource.data.sellerUid ||
         request.auth.uid == resource.data.buyerUid
@@ -55,6 +63,14 @@ service cloud.firestore {
         && savedId.matches(request.auth.uid + '_.+')
         && request.resource.data.uid == request.auth.uid;
       allow delete: if request.auth != null && savedId.matches(request.auth.uid + '_.+');
+    }
+    // Each user's cart, so it survives sign-out and follows them across devices
+    match /carts/{userId} {
+      allow read, delete: if request.auth != null && request.auth.uid == userId;
+      allow create, update: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['items', 'updatedAt'])
+        && request.resource.data.items is list
+        && request.resource.data.items.size() <= 100;
     }
     // Name + photo that other signed-in users see in chats (users/{uid} stays private)
     match /publicProfiles/{userId} {

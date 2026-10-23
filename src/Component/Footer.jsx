@@ -62,7 +62,7 @@ const Footer = () => {
             <Link to="/listings" className="block text-sm mb-2">
               Browse
             </Link>
-            <Link to="/categories" className="block text-sm mb-2">
+            <Link to="/listings" className="block text-sm mb-2">
               Categories
             </Link>
           </div>

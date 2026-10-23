@@ -540,7 +540,15 @@ const HeroSection = () => {
             <p className="text-white/70 mt-1.5 text-xs sm:text-sm max-w-xs">
               {s.sub}
             </p>
-            <button className="mt-3 px-4 sm:px-5 py-2 sm:py-2.5 bg-primary text-primary-foreground rounded-full text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity">
+            <button
+              type="button"
+              onClick={() =>
+                document
+                  .getElementById("all-listings")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" })
+              }
+              className="mt-3 px-4 sm:px-5 py-2 sm:py-2.5 bg-primary text-primary-foreground rounded-full text-xs sm:text-sm font-bold hover:opacity-90 transition-opacity"
+            >
               Shop Now
             </button>
           </div>
@@ -777,7 +785,11 @@ const Listings = () => {
             <PopularCollections listings={listings} />
           )}
 
-          <div ref={resultsRef} className="flex items-center gap-3 pt-1">
+          <div
+            ref={resultsRef}
+            id="all-listings"
+            className="flex items-center gap-3 pt-1 scroll-mt-24"
+          >
             <div className="flex-1 h-px bg-border/60" />
             <span className="text-[10px] uppercase tracking-[0.2em] text-foreground/35 font-bold">
               All Listings

@@ -744,6 +744,7 @@ const ProductDetails = () => {
       window.open(
         `https://wa.me/234${listing.sellerContact.replace(/^0/, "")}?text=${text}`,
         "_blank",
+        "noopener,noreferrer",
       );
     } else {
       openMsg();

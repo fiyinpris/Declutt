@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
+import LiveActivityToast from "./LiveActivityToast";
 import { Link } from "react-router-dom";
 import heroImage from "../images/hero-2.avif";
 import heroImage2 from "../images/hero-image.avif";
@@ -10,6 +10,13 @@ import stepImg4 from "../images/step4.jpg";
 import featureImg from "../images/image4.avif";
 import phoneImg from "../images/image5.png";
 import { useInView } from "../utils/useInView";
+import { useAuth } from "../context/AuthContext";
+
+// "Start selling" buttons: sellers go straight to adding an item, everyone else signs up
+const useSellPath = () => {
+  const { profile } = useAuth();
+  return profile?.role === "seller" ? "/seller?tab=listings" : "/signup";
+};
 
 const useScrollProgress = () => {
   const ref = useRef(null);
@@ -505,6 +512,7 @@ const StackedCards = () => {
 };
 
 const Section4 = () => {
+  const sellPath = useSellPath();
   const [ref, inView] = useInView(0.2);
   const [cardPhase, setCardPhase] = useState("hidden");
   useEffect(() => {
@@ -580,9 +588,9 @@ const Section4 = () => {
             <p className="mt-2 text-xs sm:text-sm text-white/75 max-w-60 sm:max-w-xs drop-shadow">
               Built for you. Fast, safe, and completely free to start.
             </p>
-            <button className="mt-3 sm:mt-4 main-button text-xs sm:text-sm px-4 sm:px-5 py-1.5 sm:py-2">
+            <Link to={sellPath} className="mt-3 sm:mt-4 main-button inline-block text-xs sm:text-sm px-4 sm:px-5 py-1.5 sm:py-2">
               Start for free
-            </button>
+            </Link>
           </div>
         </div>
         <div
@@ -1412,37 +1420,11 @@ const CTASection = () => {
 };
 
 // ── Notifications ─────────────────────────────────────────────────────────────
-const NOTIFICATIONS = [
-  {
-    name: "Amara O.",
-    item: "Vintage Leather Sofa",
-    time: "2 mins ago",
-    avatar: "AO",
-  },
-  {
-    name: "Tunde B.",
-    item: "Canon DSLR Camera",
-    time: "5 mins ago",
-    avatar: "TB",
-  },
-  { name: "Chisom E.", item: "Standing Desk", time: "just now", avatar: "CE" },
-  { name: "Fatima K.", item: "Mountain Bike", time: "1 min ago", avatar: "FK" },
-  { name: "David M.", item: "iPhone 13 Pro", time: "3 mins ago", avatar: "DM" },
-  {
-    name: "Ngozi A.",
-    item: "Dining Table Set",
-    time: "just now",
-    avatar: "NA",
-  },
-];
-
 // ── Main ──────────────────────────────────────────────────────────────────────
 export const HomeSection = () => {
+  const sellPath = useSellPath();
   const [activeImage, setActiveImage] = useState(0);
   const [imgProgress, setImgProgress] = useState(0);
-  const [toastVisible, setToastVisible] = useState(false);
-  const [toastAnimating, setToastAnimating] = useState(false);
-  const [currentNotif, setCurrentNotif] = useState(0);
 
   const [bannerRef, bannerInView] = useInView(0.15);
   const [headerRef, headerInView] = useInView(0.3);
@@ -1465,36 +1447,6 @@ export const HomeSection = () => {
       clearTimeout(it);
     };
   }, [activeImage]);
-
-  useEffect(() => {
-    const show = () => {
-      setToastVisible(true);
-      setTimeout(() => setToastAnimating(true), 10);
-      setTimeout(() => {
-        setToastAnimating(false);
-        setTimeout(() => {
-          setToastVisible(false);
-          setCurrentNotif((p) => (p + 1) % NOTIFICATIONS.length);
-        }, 400);
-      }, 6000);
-    };
-    const t1 = setTimeout(show, 2500);
-    const t2 = setInterval(show, 30000);
-    return () => {
-      clearTimeout(t1);
-      clearInterval(t2);
-    };
-  }, []);
-
-  const dismissToast = () => {
-    setToastAnimating(false);
-    setTimeout(() => {
-      setToastVisible(false);
-      setCurrentNotif((p) => (p + 1) % NOTIFICATIONS.length);
-    }, 400);
-  };
-
-  const n = NOTIFICATIONS[currentNotif];
 
   return (
     <>
@@ -1551,12 +1503,12 @@ export const HomeSection = () => {
               className="relative z-10 mt-6 sm:mt-7 lg:mt-8 flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center md:justify-start opacity-0"
               style={{ animation: "fade-in 0.8s ease-out 0.55s forwards" }}
             >
-              <button className="main-button w-full sm:w-auto text-sm sm:text-base xl:px-8 xl:py-3 2xl:text-lg 2xl:px-10 2xl:py-4">
+              <Link to={sellPath} className="main-button inline-flex items-center justify-center w-full sm:w-auto text-sm sm:text-base xl:px-8 xl:py-3 2xl:text-lg 2xl:px-10 2xl:py-4">
                 Start Selling
-              </button>
-              <button className="w-full sm:w-auto px-5 sm:px-6 py-2 xl:px-8 xl:py-3 2xl:text-lg 2xl:px-10 2xl:py-4 text-sm sm:text-base rounded-full border border-primary text-primary font-medium transition-all duration-300 hover:bg-primary hover:text-primary-foreground hover:scale-105 active:scale-95">
+              </Link>
+              <Link to="/listings" className="inline-flex items-center justify-center w-full sm:w-auto px-5 sm:px-6 py-2 xl:px-8 xl:py-3 2xl:text-lg 2xl:px-10 2xl:py-4 text-sm sm:text-base rounded-full border border-primary text-primary font-medium transition-all duration-300 hover:bg-primary hover:text-primary-foreground hover:scale-105 active:scale-95">
                 Browse Listings
-              </button>
+              </Link>
             </div>
           </div>
           <div
@@ -1644,7 +1596,7 @@ export const HomeSection = () => {
                 </span>
               ))}
             </div>
-            <button className="mt-6 sm:mt-8 inline-flex items-center gap-2 text-primary font-semibold text-sm sm:text-base hover:gap-3 transition-all duration-300">
+            <Link to={sellPath} className="mt-6 sm:mt-8 inline-flex items-center gap-2 text-primary font-semibold text-sm sm:text-base hover:gap-3 transition-all duration-300">
               Start listing for free
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -1659,7 +1611,7 @@ export const HomeSection = () => {
               >
                 <path d="M5 12h14M12 5l7 7-7 7" />
               </svg>
-            </button>
+            </Link>
           </div>
         </div>
       </section>
@@ -1705,59 +1657,8 @@ export const HomeSection = () => {
       {/* ════════ CTA Strip ════════ */}
       <CTASection />
 
-      {/* Purchase toast */}
-      {toastVisible &&
-        createPortal(
-          <div
-            className="fixed left-3 sm:left-4 lg:left-6 flex items-center gap-2 sm:gap-3 bg-card border border-border/50 rounded-xl sm:rounded-2xl shadow-xl px-3 sm:px-4 py-2 sm:py-3 w-57.5 sm:w-65 lg:w-67.5"
-            style={{
-              bottom: "calc(var(--tabbar-h) + 1rem)",
-              zIndex: 45, // above page content and the tab bar, below open menus/drawers (z-60+)
-              transform: toastAnimating
-                ? "translateY(0) scale(1)"
-                : "translateY(20px) scale(0.95)",
-              opacity: toastAnimating ? 0.95 : 0,
-              transition:
-                "transform 0.4s cubic-bezier(0.34,1.56,0.64,1), opacity 0.35s ease",
-            }}
-          >
-            <div className="shrink-0 w-8 sm:w-9 h-8 sm:h-9 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px] sm:text-xs font-bold">
-              {n.avatar}
-            </div>
-            <div className="flex flex-col min-w-0 flex-1">
-              <p className="text-[9px] sm:text-[10px] text-foreground/45 leading-none mb-0.5">
-                {n.time}
-              </p>
-              <p className="text-[10px] sm:text-xs font-semibold text-foreground leading-snug">
-                {n.name} just purchased
-              </p>
-              <p className="text-[9px] sm:text-xs text-primary font-medium truncate">
-                {n.item}
-              </p>
-            </div>
-            <div className="flex flex-col items-center gap-1.5 shrink-0">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <button
-                onClick={dismissToast}
-                aria-label="Dismiss"
-                className="w-4 h-4 flex items-center justify-center rounded-full text-foreground/30 hover:text-foreground/70 hover:bg-border transition-colors duration-150"
-              >
-                <svg
-                  width="8"
-                  height="8"
-                  viewBox="0 0 10 10"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                >
-                  <path d="M1 1l8 8M9 1l-8 8" />
-                </svg>
-              </button>
-            </div>
-          </div>,
-          document.body,
-        )}
+      {/* Real recent listings (see LiveActivityToast) */}
+      <LiveActivityToast />
     </>
   );
 };

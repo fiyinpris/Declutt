@@ -95,7 +95,7 @@ const useMessages = (role, uid) => {
         console.error("Messages listener failed, falling back to polling:", e);
         startPoll();
       });
-    } catch (e) {
+    } catch {
       startPoll();
     }
     return () => {

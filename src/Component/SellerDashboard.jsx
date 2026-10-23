@@ -192,16 +192,16 @@ const NotificationToast = ({ notification, onDismiss, onMessage }) => {
   const [leaving, setLeaving] = useState(false);
   const timerRef = useRef(null);
 
+  const dismiss = () => {
+    setLeaving(true);
+    setTimeout(() => onDismiss(), 350);
+  };
+
   useEffect(() => {
     requestAnimationFrame(() => setVisible(true));
     timerRef.current = setTimeout(() => dismiss(), 6000);
     return () => clearTimeout(timerRef.current);
   }, []);
-
-  const dismiss = () => {
-    setLeaving(true);
-    setTimeout(() => onDismiss(), 350);
-  };
 
   const initials = getInitials(notification.buyerName);
   const colorIdx = notification.buyerName

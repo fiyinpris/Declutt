@@ -555,7 +555,7 @@ const BuyerDashboard = () => {
   const initials = getInitials(profile?.name);
   const displayName = formatDisplayName(profile?.name);
 
-  const SidebarInner = ({ mobile = false }) => (
+  const renderSidebar = (mobile = false) => (
     <div className="flex flex-col h-full bg-card">
       {mobile && (
         <div
@@ -658,7 +658,7 @@ const BuyerDashboard = () => {
             alignSelf: "stretch",
           }}
         >
-          <SidebarInner />
+          {renderSidebar()}
         </aside>
 
         {/* Mobile sidebar overlay */}
@@ -678,7 +678,7 @@ const BuyerDashboard = () => {
             borderRight: "1px solid hsl(var(--border)/0.4)",
           }}
         >
-          <SidebarInner mobile />
+          {renderSidebar(true)}
         </div>
 
         <main className="flex-1 min-w-0 flex flex-col">

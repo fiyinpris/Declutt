@@ -326,6 +326,82 @@ const ListingCard = ({
   );
 };
 
+/* Non-clickable display tile */
+const CollectionTile = ({ item, className, style }) => {
+  return (
+    <div
+      className={`relative rounded-2xl overflow-hidden select-none pointer-events-none ${className}`}
+      style={style}
+    >
+      {item?.imageUrl ? (
+        <img
+          src={item.imageUrl}
+          alt={item.name || "Popular item"}
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+      ) : (
+        <div className="w-full h-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-foreground/50 text-sm uppercase tracking-[0.2em]">
+          No image
+        </div>
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/5 to-transparent" />
+      <div className="absolute bottom-3 left-3 right-3">
+        <span className="inline-flex items-center bg-primary text-primary-foreground text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg">
+          {item?.category || item?.name}
+        </span>
+        <p className="text-white text-[10px] mt-1 truncate opacity-75 font-medium">
+          {item?.name}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+/* Arrow hint — purely visual, pointer-events none */
+const ArrowHint = ({ direction, visible }) => (
+  <div
+    className="absolute top-0 bottom-0 flex items-center"
+    style={{
+      [direction === "right" ? "right" : "left"]: 0,
+      zIndex: 10,
+      pointerEvents: "none",
+      opacity: visible ? 1 : 0,
+      transition: "opacity 0.3s ease",
+    }}
+  >
+    <div
+      className="absolute top-0 bottom-0 w-20"
+      style={{
+        [direction === "right" ? "right" : "left"]: 0,
+        background:
+          direction === "right"
+            ? "linear-gradient(to left, hsl(var(--background)), transparent)"
+            : "linear-gradient(to right, hsl(var(--background)), transparent)",
+      }}
+    />
+    <div
+      className="arrow-pulse relative z-10 flex items-center justify-center w-8 h-8 rounded-full bg-primary/90 text-primary-foreground shadow-lg"
+      style={{
+        [direction === "right" ? "marginRight" : "marginLeft"]: "6px",
+      }}
+    >
+      <svg
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={{ transform: direction === "left" ? "scaleX(-1)" : "none" }}
+      >
+        <path d="M5 12h14M13 6l6 6-6 6" />
+      </svg>
+    </div>
+  </div>
+);
+
 /* ── Popular Collections ── */
 const MOBILE_SLOTS = 10;
 
@@ -352,83 +428,6 @@ const PopularCollections = ({ listings }) => {
 
   const getItem = (slot) => pool[slot % pool.length];
 
-  /* Non-clickable display tile */
-  const CollectionTile = ({ slot, className, style }) => {
-    const item = getItem(slot);
-    return (
-      <div
-        className={`relative rounded-2xl overflow-hidden select-none pointer-events-none ${className}`}
-        style={style}
-      >
-        {item?.imageUrl ? (
-          <img
-            src={item.imageUrl}
-            alt={item.name || "Popular item"}
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-        ) : (
-          <div className="w-full h-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-foreground/50 text-sm uppercase tracking-[0.2em]">
-            No image
-          </div>
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/5 to-transparent" />
-        <div className="absolute bottom-3 left-3 right-3">
-          <span className="inline-flex items-center bg-primary text-primary-foreground text-[10px] font-bold px-2.5 py-1 rounded-full shadow-lg">
-            {item?.category || item?.name}
-          </span>
-          <p className="text-white text-[10px] mt-1 truncate opacity-75 font-medium">
-            {item?.name}
-          </p>
-        </div>
-      </div>
-    );
-  };
-
-  /* Arrow hint — purely visual, pointer-events none */
-  const ArrowHint = ({ direction, visible }) => (
-    <div
-      className="absolute top-0 bottom-0 flex items-center"
-      style={{
-        [direction === "right" ? "right" : "left"]: 0,
-        zIndex: 10,
-        pointerEvents: "none",
-        opacity: visible ? 1 : 0,
-        transition: "opacity 0.3s ease",
-      }}
-    >
-      <div
-        className="absolute top-0 bottom-0 w-20"
-        style={{
-          [direction === "right" ? "right" : "left"]: 0,
-          background:
-            direction === "right"
-              ? "linear-gradient(to left, hsl(var(--background)), transparent)"
-              : "linear-gradient(to right, hsl(var(--background)), transparent)",
-        }}
-      />
-      <div
-        className="arrow-pulse relative z-10 flex items-center justify-center w-8 h-8 rounded-full bg-primary/90 text-primary-foreground shadow-lg"
-        style={{
-          [direction === "right" ? "marginRight" : "marginLeft"]: "6px",
-        }}
-      >
-        <svg
-          width="15"
-          height="15"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          style={{ transform: direction === "left" ? "scaleX(-1)" : "none" }}
-        >
-          <path d="M5 12h14M13 6l6 6-6 6" />
-        </svg>
-      </div>
-    </div>
-  );
-
   return (
     <section className="py-2">
       <div className="text-center mb-5">
@@ -443,20 +442,20 @@ const PopularCollections = ({ listings }) => {
         className="hidden sm:flex gap-3 pointer-events-none select-none"
         style={{ height: "360px" }}
       >
-        <CollectionTile slot={0} className="flex-1 h-full" />
+        <CollectionTile item={getItem(0)} className="flex-1 h-full" />
         <div className="flex flex-col gap-3 flex-1 h-full">
           <CollectionTile
-            slot={1}
+            item={getItem(1)}
             className="w-full"
             style={{ flex: "1 1 0", minHeight: 0 }}
           />
           <CollectionTile
-            slot={2}
+            item={getItem(2)}
             className="w-full"
             style={{ flex: "1 1 0", minHeight: 0 }}
           />
         </div>
-        <CollectionTile slot={3} className="flex-1 h-full" />
+        <CollectionTile item={getItem(3)} className="flex-1 h-full" />
       </div>
 
       {/* Mobile: horizontal scroll with left + right hint arrows */}
@@ -469,7 +468,7 @@ const PopularCollections = ({ listings }) => {
           {Array.from({ length: MOBILE_SLOTS }, (_, slot) => (
             <CollectionTile
               key={slot}
-              slot={slot}
+              item={getItem(slot)}
               className="flex-shrink-0"
               style={{
                 width: "calc(50vw - 18px)",
@@ -654,7 +653,7 @@ const Listings = () => {
             setLoading(false);
           });
       });
-    } catch (e) {
+    } catch {
       getDocs(collection(db, "listings")).then(apply).catch(console.error);
     }
     return () => unsub();
@@ -714,7 +713,7 @@ const Listings = () => {
     try {
       sessionStorage.setItem("listings_scroll", String(window.scrollY || 0));
       sessionStorage.setItem("listings_scroll_id", String(listing.id));
-    } catch (_) {}
+    } catch { /* ignore */ }
     navigate(`/product/${listing.id}`);
   };
 
@@ -742,7 +741,7 @@ const Listings = () => {
           sessionStorage.removeItem("listings_scroll");
         }, 120);
       }
-    } catch (_) {}
+    } catch { /* ignore */ }
   }, [loading]);
 
   return (

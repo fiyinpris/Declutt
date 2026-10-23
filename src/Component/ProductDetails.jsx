@@ -291,7 +291,7 @@ const MessagingPanel = ({ listing, onClose, currentUser, buyerName }) => {
         console.error("messages listener error, polling instead", e);
         startPoll();
       });
-    } catch (e) {
+    } catch {
       startPoll();
     }
     return () => {
@@ -750,11 +750,11 @@ const ProductDetails = () => {
     if (navigator.share) {
       try {
         await navigator.share({ title: listing.name, url });
-      } catch (_) {}
+      } catch { /* ignore */ }
     } else {
       try {
         await navigator.clipboard.writeText(url);
-      } catch (_) {}
+      } catch { /* ignore */ }
       showToast("Link copied ✓");
     }
   };
@@ -795,7 +795,7 @@ const ProductDetails = () => {
   const hasReviews = (listing.reviewCount || 0) > 0;
   const soldCount = listing.soldCount || 0;
 
-  const PurchaseActions = () => (
+  const renderPurchaseActions = () => (
     <div className="space-y-3 pt-4 border-t border-border">
       <QtySelector
         value={qty}
@@ -1024,7 +1024,7 @@ const ProductDetails = () => {
             <DistanceLine listing={listing} loc={buyerLoc} />
 
             <div className="lg:hidden">
-              <PurchaseActions />
+              {renderPurchaseActions()}
             </div>
 
             <div className="lg:hidden pt-2 border-t border-border">
@@ -1037,7 +1037,7 @@ const ProductDetails = () => {
           <div className="hidden lg:block sticky top-28">
             <div className="bg-card border-2 border-border rounded-2xl p-5 space-y-4">
               <SellerInfo listing={listing} onMsg={openMsg} />
-              <PurchaseActions />
+              {renderPurchaseActions()}
             </div>
           </div>
         </div>

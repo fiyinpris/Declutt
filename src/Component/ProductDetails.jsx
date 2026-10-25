@@ -22,13 +22,14 @@ import {
   Composer,
   PeerAvatar,
   replySnapshot,
+  editMessage,
+  useTyping,
 } from "./Chatui";
 import { useBuyerLocation } from "../utils/geo";
 import { cartHelpers } from "../utils/Cart";
 import {
   isAllowedListing,
   isPublicListing,
-  listingStatus,
 } from "../utils/categories";
 
 const REPORT_REASONS = [
@@ -349,6 +350,13 @@ const MessagingPanel = ({ listing, onClose, currentUser, buyerName }) => {
   const [ready, setReady] = useState(false);
   const [sendError, setSendError] = useState("");
   const [replyTo, setReplyTo] = useState(null);
+  const [editing, setEditing] = useState(null);
+  const { peerTyping, ping } = useTyping(
+    currentUser?.uid && listing?.sellerUid
+      ? `${currentUser.uid}_${listing.sellerUid}`
+      : null,
+    "buyer",
+  );
 
   // All messages between this buyer and this seller (every item), realtime. Equality filters only
   // (no composite index); polling fallback if the listener fails.
@@ -424,6 +432,17 @@ const MessagingPanel = ({ listing, onClose, currentUser, buyerName }) => {
       return;
     }
     const txt = input.trim();
+    if (editing) {
+      const m = editing;
+      setEditing(null);
+      setInput("");
+      if (txt !== m.text)
+        editMessage(m, txt).catch((e) => {
+          console.error("Edit failed:", e);
+          setSendError("Couldn't edit that message. Please try again.");
+        });
+      return;
+    }
     const quoting = replyTo;
     setInput("");
     setReplyTo(null);
@@ -543,8 +562,14 @@ const MessagingPanel = ({ listing, onClose, currentUser, buyerName }) => {
               {listing.sellerName || "Seller"}
             </p>
             <p className="text-[11px] text-foreground/45">
-              <span className="font-bold text-primary">Seller</span> · replies
-              appear here instantly
+              {peerTyping ? (
+                <span className="font-bold text-primary">typing…</span>
+              ) : (
+                <>
+                  <span className="font-bold text-primary">Seller</span> · replies
+                  appear here instantly
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -558,7 +583,15 @@ const MessagingPanel = ({ listing, onClose, currentUser, buyerName }) => {
             messages={messages}
             role="buyer"
             uid={currentUser.uid}
-            onReply={setReplyTo}
+            onReply={(m) => {
+              setEditing(null);
+              setReplyTo(m);
+            }}
+            onEdit={(m) => {
+              setReplyTo(null);
+              setEditing(m);
+              setInput(m.text || "");
+            }}
             peerName={listing.sellerName}
             pendingListing={thisItem}
             resetKey={`${listing.sellerUid}-${listing.id}`}
@@ -581,6 +614,12 @@ const MessagingPanel = ({ listing, onClose, currentUser, buyerName }) => {
             replyTo?.from === "buyer" ? "yourself" : listing.sellerName || "Seller"
           }
           onCancelReply={() => setReplyTo(null)}
+          editing={editing}
+          onCancelEdit={() => {
+            setEditing(null);
+            setInput("");
+          }}
+          onTyping={ping}
           quick={[
             "Is this still available?",
             "What's your best price?",
@@ -892,7 +931,7 @@ const ProductDetails = () => {
       </div>
     );
 
-  // Waiting for review, rejected, or not furniture/appliances/electronics: only the seller and
+  // Hidden by an admin, or not furniture/appliances/electronics: only the seller and
   // admins can open it
   const isOwner = !!listing && !!uid && listing.sellerUid === uid;
   const isAdmin = profile?.role === "admin";
@@ -1051,9 +1090,7 @@ const ProductDetails = () => {
               <div className="px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-700 dark:text-amber-400">
                 {!isAllowedListing(listing)
                   ? "Hidden from buyers: Declutt only accepts furniture, appliances and electronics. Edit it and choose one of those categories."
-                  : listingStatus(listing) === "rejected"
-                    ? `Not approved${listing.rejectReason ? `: ${listing.rejectReason}` : "."} Edit the listing to send it for review again.`
-                    : "Waiting for review — buyers will see this once an admin approves it."}
+                  : `Hidden by Declutt${listing.rejectReason ? `: ${listing.rejectReason}` : "."} Contact us if you think this is a mistake.`}
               </div>
             )}
             <span

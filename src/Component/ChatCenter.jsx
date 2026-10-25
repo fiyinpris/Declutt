@@ -10,6 +10,7 @@ import {
   doc,
   writeBatch,
   serverTimestamp,
+  arrayUnion,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { Ico, Spin } from "./Ico";
@@ -25,6 +26,8 @@ import {
   Composer,
   replySnapshot,
   hiddenFor,
+  editMessage,
+  useTyping,
 } from "./Chatui";
 
 export { tsMs }; // other files import tsMs from here
@@ -48,6 +51,84 @@ const QUICK = {
     "When can you pick it up?",
     "Let's meet in a public place",
   ],
+};
+
+const USER_REPORT_REASONS = [
+  "Harassment or abusive language",
+  "Scam or fraud attempt",
+  "Spam",
+  "Inappropriate content",
+  "Something else",
+];
+
+/** Bottom sheet / dialog used by the chat's report + forward actions. */
+const Sheet = ({ title, onClose, children }) => (
+  <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center sm:p-4">
+    <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" onClick={onClose} />
+    <div className="relative w-full sm:max-w-md max-h-[85dvh] overflow-y-auto bg-card border border-border rounded-t-3xl sm:rounded-2xl shadow-2xl p-5 text-left">
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <p className="text-base font-bold text-foreground">{title}</p>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="w-8 h-8 rounded-full flex items-center justify-center text-foreground/45 hover:bg-border/40"
+        >
+          <Ico s={16} w={2.2} r>
+            <path d="M18 6 6 18M6 6l12 12" />
+          </Ico>
+        </button>
+      </div>
+      {children}
+    </div>
+  </div>
+);
+
+const ReportUserSheet = ({ name, onClose, onSubmit }) => {
+  const [reason, setReason] = useState(USER_REPORT_REASONS[0]);
+  const [details, setDetails] = useState("");
+  const [busy, setBusy] = useState(false);
+  return (
+    <Sheet title={`Report ${name}`} onClose={onClose}>
+      <div className="space-y-2" role="radiogroup" aria-label="Reason">
+        {USER_REPORT_REASONS.map((r) => (
+          <button
+            key={r}
+            type="button"
+            role="radio"
+            aria-checked={reason === r}
+            onClick={() => setReason(r)}
+            className={`w-full text-left px-3.5 py-2.5 rounded-xl border text-sm ${reason === r ? "border-primary bg-primary/8 font-semibold text-foreground" : "border-border text-foreground/65"}`}
+          >
+            {r}
+          </button>
+        ))}
+      </div>
+      <textarea
+        rows={3}
+        maxLength={500}
+        value={details}
+        onChange={(e) => setDetails(e.target.value)}
+        placeholder="What happened? (optional)"
+        className="mt-3 w-full resize-none rounded-xl border border-border bg-background px-3.5 py-2.5 text-[16px] sm:text-sm text-foreground outline-none focus:border-primary/50"
+      />
+      <p className="mt-2 text-[11px] text-foreground/45">
+        Declutt can read this conversation to review your report.
+      </p>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          await onSubmit(reason, details.trim().slice(0, 500));
+          setBusy(false);
+        }}
+        className="mt-4 w-full py-3 rounded-xl bg-red-500 text-white text-sm font-bold disabled:opacity-60"
+      >
+        {busy ? "Sending…" : "Send report"}
+      </button>
+    </Sheet>
+  );
 };
 
 const useMessages = (role, uid) => {
@@ -127,6 +208,11 @@ const ChatCenter = ({
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("all");
   const [replyTo, setReplyTo] = useState(null);
+  const [editing, setEditing] = useState(null); // message being edited
+  const [forwarding, setForwarding] = useState(null); // message to forward
+  const [headerMenu, setHeaderMenu] = useState(false);
+  const [reporting, setReporting] = useState(false);
+  const [notice, setNotice] = useState("");
 
   const otherName = (t) =>
     role === "seller" ? t.buyerName || "Buyer" : t.sellerName || "Seller";
@@ -174,6 +260,7 @@ const ChatCenter = ({
         const newest = t.messages[t.messages.length - 1];
         return { ...t, last, lastMs: tsMs(newest.createdAt) };
       })
+      .filter((t) => t.last) // "Delete chat" hides every message for you → the chat disappears
       .sort((a, b) => b.lastMs - a.lastMs);
   }, [msgs, role, uid]);
 
@@ -224,6 +311,8 @@ const ChatCenter = ({
       ? draft.listing
       : null;
 
+  const { peerTyping, ping } = useTyping(active?.key, role);
+
   // Opening a conversation = reading it → the other person's ticks turn brown (read)
   useEffect(() => {
     if (!active) return;
@@ -257,11 +346,99 @@ const ChatCenter = ({
     setSendError("");
     setText("");
     setReplyTo(null);
+    setEditing(null);
+    setHeaderMenu(false);
+  };
+
+  const flash = (msg) => {
+    setNotice(msg);
+    setTimeout(() => setNotice(""), 2500);
+  };
+
+  // Forward: copy the text into another conversation (you stay the sender, on your side)
+  const forwardTo = async (t) => {
+    const m = forwarding;
+    setForwarding(null);
+    try {
+      await addDoc(collection(db, "messages"), {
+        sellerUid: t.sellerUid,
+        buyerUid: t.buyerUid,
+        buyerName: t.buyerName || "Buyer",
+        sellerName: t.sellerName || "Seller",
+        listingId: t.listing?.id || null,
+        listingName: t.listing?.name || "",
+        listingImageUrl: t.listing?.imageUrl || null,
+        listingPrice: t.listing?.price ?? null,
+        text: m.text,
+        forwarded: true,
+        from: role,
+        createdAt: serverTimestamp(),
+        delivered: false,
+        read: false,
+      });
+      flash(`Forwarded to ${otherName(t)}`);
+    } catch (e) {
+      console.error("Forward failed:", e);
+      flash("Couldn't forward that message");
+    }
+  };
+
+  // Delete chat (for you): hides every message in it for you only
+  const deleteChat = async () => {
+    setHeaderMenu(false);
+    if (!active || !window.confirm(`Delete this chat with ${otherName(active)}? It's only removed for you.`)) return;
+    const mine = active.messages.filter((m) => !hiddenFor(m, uid));
+    try {
+      for (let i = 0; i < mine.length; i += 400) {
+        const batch = writeBatch(db);
+        mine.slice(i, i + 400).forEach((m) =>
+          batch.update(doc(db, "messages", m.id), { deletedFor: arrayUnion(uid) }),
+        );
+        await batch.commit();
+      }
+      setActiveKey(null);
+      setMobileOpen(false);
+    } catch (e) {
+      console.error("Delete chat failed:", e);
+      flash("Couldn't delete the chat");
+    }
+  };
+
+  const reportUser = async (reason, details) => {
+    try {
+      await addDoc(collection(db, "reports"), {
+        type: "user",
+        reportedUid: otherUid(active),
+        reportedName: otherName(active),
+        conversationKey: active.key,
+        reason,
+        details,
+        reporterUid: uid,
+        status: "open",
+        createdAt: serverTimestamp(),
+      });
+      setReporting(false);
+      flash("Thanks — Declutt will review this");
+    } catch (e) {
+      console.error("Report failed:", e);
+      flash("Couldn't send the report");
+    }
   };
 
   const send = async () => {
     const body = text.trim();
     if (!body || !active || sending) return;
+    if (editing) {
+      const m = editing;
+      setEditing(null);
+      setText("");
+      if (body !== m.text)
+        editMessage(m, body).catch((e) => {
+          console.error("Edit failed:", e);
+          setSendError("Couldn't edit that message. Please try again.");
+        });
+      return;
+    }
     if (!active.sellerUid || !active.buyerUid) {
       setSendError("This conversation is missing a participant.");
       return;
@@ -512,20 +689,76 @@ const ChatCenter = ({
                     {otherName(active)}
                   </p>
                   <p className="text-[11px] text-foreground/45">
-                    <span className="font-bold text-primary">
-                      {role === "seller" ? "Buyer" : "Seller"}
-                    </span>
-                    {" · "}
-                    {itemCount} item{itemCount !== 1 ? "s" : ""} discussed
+                    {peerTyping ? (
+                      <span className="font-bold text-primary">typing…</span>
+                    ) : (
+                      <>
+                        <span className="font-bold text-primary">
+                          {role === "seller" ? "Buyer" : "Seller"}
+                        </span>
+                        {" · "}
+                        {itemCount} item{itemCount !== 1 ? "s" : ""} discussed
+                      </>
+                    )}
                   </p>
                 </div>
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setHeaderMenu((o) => !o)}
+                    aria-label="Chat options"
+                    aria-expanded={headerMenu}
+                    className="w-9 h-9 rounded-full flex items-center justify-center text-foreground/55 hover:bg-border/40"
+                  >
+                    <Ico s={18} w={2.4} r>
+                      <circle cx="12" cy="5" r="1" />
+                      <circle cx="12" cy="12" r="1" />
+                      <circle cx="12" cy="19" r="1" />
+                    </Ico>
+                  </button>
+                  {headerMenu && (
+                    <div className="absolute right-0 top-11 z-20 w-48 rounded-xl bg-card border border-border shadow-xl overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setHeaderMenu(false);
+                          setReporting(true);
+                        }}
+                        className="w-full text-left px-4 py-3 text-sm text-foreground/80 hover:bg-primary/8"
+                      >
+                        Report {role === "seller" ? "buyer" : "seller"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={deleteChat}
+                        className="w-full text-left px-4 py-3 text-sm text-red-500 hover:bg-red-500/8"
+                      >
+                        Delete chat
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
+              {notice && (
+                <p className="px-4 py-1.5 text-xs text-primary bg-primary/10 shrink-0">
+                  {notice}
+                </p>
+              )}
 
               <MessageList
                 messages={active.messages}
                 role={role}
                 uid={uid}
-                onReply={setReplyTo}
+                onReply={(m) => {
+                  setEditing(null);
+                  setReplyTo(m);
+                }}
+                onEdit={(m) => {
+                  setReplyTo(null);
+                  setEditing(m);
+                  setText(m.text || "");
+                }}
+                onForward={threads.length > 1 ? setForwarding : undefined}
                 peerName={otherName(active)}
                 pendingListing={pendingListing}
                 resetKey={`${active.key}-${mobileOpen}`}
@@ -554,7 +787,49 @@ const ChatCenter = ({
                   replyTo?.from === role ? "yourself" : otherName(active)
                 }
                 onCancelReply={() => setReplyTo(null)}
+                editing={editing}
+                onCancelEdit={() => {
+                  setEditing(null);
+                  setText("");
+                }}
+                onTyping={ping}
               />
+              {reporting && (
+                <ReportUserSheet
+                  name={otherName(active)}
+                  onClose={() => setReporting(false)}
+                  onSubmit={reportUser}
+                />
+              )}
+              {forwarding && (
+                <Sheet title="Forward to…" onClose={() => setForwarding(null)}>
+                  <p className="text-xs text-foreground/50 mb-3 line-clamp-2">
+                    “{forwarding.text}”
+                  </p>
+                  <div className="space-y-1">
+                    {threads
+                      .filter((t) => t.key !== active.key)
+                      .map((t) => (
+                        <button
+                          key={t.key}
+                          type="button"
+                          onClick={() => forwardTo(t)}
+                          className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-primary/8 text-left"
+                        >
+                          <PeerAvatar uid={otherUid(t)} name={otherName(t)} size={36} />
+                          <span className="min-w-0">
+                            <span className="block text-sm font-bold text-foreground truncate">
+                              {otherName(t)}
+                            </span>
+                            <span className="block text-xs text-foreground/45 truncate">
+                              {t.listing?.name || ""}
+                            </span>
+                          </span>
+                        </button>
+                      ))}
+                  </div>
+                </Sheet>
+              )}
             </div>
           ) : (
             <div className="hidden sm:flex flex-col items-center justify-center gap-2 text-foreground/35 text-sm bg-background/60">

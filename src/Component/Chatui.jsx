@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import {
   doc,
@@ -6,6 +6,9 @@ import {
   updateDoc,
   arrayUnion,
   deleteField,
+  onSnapshot,
+  serverTimestamp,
+  setDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { usePublicProfile } from "../utils/publicProfile";
@@ -145,6 +148,64 @@ const deleteForEveryone = (m) =>
     replyTo: deleteField(),
   });
 
+/* ───────────── edit / react / typing ─────────────
+ *  editedAt                 set when the sender edits the text ("edited" label)
+ *  reactions: { uid: "👍" } one reaction per person; tap the same emoji again to remove it
+ *  forwarded: true          message was forwarded from another chat
+ *  typing/{buyer_seller}    { buyer, seller } last-keystroke times → "typing…"
+ */
+export const REACTIONS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+
+const toggleReaction = (m, uid, emoji) =>
+  updateDoc(doc(db, "messages", m.id), {
+    [`reactions.${uid}`]: m.reactions?.[uid] === emoji ? deleteField() : emoji,
+  });
+
+export const editMessage = (m, text) =>
+  updateDoc(doc(db, "messages", m.id), { text, editedAt: serverTimestamp() });
+
+/** Live "the other person is typing" flag + a throttled ping() to call while typing. */
+export const useTyping = (convKey, role) => {
+  const [peerTyping, setPeerTyping] = useState(false);
+  const lastPing = useRef(0);
+  useEffect(() => {
+    if (!convKey || !role) return;
+    const peer = role === "buyer" ? "seller" : "buyer";
+    let prev = null;
+    let first = true;
+    let timer;
+    const unsub = onSnapshot(
+      doc(db, "typing", convKey),
+      (s) => {
+        const v = s.exists() ? tsMs(s.data()[peer]) : null;
+        // only a NEW keystroke time counts (no clock comparison, so device clocks don't matter)
+        if (!first && v && v !== prev) {
+          setPeerTyping(true);
+          clearTimeout(timer);
+          timer = setTimeout(() => setPeerTyping(false), 4000);
+        }
+        first = false;
+        prev = v;
+      },
+      () => {},
+    );
+    return () => {
+      unsub();
+      clearTimeout(timer);
+    };
+  }, [convKey, role]);
+  const ping = useCallback(() => {
+    if (!convKey || !role) return;
+    const now = Date.now();
+    if (now - lastPing.current < 2500) return;
+    lastPing.current = now;
+    setDoc(doc(db, "typing", convKey), { [role]: serverTimestamp() }, { merge: true }).catch(
+      () => {},
+    );
+  }, [convKey, role]);
+  return { peerTyping, ping };
+};
+
 const MenuChip = ({ danger = false, onClick, children }) => (
   <button
     type="button"
@@ -261,6 +322,8 @@ export const MessageList = ({
   emptyNode,
   pendingListing,
   onReply,
+  onEdit,
+  onForward,
 }) => {
   const ref = useRef(null);
   const near = useRef(true);
@@ -291,6 +354,11 @@ export const MessageList = ({
       console.error("Delete failed:", e);
       alert("Couldn't delete that message. Please try again.");
     }
+  };
+
+  const react = (m, emoji) => {
+    setMenu(null);
+    toggleReaction(m, uid, emoji).catch((e) => console.error("Reaction failed:", e));
   };
 
   // Tapping a quote jumps to the original message and briefly highlights it
@@ -427,6 +495,11 @@ export const MessageList = ({
                           : `bg-card text-foreground border border-border ${end ? "rounded-bl-md" : ""}`
                     }`}
                   >
+                    {m.forwarded && !deleted && (
+                      <span className="block text-[10px] italic opacity-70 mb-0.5">
+                        ↪ Forwarded
+                      </span>
+                    )}
                     {original && !deleted && (
                       <span
                         role="button"
@@ -454,8 +527,45 @@ export const MessageList = ({
                         : "This message was deleted"
                       : m.text}
                   </div>
+                  {!deleted && m.reactions && Object.keys(m.reactions).length > 0 && (
+                    <div className={`flex flex-wrap gap-1 -mt-1.5 ${mine ? "justify-end pr-2" : "pl-2"}`}>
+                      {Object.entries(
+                        Object.values(m.reactions).reduce(
+                          (acc, e) => ({ ...acc, [e]: (acc[e] || 0) + 1 }),
+                          {},
+                        ),
+                      ).map(([emoji, n]) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => uid && react(m, emoji)}
+                          className={`px-1.5 h-6 rounded-full text-xs flex items-center gap-0.5 border shadow-sm ${m.reactions[uid] === emoji ? "bg-primary/15 border-primary/40" : "bg-card border-border"}`}
+                          aria-label={`${emoji} ${n}`}
+                        >
+                          <span>{emoji}</span>
+                          {n > 1 && <span className="text-[10px] font-bold text-foreground/60">{n}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   {open && (
-                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    <div className={`flex flex-col gap-1.5 mt-1.5 ${mine ? "items-end" : "items-start"}`}>
+                      {menu.step === "actions" && uid && !deleted && (
+                        <div className="flex gap-1 px-1.5 py-1 rounded-full bg-card border border-border shadow-sm">
+                          {REACTIONS.map((e) => (
+                            <button
+                              key={e}
+                              type="button"
+                              onClick={() => react(m, e)}
+                              aria-label={`React ${e}`}
+                              className={`w-8 h-8 rounded-full text-lg leading-none hover:scale-125 transition-transform ${m.reactions?.[uid] === e ? "bg-primary/15" : ""}`}
+                            >
+                              {e}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    <div className="flex flex-wrap gap-1.5">
                       {menu.step === "actions" ? (
                         <>
                           {!deleted && onReply && (
@@ -466,6 +576,36 @@ export const MessageList = ({
                               }}
                             >
                               Reply
+                            </MenuChip>
+                          )}
+                          {mine && !deleted && onEdit && (
+                            <MenuChip
+                              onClick={() => {
+                                onEdit(m);
+                                setMenu(null);
+                              }}
+                            >
+                              Edit
+                            </MenuChip>
+                          )}
+                          {!deleted && onForward && (
+                            <MenuChip
+                              onClick={() => {
+                                onForward(m);
+                                setMenu(null);
+                              }}
+                            >
+                              Forward
+                            </MenuChip>
+                          )}
+                          {!deleted && (
+                            <MenuChip
+                              onClick={() => {
+                                navigator.clipboard?.writeText(m.text || "");
+                                setMenu(null);
+                              }}
+                            >
+                              Copy
                             </MenuChip>
                           )}
                           <MenuChip
@@ -497,10 +637,12 @@ export const MessageList = ({
                         </>
                       )}
                     </div>
+                    </div>
                   )}
                   {end && (
                     <div className="flex items-center gap-1.5 mt-1 px-1 text-[11px] text-foreground/40">
                       <span>{fmtTime(ms) || "sending…"}</span>
+                      {m.editedAt && !deleted && <span className="italic">edited</span>}
                       {mine && <Ticks status={messageStatus(m)} />}
                     </div>
                   )}
@@ -554,6 +696,9 @@ export const Composer = ({
   replyTo = null,
   replyLabel = "",
   onCancelReply,
+  editing = null,
+  onCancelEdit,
+  onTyping,
 }) => {
   const ta = useRef(null);
   useEffect(() => {
@@ -566,27 +711,27 @@ export const Composer = ({
   }, [value]);
 
   useEffect(() => {
-    if (replyTo) ta.current?.focus();
-  }, [replyTo]);
+    if (replyTo || editing) ta.current?.focus();
+  }, [replyTo, editing]);
 
   const canSend = value.trim() && !sending;
   return (
     <div className="shrink-0 bg-card border-t border-border text-left">
       <div className="mx-auto w-full max-w-3xl">
-        {replyTo && (
+        {(editing || replyTo) && (
           <div className="flex items-center gap-2 mx-3 mt-3 pl-3 pr-1.5 py-2 rounded-xl bg-background border-l-[3px] border-primary">
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold text-primary">
-                Replying to {replyLabel}
+                {editing ? "Editing message" : `Replying to ${replyLabel}`}
               </p>
               <p className="text-xs text-foreground/55 truncate">
-                {replyTo.text}
+                {(editing || replyTo).text}
               </p>
             </div>
             <button
               type="button"
-              onClick={onCancelReply}
-              aria-label="Cancel reply"
+              onClick={editing ? onCancelEdit : onCancelReply}
+              aria-label={editing ? "Cancel edit" : "Cancel reply"}
               className="w-8 h-8 rounded-full flex items-center justify-center text-foreground/45 hover:text-foreground hover:bg-border/40 shrink-0"
             >
               <svg
@@ -604,7 +749,7 @@ export const Composer = ({
             </button>
           </div>
         )}
-        {quick.length > 0 && !value && !replyTo && (
+        {quick.length > 0 && !value && !replyTo && !editing && (
           <div
             className="flex items-center gap-2 px-3 pt-3 overflow-x-auto"
             style={{ scrollbarWidth: "none" }}
@@ -626,7 +771,10 @@ export const Composer = ({
             rows={1}
             value={value}
             autoFocus={autoFocus}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) => {
+              onChange(e.target.value);
+              onTyping?.();
+            }}
             onKeyDown={(e) => {
               // Desktop: Enter sends, Shift+Enter = new line. Phones: Enter = new line, use the send button.
               if (

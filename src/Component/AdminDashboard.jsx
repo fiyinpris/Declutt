@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   collection,
   addDoc,
@@ -17,10 +17,17 @@ import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
 import { compressToBase64 } from "../utils/images";
 import {
+  AdminOverview,
+  ConversationsPanel,
+  FeatureRequestsPanel,
+  OrdersInfo,
+  UsersPanel,
+} from "./AdminPanels";
+import {
   CATEGORIES,
   isAllowedListing,
   isFeatured,
-  listingStatus,
+  isHiddenByAdmin,
   normalizeCategory,
 } from "../utils/categories";
 
@@ -361,8 +368,8 @@ const ListingModal = ({ onClose, onSaved, existing = null }) => {
 };
 
 // ── Listing Row / Card ───────────────────────────────────────────────────────
-const ListingRow = ({ listing, onEdit, onDelete, onFeature }) => (
-  <div className="flex items-center gap-4 px-4 py-3.5 rounded-xl bg-card border border-border hover:border-primary/30 transition-all duration-200">
+const ListingRow = ({ listing, onEdit, onDelete, onFeature, onToggleHidden }) => (
+  <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 sm:gap-4 px-4 py-3.5 rounded-xl bg-card border border-border hover:border-primary/30 transition-all duration-200">
     <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-border/30">
       {listing.imageUrl ? (
         <img
@@ -386,11 +393,9 @@ const ListingRow = ({ listing, onEdit, onDelete, onFeature }) => (
         >
           {listing.available ? "Available" : "Sold"}
         </span>
-        {listingStatus(listing) !== "approved" && (
-          <span
-            className={`text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 border ${listingStatus(listing) === "pending" ? "bg-amber-500/10 text-amber-600 border-amber-500/25" : "bg-red-500/10 text-red-500 border-red-500/25"}`}
-          >
-            {listingStatus(listing) === "pending" ? "Pending review" : "Rejected"}
+        {isHiddenByAdmin(listing) && (
+          <span className="text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5 border bg-red-500/10 text-red-500 border-red-500/25">
+            Hidden
           </span>
         )}
         {isFeatured(listing) && (
@@ -409,7 +414,29 @@ const ListingRow = ({ listing, onEdit, onDelete, onFeature }) => (
     <p className="text-sm font-bold text-primary shrink-0">
       ₦{Number(listing.price).toLocaleString()}
     </p>
-    <div className="flex gap-1.5 shrink-0">
+    <div className="flex gap-1.5 shrink-0 w-full sm:w-auto justify-end">
+      <button
+        onClick={() => onToggleHidden(listing)}
+        title={isHiddenByAdmin(listing) ? "Restore (show to buyers)" : "Hide from buyers"}
+        aria-label={isHiddenByAdmin(listing) ? "Restore listing" : "Hide listing"}
+        className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors ${isHiddenByAdmin(listing) ? "border-red-500/40 text-red-500 bg-red-500/10" : "border-border text-foreground/50 hover:text-red-500 hover:border-red-500/40"}`}
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          {isHiddenByAdmin(listing) ? (
+            <>
+              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
+              <circle cx="12" cy="12" r="3" />
+            </>
+          ) : (
+            <>
+              <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+              <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68" />
+              <path d="M6.61 6.61A13.53 13.53 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61" />
+              <line x1="2" y1="2" x2="22" y2="22" />
+            </>
+          )}
+        </svg>
+      </button>
       <button
         onClick={() => onFeature(listing)}
         title={isFeatured(listing) ? "Stop featuring" : "Feature for 7 days"}
@@ -460,145 +487,8 @@ const ListingRow = ({ listing, onEdit, onDelete, onFeature }) => (
   </div>
 );
 
-// ── Listings waiting for review (approve before buyers can see them) ─────────
-const ReviewQueue = ({ items, onChanged }) => {
-  const [rejecting, setRejecting] = useState(null); // listing id
-  const [reason, setReason] = useState("");
-  const [busy, setBusy] = useState(null);
-
-  const decide = async (l, approve) => {
-    setBusy(l.id);
-    try {
-      await updateDoc(
-        doc(db, "listings", l.id),
-        approve
-          ? { status: "approved", rejectReason: deleteField() }
-          : {
-              status: "rejected",
-              rejectReason:
-                reason.trim() ||
-                "Only furniture, appliances and electronics are allowed.",
-            },
-      );
-      setRejecting(null);
-      setReason("");
-      onChanged();
-    } catch (e) {
-      console.error("Review failed:", e);
-      alert("Couldn't update that listing. Please try again.");
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  return (
-    <div className="bg-card border border-border rounded-2xl overflow-hidden text-left">
-      <div className="px-4 sm:px-5 py-3.5 border-b border-border/60 flex items-center justify-between">
-        <p className="text-sm font-bold text-foreground">
-          Waiting for review
-          {items.length > 0 && (
-            <span className="ml-2 px-2 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-black align-middle">
-              {items.length}
-            </span>
-          )}
-        </p>
-        <span className="text-[11px] text-foreground/40">
-          Buyers only see approved listings
-        </span>
-      </div>
-      {items.length === 0 ? (
-        <p className="px-5 py-6 text-sm text-foreground/40">
-          Nothing to review right now.
-        </p>
-      ) : (
-        <ul className="divide-y divide-border/60 max-h-[520px] overflow-y-auto">
-          {items.map((l) => (
-            <li key={l.id} className="px-4 sm:px-5 py-4 flex flex-col sm:flex-row gap-4">
-              <div className="w-full sm:w-24 h-40 sm:h-24 rounded-xl overflow-hidden bg-border/30 shrink-0">
-                {l.imageUrl ? (
-                  <img src={l.imageUrl} alt={l.name} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-xs text-foreground/30">
-                    No photo
-                  </div>
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-foreground">{l.name}</p>
-                <p className="text-xs text-foreground/50 mt-0.5">
-                  {normalizeCategory(l.category)} · ₦
-                  {Number(l.price).toLocaleString()} · by{" "}
-                  {l.sellerName || "Seller"}
-                </p>
-                {l.description && (
-                  <p className="text-xs text-foreground/60 mt-1.5 line-clamp-3">
-                    {l.description}
-                  </p>
-                )}
-                {rejecting === l.id ? (
-                  <div className="mt-3 flex flex-col sm:flex-row gap-2">
-                    <input
-                      autoFocus
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                      placeholder="Reason shown to the seller (optional)"
-                      className="flex-1 px-3 py-2 text-sm rounded-lg border border-border bg-background text-foreground outline-none focus:border-primary/50"
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => decide(l, false)}
-                        disabled={busy === l.id}
-                        className="px-3 py-2 rounded-lg bg-red-500 text-white text-xs font-bold disabled:opacity-60"
-                      >
-                        Reject
-                      </button>
-                      <button
-                        onClick={() => setRejecting(null)}
-                        className="px-3 py-2 rounded-lg border border-border text-xs font-semibold text-foreground/60"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      onClick={() => decide(l, true)}
-                      disabled={busy === l.id}
-                      className="px-3.5 py-2 rounded-lg bg-green-600 text-white text-xs font-bold disabled:opacity-60"
-                    >
-                      Approve
-                    </button>
-                    <button
-                      onClick={() => {
-                        setRejecting(l.id);
-                        setReason("");
-                      }}
-                      className="px-3.5 py-2 rounded-lg border border-red-500/30 text-red-500 text-xs font-bold"
-                    >
-                      Reject…
-                    </button>
-                    <a
-                      href={`/product/${l.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3.5 py-2 rounded-lg border border-border text-foreground/60 text-xs font-semibold hover:text-primary"
-                    >
-                      View
-                    </a>
-                  </div>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-};
-
 // ── Reports from buyers ("Report this listing" on the product page) ─────────
-const ReportsInbox = ({ onListingRemoved }) => {
+const ReportsInbox = ({ onListingRemoved, onViewChat }) => {
   const [items, setItems] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -616,6 +506,18 @@ const ReportsInbox = ({ onListingRemoved }) => {
       dead = true;
     };
   }, [reloadKey]);
+
+  const suspend = async (r) => {
+    if (!window.confirm(`Suspend ${r.reportedName || "this user"}? They won't be able to post listings or send messages.`)) return;
+    try {
+      await updateDoc(doc(db, "users", r.reportedUid), { suspended: true });
+      await updateDoc(doc(db, "reports", r.id), { status: "suspended" });
+      setReloadKey((k) => k + 1);
+    } catch (e) {
+      console.error("Suspend failed:", e);
+      alert("Couldn't suspend that user.");
+    }
+  };
 
   const resolve = async (r, removeListing) => {
     try {
@@ -664,14 +566,21 @@ const ReportsInbox = ({ onListingRemoved }) => {
           {open.map((r) => (
             <li key={r.id} className="px-4 sm:px-5 py-3.5">
               <div className="flex items-center justify-between gap-3">
-                <a
-                  href={`/product/${r.listingId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm font-bold text-foreground hover:text-primary truncate"
-                >
-                  {r.listingName || "Listing"}
-                </a>
+                {r.type === "user" ? (
+                  <p className="text-sm font-bold text-foreground truncate">
+                    User: {r.reportedName || "Unknown"}
+                    <span className="font-normal text-foreground/45"> · reported from chat</span>
+                  </p>
+                ) : (
+                  <a
+                    href={`/product/${r.listingId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm font-bold text-foreground hover:text-primary truncate"
+                  >
+                    {r.listingName || "Listing"}
+                  </a>
+                )}
                 <span className="text-[11px] text-foreground/40 shrink-0">
                   {r.createdAt?.toDate?.().toLocaleString([], {
                     dateStyle: "medium",
@@ -688,12 +597,31 @@ const ReportsInbox = ({ onListingRemoved }) => {
                 </p>
               )}
               <div className="mt-2.5 flex flex-wrap gap-2">
-                <button
-                  onClick={() => resolve(r, true)}
-                  className="px-3 py-1.5 rounded-lg bg-red-500 text-white text-xs font-bold"
-                >
-                  Remove listing
-                </button>
+                {r.type === "user" ? (
+                  <>
+                    {r.conversationKey && (
+                      <button
+                        onClick={() => onViewChat(r.conversationKey)}
+                        className="px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-foreground/70 hover:text-primary"
+                      >
+                        View conversation
+                      </button>
+                    )}
+                    <button
+                      onClick={() => suspend(r)}
+                      className="px-3 py-1.5 rounded-lg bg-red-500 text-white text-xs font-bold"
+                    >
+                      Suspend user
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => resolve(r, true)}
+                    className="px-3 py-1.5 rounded-lg bg-red-500 text-white text-xs font-bold"
+                  >
+                    Remove listing
+                  </button>
+                )}
                 <button
                   onClick={() => resolve(r, false)}
                   className="px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-foreground/60 hover:text-foreground"
@@ -842,9 +770,24 @@ const ContactInbox = () => {
 };
 
 // ── Main AdminDashboard ──────────────────────────────────────────────────────
+const ADMIN_TABS = [
+  ["overview", "Overview"],
+  ["listings", "Listings"],
+  ["users", "Users"],
+  ["featured", "Featured requests"],
+  ["chats", "Conversations"],
+  ["reports", "Reports & support"],
+  ["orders", "Orders"],
+];
+
 const AdminDashboard = () => {
   const { profile, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const tabParam = new URLSearchParams(location.search).get("tab");
+  const tab = ADMIN_TABS.some(([id]) => id === tabParam) ? tabParam : "overview";
+  const setTab = (id) => navigate(`/admin?tab=${id}`);
+  const [chatKey, setChatKey] = useState(null);
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -885,9 +828,31 @@ const AdminDashboard = () => {
     }
   };
 
-  const pendingReview = listings.filter(
-    (l) => isAllowedListing(l) && listingStatus(l) === "pending",
-  );
+  // Moderation: hide a listing from buyers (seller sees the reason) or restore it
+  const toggleHidden = async (l) => {
+    try {
+      if (isHiddenByAdmin(l)) {
+        await updateDoc(doc(db, "listings", l.id), {
+          status: "approved",
+          rejectReason: deleteField(),
+        });
+      } else {
+        const reason = window.prompt(
+          `Hide "${l.name}" from buyers? Optional reason shown to the seller:`,
+          "",
+        );
+        if (reason === null) return;
+        await updateDoc(doc(db, "listings", l.id), {
+          status: "hidden",
+          rejectReason: reason.trim() || "Doesn't meet Declutt's listing rules.",
+        });
+      }
+      fetchListings();
+    } catch (e) {
+      console.error("Moderation failed:", e);
+      alert("Couldn't update that listing. Please try again.");
+    }
+  };
 
   const handleDelete = async (id) => {
     await deleteDoc(doc(db, "listings", id));
@@ -961,9 +926,40 @@ const AdminDashboard = () => {
             </button>
           </div>
         </div>
+        <nav className="max-w-6xl mx-auto px-2 sm:px-4 flex gap-1 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+          {ADMIN_TABS.map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setTab(id)}
+              className={`shrink-0 px-3 py-2.5 text-xs sm:text-sm font-semibold border-b-2 transition-colors ${tab === id ? "border-primary text-primary" : "border-transparent text-foreground/55 hover:text-foreground"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
       </div>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-8">
+        {tab === "overview" && <AdminOverview onGo={setTab} />}
+        {tab === "users" && <UsersPanel listings={listings} />}
+        {tab === "featured" && <FeatureRequestsPanel onChanged={fetchListings} />}
+        {tab === "chats" && <ConversationsPanel key={chatKey || "all"} initialKey={chatKey} />}
+        {tab === "reports" && (
+          <>
+            <ReportsInbox
+              onListingRemoved={fetchListings}
+              onViewChat={(key) => {
+                setChatKey(key);
+                setTab("chats");
+              }}
+            />
+            <ContactInbox />
+          </>
+        )}
+        {tab === "orders" && <OrdersInfo />}
+        {tab === "listings" && (
+        <>
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {stats.map((s) => (
@@ -977,9 +973,6 @@ const AdminDashboard = () => {
           ))}
         </div>
 
-        <ReviewQueue items={pendingReview} onChanged={fetchListings} />
-        <ReportsInbox onListingRemoved={fetchListings} />
-        <ContactInbox />
 
         {/* Controls */}
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
@@ -1076,9 +1069,12 @@ const AdminDashboard = () => {
                 }}
                 onDelete={(id) => setDeleteConfirm(id)}
                 onFeature={toggleFeatured}
+                onToggleHidden={toggleHidden}
               />
             ))}
           </div>
+        )}
+        </>
         )}
       </div>
 

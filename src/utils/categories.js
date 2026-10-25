@@ -24,27 +24,19 @@ export const normalizeCategory = (category) =>
 export const isAllowedListing = (listing) => !!normalizeCategory(listing?.category);
 
 /*
- * Review status: sellers' new listings (and edits to name/description/photos/category) are
- * "pending" until an admin approves them. Listings from before reviews existed have no
- * status and count as approved.
+ * Moderation: listings go live as soon as a seller posts them. An admin can hide one
+ * (status "hidden", with an optional rejectReason the seller sees). The older "rejected"
+ * status counts as hidden; anything else (none, "approved", the old "pending") is live.
  */
-export const listingStatus = (listing) => listing?.status || "approved";
+export const isHiddenByAdmin = (listing) =>
+  listing?.status === "hidden" || listing?.status === "rejected";
 
-/** Shown to buyers: an allowed category AND approved. */
+/** Shown to buyers: an allowed category and not hidden by an admin. */
 export const isPublicListing = (listing) =>
-  isAllowedListing(listing) && listingStatus(listing) === "approved";
+  isAllowedListing(listing) && !isHiddenByAdmin(listing);
 
 const ms = (t) => (t?.toMillis ? t.toMillis() : t?.seconds ? t.seconds * 1000 : 0);
 
 /** Featured (paid promotion, set by an admin) until `featuredUntil`. */
 export const isFeatured = (listing, now = Date.now()) =>
   ms(listing?.featuredUntil) > now;
-
-// Core details a buyer relies on — changing any of them sends the listing back for review
-export const REVIEWED_FIELDS = [
-  "name",
-  "description",
-  "category",
-  "imageUrl",
-  "additionalImages",
-];

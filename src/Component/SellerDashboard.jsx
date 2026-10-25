@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   collection,
   getDocs,
@@ -24,14 +24,14 @@ import { captureBestPosition, describeGeoError, getCoords } from "../utils/geo";
 import { compressToBase64 } from "../utils/images";
 import {
   CATEGORIES,
-  REVIEWED_FIELDS,
   isAllowedListing,
   isFeatured,
   isPublicListing,
-  listingStatus,
+  isHiddenByAdmin,
   normalizeCategory,
 } from "../utils/categories";
 import ProfilePhotoCard from "./ProfilePhotoCard";
+import FeatureRequestModal from "./FeatureRequestModal";
 
 const NAVBAR_H = 64;
 
@@ -678,7 +678,12 @@ const ListingModal = ({
 
   const handleMainImage = (e) => {
     const file = e.target.files[0];
+    e.target.value = ""; // allow picking the same file again after an error
     if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("That file isn't a photo. Choose a JPG, PNG or WEBP image.");
+      return;
+    }
     if (file.size > 10 * 1024 * 1024) {
       setError("Image must be under 10MB.");
       return;
@@ -690,15 +695,25 @@ const ListingModal = ({
 
   const handleAdditionalImages = async (e) => {
     const files = Array.from(e.target.files);
+    e.target.value = "";
     if (!files.length) return;
     const remaining = 3 - additionalImages.length;
     const toProcess = files.slice(0, remaining);
     const newImages = [];
+    let skipped = files.length - toProcess.length;
     for (const file of toProcess) {
-      if (file.size > 10 * 1024 * 1024) continue;
+      if (!file.type.startsWith("image/") || file.size > 10 * 1024 * 1024) {
+        skipped++;
+        continue;
+      }
       newImages.push(URL.createObjectURL(file));
     }
     setAdditionalImages((prev) => [...prev, ...newImages]);
+    setError(
+      skipped
+        ? `${skipped} photo${skipped > 1 ? "s were" : " was"} skipped — up to 3 extra photos, images under 10MB only.`
+        : "",
+    );
   };
 
   const removeAdditionalImage = (idx) =>
@@ -706,6 +721,7 @@ const ListingModal = ({
 
   const handleSave = async (e) => {
     e.preventDefault();
+    if (saving) return; // no double submissions
     setError("");
     if (!form.name.trim()) {
       setError("Product name is required.");
@@ -742,7 +758,17 @@ const ListingModal = ({
     setSaving(true);
     try {
       let imageUrl = existing?.imageUrl || "";
-      if (mainImageFile) imageUrl = await compressToBase64(mainImageFile);
+      if (mainImageFile) {
+        try {
+          imageUrl = await compressToBase64(mainImageFile);
+        } catch {
+          setError(
+            "We couldn't read that photo. Try a JPG or PNG (some phone formats like HEIC aren't supported).",
+          );
+          setSaving(false);
+          return;
+        }
+      }
       const compressedAdditional = [];
       for (const img of additionalImages) {
         if (img.startsWith("blob:")) {
@@ -780,17 +806,12 @@ const ListingModal = ({
           : {}),
         updatedAt: serverTimestamp(),
       };
+      // Listings go live straight away (admins can still hide them)
       if (existing) {
-        // Changing what buyers rely on (name, description, photos, category) needs a fresh review;
-        // price, condition, availability and location changes go live straight away
-        const same = (k) =>
-          JSON.stringify(payload[k] ?? null) === JSON.stringify(existing[k] ?? null);
-        if (!REVIEWED_FIELDS.every(same)) payload.status = "pending";
         await updateDoc(doc(db, "listings", existing.id), payload);
       } else {
         await addDoc(collection(db, "listings"), {
           ...payload,
-          status: "pending", // an admin approves it before buyers can see it
           createdAt: serverTimestamp(),
         });
       }
@@ -799,7 +820,9 @@ const ListingModal = ({
     } catch (err) {
       console.error("Save error:", err);
       if (err.code === "permission-denied")
-        setError("Permission denied — check your Firestore rules.");
+        setError(
+          "Couldn't save this item. Check the category, or contact Declutt if your account has been restricted.",
+        );
       else if (err.code === "resource-exhausted")
         setError("Database busy. Please wait a moment and try again.");
       else setError(`Save failed: ${err.message}`);
@@ -1133,7 +1156,13 @@ const StatCard = ({ label, value, icon, accent, sub }) => (
 );
 
 // ── Item Card ─────────────────────────────────────────────────────────────────
-const ItemCard = ({ listing, onEdit, onDelete, showActions = true }) => (
+const ItemCard = ({
+  listing,
+  onEdit,
+  onDelete,
+  onRequestFeature,
+  showActions = true,
+}) => (
   <div
     className="bg-card rounded-2xl overflow-hidden group transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5"
     style={{ border: "1.5px solid hsl(var(--border))" }}
@@ -1203,15 +1232,11 @@ const ItemCard = ({ listing, onEdit, onDelete, showActions = true }) => (
           Hidden from buyers — edit and choose Furniture, Appliances or
           Electronics.
         </p>
-      ) : listingStatus(listing) === "pending" ? (
-        <p className="mt-1.5 text-[11px] font-semibold text-amber-600 leading-snug">
-          ⏳ Waiting for review — buyers will see it once approved.
-        </p>
-      ) : listingStatus(listing) === "rejected" ? (
+      ) : isHiddenByAdmin(listing) ? (
         <p className="mt-1.5 text-[11px] font-semibold text-red-500 leading-snug">
-          Not approved
-          {listing.rejectReason ? `: ${listing.rejectReason}` : ""}. Edit it to
-          send it for review again.
+          Hidden by Declutt
+          {listing.rejectReason ? `: ${listing.rejectReason}` : ""}. Contact us
+          if you think this is a mistake.
         </p>
       ) : (
         isFeatured(listing) && (
@@ -1232,6 +1257,15 @@ const ItemCard = ({ listing, onEdit, onDelete, showActions = true }) => (
           </span>
         )}
       </div>
+      {onRequestFeature && isPublicListing(listing) && !isFeatured(listing) && (
+        <button
+          type="button"
+          onClick={() => onRequestFeature(listing)}
+          className="mt-2.5 w-full py-1.5 rounded-lg border border-primary/30 text-primary text-[11px] font-bold hover:bg-primary/8 transition-colors"
+        >
+          ★ Request featured
+        </button>
+      )}
     </div>
   </div>
 );
@@ -1388,7 +1422,9 @@ const OverviewPanel = ({ profile, listings, setTab, onAddNew }) => {
             className="flex items-center gap-3 p-4 rounded-2xl bg-card text-left hover:shadow-md transition-all duration-200 hover:-translate-y-0.5"
             style={{ border: "1.5px solid hsl(var(--border))" }}
           >
-            <div className="w-10 h-10 rounded-xl bg-primary/8 flex items-center justify-center text-lg shrink-0" />
+            <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+              {NAV_ITEMS.find((n) => n.id === a.tab)?.icon}
+            </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-foreground">{a.label}</p>
               <p className="text-xs text-foreground/45 truncate">{a.desc}</p>
@@ -1447,6 +1483,7 @@ const ItemsPanel = ({
   const [page, setPage] = useState(1);
   const [locBusy, setLocBusy] = useState(false);
   const [locMsg, setLocMsg] = useState("");
+  const [featureFor, setFeatureFor] = useState(null); // listing (or {} to choose) for the request form
   const runLocationUpdate = async () => {
     setLocBusy(true);
     setLocMsg("");
@@ -1522,12 +1559,13 @@ const ItemsPanel = ({
               days.
             </p>
           </div>
-          <Link
-            to="/contact?topic=feature"
+          <button
+            type="button"
+            onClick={() => setFeatureFor({})}
             className="shrink-0 text-xs font-bold px-4 py-2 rounded-full bg-primary text-primary-foreground hover:opacity-90 transition-opacity text-center"
           >
-            Request featuring
-          </Link>
+            Request Featured Listing
+          </button>
         </div>
       )}
       {listings.length > 0 ? (
@@ -1539,6 +1577,7 @@ const ItemsPanel = ({
                 listing={l}
                 onEdit={onEdit}
                 onDelete={onDelete}
+                onRequestFeature={setFeatureFor}
                 showActions={true}
               />
             ))}
@@ -1555,6 +1594,13 @@ const ItemsPanel = ({
           msg="No items yet. Start by adding your first listing."
           cta="Add your first item"
           ctaAction={onAddNew}
+        />
+      )}
+      {featureFor && (
+        <FeatureRequestModal
+          listings={listings}
+          initial={featureFor.id ? featureFor : null}
+          onClose={() => setFeatureFor(null)}
         />
       )}
     </div>
@@ -1660,18 +1706,22 @@ const RewardsPanel = ({ profile }) => {
             {
               title: "Refer a seller",
               desc: "Invite friends to sell on Declutt.",
+              icon: NAV_ITEMS.find((n) => n.id === "referrals")?.icon,
             },
             {
               title: "Close your first sale",
               desc: "Earn points on first successful sale.",
+              icon: NAV_ITEMS.find((n) => n.id === "orders")?.icon,
             },
             {
               title: "Write a review",
               desc: "Get rewarded for sharing feedback.",
+              icon: NAV_ITEMS.find((n) => n.id === "messages")?.icon,
             },
             {
               title: "Special events",
               desc: "Earn double points during promos.",
+              icon: NAV_ITEMS.find((n) => n.id === "rewards")?.icon,
             },
           ].map((r) => (
             <div
@@ -1679,7 +1729,9 @@ const RewardsPanel = ({ profile }) => {
               className="flex items-start gap-3 p-4 rounded-2xl bg-card"
               style={{ border: "1.5px solid hsl(var(--border))" }}
             >
-              <div className="w-9 h-9 rounded-xl bg-primary/8 flex items-center justify-center text-lg shrink-0 mt-0.5" />
+              <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 mt-0.5">
+                {r.icon}
+              </div>
               <div>
                 <p className="text-sm font-semibold text-foreground">
                   {r.title}

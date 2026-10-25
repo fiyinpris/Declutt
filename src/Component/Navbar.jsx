@@ -8,11 +8,13 @@ import {
   onSnapshot,
   doc,
   getDoc,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../utils/theme";
 import { cartHelpers, syncCart, useCartItems } from "../utils/Cart";
+import { isAdminUser } from "../utils/admin";
 
 const MenuIcon = () => (
   <svg
@@ -303,7 +305,7 @@ const LogoutButton = ({ onLogout, state, fullWidth = true }) => (
   </button>
 );
 
-const AccountSidebar = ({ profile, logoutState, onLogout, onClose }) => {
+const AccountSidebar = ({ profile, isAdmin, logoutState, onLogout, onClose }) => {
   const navigate = useNavigate();
   const dashPath =
     profile?.role === "seller"
@@ -394,6 +396,18 @@ const AccountSidebar = ({ profile, logoutState, onLogout, onClose }) => {
         </div>
       </div>
       <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
+        {isAdmin && profile?.role !== "admin" && (
+          <button
+            onClick={() => {
+              navigate("/admin");
+              onClose();
+            }}
+            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold text-primary hover:bg-primary/8 transition-all duration-150 text-left"
+          >
+            <span className="shrink-0">{SIDEBAR_ITEMS[0].icon}</span>
+            Admin dashboard
+          </button>
+        )}
         {visibleItems.map((item) => {
           const tab = item.id === "dashboard" ? "" : item.id;
           return (
@@ -420,7 +434,7 @@ const AccountSidebar = ({ profile, logoutState, onLogout, onClose }) => {
   );
 };
 
-const AccountDropdown = ({ profile, logoutState, onLogout }) => {
+const AccountDropdown = ({ profile, isAdmin, logoutState, onLogout }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -455,12 +469,158 @@ const AccountDropdown = ({ profile, logoutState, onLogout }) => {
       >
         <AccountSidebar
           profile={profile}
+          isAdmin={isAdmin}
           logoutState={logoutState}
           onLogout={onLogout}
           onClose={() => setOpen(false)}
         />
       </div>
     </div>
+  );
+};
+
+/* ── Phone notification bell (signed in): unread messages for everyone, plus sellers'
+   alerts (e.g. "Ada saved your Oak table"). Desktop keeps its existing layout. ── */
+const timeAgo = (t) => {
+  const ms = t?.toMillis ? t.toMillis() : t?.seconds ? t.seconds * 1000 : 0;
+  if (!ms) return "";
+  const m = Math.round((Date.now() - ms) / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.round(h / 24)}d ago`;
+};
+
+const NotificationBell = ({ uid, role, messageCount, notifCount, open, onToggle, onClose }) => {
+  const [alerts, setAlerts] = useState([]);
+  const isSeller = role === "seller";
+  const dash = isSeller ? "/seller" : "/buyer";
+
+  // Seller alerts, live while the panel is open
+  useEffect(() => {
+    if (!open || !isSeller || !uid) return;
+    return onSnapshot(
+      query(collection(db, "notifications"), where("sellerUid", "==", uid)),
+      (snap) =>
+        setAlerts(
+          snap.docs
+            .map((d) => ({ id: d.id, ...d.data() }))
+            .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0))
+            .slice(0, 12),
+        ),
+      (e) => console.error("Alerts:", e),
+    );
+  }, [open, isSeller, uid]);
+
+  const markAllRead = async () => {
+    const unread = alerts.filter((a) => !a.read);
+    if (!unread.length) return;
+    const batch = writeBatch(db);
+    unread.forEach((a) => batch.update(doc(db, "notifications", a.id), { read: true }));
+    await batch.commit().catch((e) => console.error("Mark read failed:", e));
+  };
+
+  const total = messageCount + (isSeller ? notifCount : 0);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-label={total ? `Notifications (${total} new)` : "Notifications"}
+        aria-expanded={open}
+        className={`relative flex items-center justify-center w-10 h-10 rounded-xl transition-colors ${open ? "text-primary bg-primary/10" : "text-foreground/65 hover:text-primary hover:bg-primary/10"}`}
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+        </svg>
+        {total > 0 && (
+          <span className="absolute top-0 right-0 min-w-4 h-4 px-1 rounded-full bg-primary text-primary-foreground text-[9px] font-black flex items-center justify-center">
+            {total > 99 ? "99+" : total}
+          </span>
+        )}
+      </button>
+      {open && (
+        <>
+          <div className="md:hidden fixed inset-0 top-14 z-40 bg-black/35" onClick={onClose} />
+          <div className="md:hidden fixed top-14 right-2 left-2 sm:left-auto sm:w-96 z-60 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden text-left">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
+              <p className="text-sm font-bold text-foreground">Notifications</p>
+              {isSeller && alerts.some((a) => !a.read) && (
+                <button
+                  type="button"
+                  onClick={markAllRead}
+                  className="text-xs font-semibold text-primary"
+                >
+                  Mark all read
+                </button>
+              )}
+            </div>
+            <div className="max-h-[65dvh] overflow-y-auto">
+              <Link
+                to={`${dash}?tab=messages`}
+                onClick={onClose}
+                className="flex items-center gap-3 px-4 py-3 hover:bg-primary/5 border-b border-border/40"
+              >
+                <span className="w-9 h-9 rounded-full bg-primary/12 text-primary flex items-center justify-center shrink-0">
+                  {TAB_ICONS.messages}
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-sm font-semibold text-foreground">
+                    {messageCount
+                      ? `${messageCount} unread message${messageCount > 1 ? "s" : ""}`
+                      : "Messages"}
+                  </span>
+                  <span className="block text-xs text-foreground/50">
+                    {messageCount ? "Tap to reply" : "No unread messages"}
+                  </span>
+                </span>
+                {messageCount > 0 && (
+                  <span className="w-2 h-2 rounded-full bg-primary shrink-0" />
+                )}
+              </Link>
+              {isSeller &&
+                (alerts.length === 0 ? (
+                  <p className="px-4 py-6 text-center text-xs text-foreground/45">
+                    No alerts yet. You'll see when buyers save your items.
+                  </p>
+                ) : (
+                  alerts.map((a) => (
+                    <Link
+                      key={a.id}
+                      to="/seller?tab=notifications"
+                      onClick={onClose}
+                      className={`flex items-start gap-3 px-4 py-3 border-b border-border/40 hover:bg-primary/5 ${a.read ? "" : "bg-primary/5"}`}
+                    >
+                      <span className="w-9 h-9 rounded-full bg-primary/12 text-primary flex items-center justify-center shrink-0 text-xs font-black">
+                        {(a.buyerName || "?")[0].toUpperCase()}
+                      </span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-sm text-foreground">
+                          <span className="font-semibold">{a.buyerName || "A buyer"}</span>{" "}
+                          saved{" "}
+                          <span className="font-semibold">{a.listingName || "your item"}</span>
+                        </span>
+                        <span className="block text-[11px] text-foreground/45 mt-0.5">
+                          {timeAgo(a.createdAt)}
+                        </span>
+                      </span>
+                      {!a.read && <span className="mt-1.5 w-2 h-2 rounded-full bg-primary shrink-0" />}
+                    </Link>
+                  ))
+                ))}
+              {!isSeller && messageCount === 0 && (
+                <p className="px-4 py-6 text-center text-xs text-foreground/45">
+                  You're all caught up.
+                </p>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </>
   );
 };
 
@@ -494,27 +654,39 @@ const CartButton = ({ count, onClick, className = "" }) => (
   </button>
 );
 
-/* Cart photo; carts saved to the account keep only web photo links, so a missing one is
-   loaded from the listing (once per item per visit). */
-const listingPhotos = new Map(); // listing id → Promise<imageUrl|null>
-const CartThumb = ({ item }) => {
-  const [loaded, setLoaded] = useState(null);
+/* The cart stores a snapshot of each item; when the drawer opens we load each listing's
+   CURRENT details so price edits, sold items and deleted listings show correctly. */
+const listingCache = new Map(); // listing id → Promise<listing data | null (deleted)>
+const fetchListing = (id) => {
+  if (!listingCache.has(id))
+    listingCache.set(
+      id,
+      getDoc(doc(db, "listings", id))
+        .then((s) => (s.exists() ? s.data() : null))
+        .catch(() => undefined), // network error: keep showing the saved snapshot
+    );
+  return listingCache.get(id);
+};
+
+const useLiveListings = (items, open) => {
+  const [live, setLive] = useState({});
+  const ids = items.map((i) => i.id).join(",");
   useEffect(() => {
-    if (item.imageUrl) return;
+    if (!open || !ids) return;
     let alive = true;
-    if (!listingPhotos.has(item.id))
-      listingPhotos.set(
-        item.id,
-        getDoc(doc(db, "listings", item.id))
-          .then((s) => (s.exists() ? s.data().imageUrl || null : null))
-          .catch(() => null),
-      );
-    listingPhotos.get(item.id).then((url) => alive && setLoaded(url));
+    ids.split(",").forEach((id) => listingCache.delete(id)); // fresh data each time it opens
+    Promise.all(ids.split(",").map((id) => fetchListing(id).then((d) => [id, d]))).then(
+      (pairs) => alive && setLive(Object.fromEntries(pairs)),
+    );
     return () => {
       alive = false;
     };
-  }, [item.id, item.imageUrl]);
-  const src = item.imageUrl || loaded;
+  }, [open, ids]);
+  return live;
+};
+
+const CartThumb = ({ item, liveImage }) => {
+  const src = item.imageUrl || liveImage;
   return src ? (
     <img src={src} alt={item.name} className="w-full h-full object-cover" />
   ) : (
@@ -526,8 +698,22 @@ const CartThumb = ({ item }) => {
 
 /* ── Cart Drawer ── */
 const CartDrawer = ({ open, onClose, cartItems = [], onRemove }) => {
-  const total = cartItems.reduce(
-    (sum, item) => sum + Number(item.price || 0) * (item.quantity || 1),
+  const live = useLiveListings(cartItems, open);
+  // live[id]: listing data, null = deleted, undefined = not loaded (use the saved snapshot)
+  const view = cartItems.map((item) => {
+    const l = live[item.id];
+    return {
+      ...item,
+      name: l?.name ?? item.name,
+      price: l?.price ?? item.price,
+      gone: l === null,
+      sold: !!l && l.available === false,
+      liveImage: l?.imageUrl || null,
+    };
+  });
+  const total = view.reduce(
+    (sum, item) =>
+      item.gone || item.sold ? sum : sum + Number(item.price || 0) * (item.quantity || 1),
     0,
   );
 
@@ -638,21 +824,27 @@ const CartDrawer = ({ open, onClose, cartItems = [], onRemove }) => {
             </div>
           ) : (
             <div className="space-y-3">
-              {cartItems.map((item, i) => (
+              {view.map((item, i) => (
                 <div
                   key={item.id || i}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-background"
+                  className={`flex items-center gap-3 p-3 rounded-xl bg-background ${item.gone || item.sold ? "opacity-60" : ""}`}
                   style={{ border: "1.5px solid hsl(var(--border))" }}
                 >
                   <div className="w-14 h-14 rounded-lg overflow-hidden bg-border/20 shrink-0">
-                    <CartThumb item={item} />
+                    <CartThumb item={item} liveImage={item.liveImage} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-foreground truncate">
                       {item.name}
                     </p>
                     <p className="text-xs text-foreground/40 truncate">
-                      {item.category}
+                      {item.gone ? (
+                        <span className="font-semibold text-red-500">No longer available</span>
+                      ) : item.sold ? (
+                        <span className="font-semibold text-red-500">Sold</span>
+                      ) : (
+                        item.category
+                      )}
                     </p>
                     <p className="text-sm font-bold text-primary mt-0.5">
                       ₦{Number(item.price).toLocaleString()}
@@ -918,6 +1110,7 @@ const AccountSheet = ({
 const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [bellOpen, setBellOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const { user, profile, logout } = useAuth();
@@ -959,6 +1152,7 @@ const Navbar = () => {
       try {
         setMenuOpen(false);
         setSheetOpen(false);
+        setBellOpen(false);
       } catch (e) {
         console.error("closing drawers async error:", e);
       }
@@ -999,6 +1193,7 @@ const Navbar = () => {
 
   const role = profile?.role;
   const signedIn = !!(user && profile);
+  const isAdmin = isAdminUser(user, profile);
 
   // Exact match for the phone tab bar / account sheet: same page and same ?tab (none = overview)
   const currentTab = new URLSearchParams(location.search).get("tab") || "";
@@ -1019,7 +1214,6 @@ const Navbar = () => {
           { id: "dashboard", label: "Dashboard", icon: "dashboard", to: "/seller" },
           { id: "listings", label: "My Items", icon: "items", to: "/seller?tab=listings" },
           { id: "messages", label: "Messages", icon: "messages", to: "/seller?tab=messages", badge: messageCount },
-          { id: "notifications", label: "Alerts", icon: "alerts", to: "/seller?tab=notifications", badge: notifCount },
         ]
       : role === "admin"
         ? [
@@ -1034,7 +1228,7 @@ const Navbar = () => {
           ];
 
   // Every account section, opened from the tab bar's Account tab (Saved Items lives here)
-  const accountLinks =
+  const roleLinks =
     role === "seller"
       ? [
           { label: "My Profile", to: "/seller?tab=profile" },
@@ -1058,6 +1252,10 @@ const Navbar = () => {
             { label: "Rewards / Points", to: "/buyer?tab=rewards" },
             { label: "Referrals", to: "/buyer?tab=referrals" },
           ];
+  const accountLinks =
+    isAdmin && role !== "admin"
+      ? [{ label: "Admin dashboard", to: "/admin" }, ...roleLinks]
+      : roleLinks;
 
   // The product page has its own bottom buy bar, so the tab bar steps aside there
   const showTabBar = signedIn && !location.pathname.startsWith("/product/");
@@ -1159,6 +1357,7 @@ const Navbar = () => {
                 />
                 <AccountDropdown
                   profile={profile}
+                  isAdmin={isAdmin}
                   logoutState={logoutState}
                   onLogout={handleLogout}
                 />
@@ -1193,9 +1392,23 @@ const Navbar = () => {
               signed-in navigation is in the tab bar) */}
           <div className="md:hidden flex items-center gap-1">
             <SearchNavButton onClick={handleSearchClick} />
+            {signedIn && (
+              <NotificationBell
+                uid={uid}
+                role={role}
+                messageCount={messageCount}
+                notifCount={notifCount}
+                open={bellOpen}
+                onToggle={() => setBellOpen((o) => !o)}
+                onClose={() => setBellOpen(false)}
+              />
+            )}
             <CartButton
               count={cartItems.length}
-              onClick={() => setCartOpen(true)}
+              onClick={() => {
+                setBellOpen(false);
+                setCartOpen(true);
+              }}
               className="w-10 h-10"
             />
             {!signedIn && (

@@ -308,8 +308,9 @@ const ListingCard = ({
         className="p-3 flex flex-col gap-1 min-h-[110px] cursor-pointer"
         onClick={() => onSelect(listing)}
       >
-        <div className="flex items-start justify-between gap-2">
-          <h3 className="text-xs font-bold text-foreground leading-snug line-clamp-2 text-left flex-1">
+        {/* phones: condition sits under the name so long names aren't squeezed */}
+        <div className="flex flex-col min-[400px]:flex-row items-start justify-between gap-1 min-[400px]:gap-2">
+          <h3 className="text-xs font-bold text-foreground leading-snug line-clamp-2 text-left flex-1 min-w-0 break-words">
             {listing.name}
           </h3>
           {listing.condition && (

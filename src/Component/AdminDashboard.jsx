@@ -15,12 +15,12 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
+import { AdminOrdersPanel, AdminPayoutsPanel, FeeSettingsPanel } from "./AdminOrders";
 import { compressToBase64 } from "../utils/images";
 import {
   AdminOverview,
   ConversationsPanel,
   FeatureRequestsPanel,
-  OrdersInfo,
   UsersPanel,
 } from "./AdminPanels";
 import {
@@ -778,6 +778,8 @@ const ADMIN_TABS = [
   ["chats", "Conversations"],
   ["reports", "Reports & support"],
   ["orders", "Orders"],
+  ["payouts", "Payouts"],
+  ["fees", "Fees & policies"],
 ];
 
 const AdminDashboard = () => {
@@ -957,7 +959,9 @@ const AdminDashboard = () => {
             <ContactInbox />
           </>
         )}
-        {tab === "orders" && <OrdersInfo />}
+        {tab === "orders" && <AdminOrdersPanel />}
+        {tab === "payouts" && <AdminPayoutsPanel />}
+        {tab === "fees" && <FeeSettingsPanel />}
         {tab === "listings" && (
         <>
         {/* Stats */}

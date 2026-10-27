@@ -9,6 +9,7 @@ import { markDelivered } from "./Chatui";
 import { Ico, Spin } from "./Ico";
 import { useCloseFooterGap } from "../utils/footerGap";
 import ProfilePhotoCard from "./ProfilePhotoCard";
+import { OrdersList } from "./Orders";
 
 const formatDisplayName = (name) => {
   if (!name) return "there";
@@ -248,67 +249,40 @@ const OverviewPanel = ({ profile, setTab, savedCount, unread }) => {
   );
 };
 
-const ORDER_TABS = [
-  "All",
-  "Pending",
-  "Confirmed",
-  "On the way",
-  "Delivered",
-  "Cancelled",
-];
-const OrdersPanel = () => {
-  const [activeTab, setActiveTab] = useState("All");
-  return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <p className="text-lg font-bold text-foreground">My Orders</p>
-        <span className="text-xs text-foreground/40 bg-border/40 px-3 py-1 rounded-full">
-          0 total
-        </span>
-      </div>
-      <div className="relative border-b border-border">
-        <div
-          className="flex gap-1 overflow-x-auto"
-          style={{ scrollbarWidth: "none" }}
-        >
-          {ORDER_TABS.map((t) => (
-            <button
-              key={t}
-              onClick={() => setActiveTab(t)}
-              className={`relative px-4 sm:px-5 py-3 text-sm font-semibold whitespace-nowrap transition-all shrink-0 focus:outline-none rounded-t-lg ${activeTab === t ? "text-primary bg-primary/5" : "text-foreground/45 hover:text-foreground/70 hover:bg-border/20"}`}
-            >
-              {t}
-              {activeTab === t && (
-                <span className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-primary rounded-full" />
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="py-16 flex flex-col items-center gap-4 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-border/30 flex items-center justify-center text-foreground/20">
-          <Ico s={30} w={1.5}>
-            <circle cx="9" cy="21" r="1" />
-            <circle cx="20" cy="21" r="1" />
-            <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-          </Ico>
-        </div>
-        <p className="text-sm font-semibold text-foreground/50">
-          No orders yet
-        </p>
-        <p className="text-xs text-foreground/30">
-          Items you order will appear here with live status updates.
-        </p>
-        <Link
-          to="/listings"
-          className="main-button text-sm px-5 py-2.5 inline-flex items-center gap-2"
-        >
-          Browse listings
-        </Link>
-      </div>
+const OrdersPanel = ({ uid }) => (
+  <div className="space-y-5">
+    <div className="flex items-center justify-between">
+      <p className="text-lg font-bold text-foreground">My Orders</p>
     </div>
-  );
-};
+    <OrdersList
+      uid={uid}
+      viewer="buyer"
+      empty={
+        <div className="py-16 flex flex-col items-center gap-4 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-border/30 flex items-center justify-center text-foreground/20">
+            <Ico s={30} w={1.5}>
+              <circle cx="9" cy="21" r="1" />
+              <circle cx="20" cy="21" r="1" />
+              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+            </Ico>
+          </div>
+          <p className="text-sm font-semibold text-foreground/50">
+            No orders yet
+          </p>
+          <p className="text-xs text-foreground/30">
+            Items you order will appear here with live status updates.
+          </p>
+          <Link
+            to="/listings"
+            className="main-button text-sm px-5 py-2.5 inline-flex items-center gap-2"
+          >
+            Browse listings
+          </Link>
+        </div>
+      }
+    />
+  </div>
+);
 
 /* ── Saved Items (live, Firestore-backed) ── */
 const FavouritesPanel = ({ items, onRemove }) => {
@@ -709,7 +683,7 @@ const BuyerDashboard = () => {
                 offset={230}
               />
             )}
-            {tab === "orders" && <OrdersPanel />}
+            {tab === "orders" && <OrdersPanel uid={user?.uid} />}
             {tab === "favourites" && (
               <FavouritesPanel items={savedItems} onRemove={removeSavedItem} />
             )}

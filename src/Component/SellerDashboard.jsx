@@ -32,6 +32,9 @@ import {
 } from "../utils/categories";
 import ProfilePhotoCard from "./ProfilePhotoCard";
 import FeatureRequestModal from "./FeatureRequestModal";
+import { OrdersList } from "./Orders";
+import SellerPayments from "./SellerPayments";
+import { NIGERIAN_STATES, isOrderAlert, orderAlertText } from "../utils/orders";
 
 const NAVBAR_H = 64;
 
@@ -108,6 +111,16 @@ const NAV_ITEMS = [
         <circle cx="9" cy="7" r="4" />
         <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
         <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      </Ico>
+    ),
+  },
+  {
+    id: "payments",
+    label: "Payments",
+    icon: (
+      <Ico r>
+        <rect x="2" y="5" width="20" height="14" rx="2" />
+        <path d="M2 10h20M6 15h4" />
       </Ico>
     ),
   },
@@ -253,13 +266,23 @@ const NotificationToast = ({ notification, onDismiss, onMessage }) => {
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <p className="text-xs font-black text-foreground leading-tight">
-                {notification.buyerName}
+                {isOrderAlert(notification)
+                  ? notification.type === "order"
+                    ? "New order"
+                    : "Order update"
+                  : notification.buyerName}
               </p>
               <p className="text-[11px] text-foreground/60 mt-0.5 leading-snug">
-                saved your{" "}
-                <span className="font-semibold text-foreground/80">
-                  {notification.listingName}
-                </span>
+                {isOrderAlert(notification) ? (
+                  orderAlertText(notification)
+                ) : (
+                  <>
+                    saved your{" "}
+                    <span className="font-semibold text-foreground/80">
+                      {notification.listingName}
+                    </span>
+                  </>
+                )}
               </p>
             </div>
             <button
@@ -284,7 +307,7 @@ const NotificationToast = ({ notification, onDismiss, onMessage }) => {
                 <path d="m22 2-7 20-4-9-9-4Z" />
                 <path d="M22 2 11 13" />
               </Ico>
-              Message them
+              {isOrderAlert(notification) ? "View order" : "Message them"}
             </button>
             <span className="text-[10px] text-foreground/35">
               {timeAgo(notification.createdAt)}
@@ -502,15 +525,23 @@ const NotificationsPanel = ({ sellerUid, onMessageBuyer }) => {
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-foreground leading-snug">
-                        <span className="font-black">{n.buyerName}</span>{" "}
-                        <span className="text-foreground/60">
-                          {n.type === "saved" ? "saved" : "added"} your item to
-                          their wishlist
-                        </span>
+                        {isOrderAlert(n) ? (
+                          orderAlertText(n)
+                        ) : (
+                          <>
+                            <span className="font-black">{n.buyerName}</span>{" "}
+                            <span className="text-foreground/60">
+                              {n.type === "saved" ? "saved" : "added"} your item to
+                              their wishlist
+                            </span>
+                          </>
+                        )}
                       </p>
-                      <p className="text-xs text-primary font-semibold mt-0.5 truncate">
-                        {n.listingName}
-                      </p>
+                      {!isOrderAlert(n) && (
+                        <p className="text-xs text-primary font-semibold mt-0.5 truncate">
+                          {n.listingName}
+                        </p>
+                      )}
                       <p className="text-[11px] text-foreground/35 mt-0.5">
                         {timeAgo(n.createdAt)}
                       </p>
@@ -528,7 +559,9 @@ const NotificationsPanel = ({ sellerUid, onMessageBuyer }) => {
                       <path d="m22 2-7 20-4-9-9-4Z" />
                       <path d="M22 2 11 13" />
                     </Ico>
-                    Message {n.buyerName?.split(" ")[0]} to close the deal
+                    {isOrderAlert(n)
+                      ? "View order"
+                      : `Message ${n.buyerName?.split(" ")[0]} to close the deal`}
                   </button>
                 </div>
               </div>
@@ -1407,7 +1440,7 @@ const OverviewPanel = ({ profile, listings, setTab, onAddNew }) => {
           },
           {
             label: "Check orders",
-            desc: "See who wants your items",
+            desc: "Accept & send buyer orders",
             tab: "orders",
           },
           {
@@ -1608,44 +1641,56 @@ const ItemsPanel = ({
 };
 
 // ── Orders Panel ──────────────────────────────────────────────────────────────
-const ORDER_TABS = [
-  "All",
-  "Pending",
-  "Confirmed",
-  "Shipped",
-  "Delivered",
-  "Cancelled",
-];
-const OrdersPanel = () => {
-  const [activeTab, setActiveTab] = useState("All");
+// ── Orders Panel: sales (and, on the Purchases view, anything the seller bought) ──
+const OrdersPanel = ({ uid }) => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const purchases = new URLSearchParams(location.search).get("view") === "purchases";
+  const setView = (p) =>
+    navigate(`?tab=orders${p ? "&view=purchases" : ""}`, { replace: true });
   return (
     <div className="space-y-5">
-      <div>
-        <p className="text-2xl font-black text-foreground">Orders Received</p>
-        <p className="text-xs text-foreground/40 mt-0.5">
-          All incoming orders from buyers
-        </p>
-      </div>
-      <div className="relative border-b border-border">
-        <div
-          className="flex gap-1 overflow-x-auto"
-          style={{ scrollbarWidth: "none" }}
-        >
-          {ORDER_TABS.map((t) => (
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-2xl font-black text-foreground">
+            {purchases ? "My Purchases" : "Orders Received"}
+          </p>
+          <p className="text-xs text-foreground/40 mt-0.5">
+            {purchases
+              ? "Things you've bought on Declutt"
+              : "Accept, send and track buyer orders"}
+          </p>
+        </div>
+        <div className="flex p-1 rounded-xl bg-border/40">
+          {[
+            ["Sales", false],
+            ["Purchases", true],
+          ].map(([label, p]) => (
             <button
-              key={t}
-              onClick={() => setActiveTab(t)}
-              className={`relative px-5 py-3 text-sm font-semibold whitespace-nowrap transition-all duration-150 shrink-0 focus:outline-none rounded-t-lg ${activeTab === t ? "text-primary bg-primary/5" : "text-foreground/45 hover:text-foreground/70 hover:bg-border/20"}`}
+              key={label}
+              type="button"
+              onClick={() => setView(p)}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${purchases === p ? "bg-card text-foreground shadow-sm" : "text-foreground/50 hover:text-foreground/70"}`}
             >
-              {t}
-              {activeTab === t && (
-                <span className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-primary rounded-full" />
-              )}
+              {label}
             </button>
           ))}
         </div>
       </div>
-      <Empty msg="No orders yet. When buyers place orders, they'll appear here." />
+      <OrdersList
+        key={purchases ? "buy" : "sell"}
+        uid={uid}
+        viewer={purchases ? "buyer" : "seller"}
+        empty={
+          <Empty
+            msg={
+              purchases
+                ? "You haven't bought anything yet."
+                : "No orders yet. When buyers check out your items, they'll appear here."
+            }
+          />
+        }
+      />
     </div>
   );
 };
@@ -1797,46 +1842,6 @@ const ReferralsPanel = ({ profile }) => {
   );
 };
 
-// ── Nigerian States ───────────────────────────────────────────────────────────
-const NIGERIAN_STATES = [
-  "Abia",
-  "Adamawa",
-  "Akwa Ibom",
-  "Anambra",
-  "Bauchi",
-  "Bayelsa",
-  "Benue",
-  "Borno",
-  "Cross River",
-  "Delta",
-  "Ebonyi",
-  "Edo",
-  "Ekiti",
-  "Enugu",
-  "FCT – Abuja",
-  "Gombe",
-  "Imo",
-  "Jigawa",
-  "Kaduna",
-  "Kano",
-  "Katsina",
-  "Kebbi",
-  "Kogi",
-  "Kwara",
-  "Lagos",
-  "Nasarawa",
-  "Niger",
-  "Ogun",
-  "Ondo",
-  "Osun",
-  "Oyo",
-  "Plateau",
-  "Rivers",
-  "Sokoto",
-  "Taraba",
-  "Yobe",
-  "Zamfara",
-];
 
 // ── Profile Panel ─────────────────────────────────────────────────────────────
 const PField = ({ label, error, children, hint, htmlFor }) => (
@@ -2102,8 +2107,12 @@ const SellerDashboard = () => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // Open (or start) a chat with the buyer about the product they saved
+  // Open (or start) a chat with the buyer about the product they saved; order alerts → Orders
   const messageBuyer = useCallback((n) => {
+    if (isOrderAlert(n)) {
+      setTab("orders");
+      return;
+    }
     setMessageBuyerTarget({
       buyerUid: n.buyerUid,
       listingId: n.listingId,
@@ -2298,7 +2307,10 @@ const SellerDashboard = () => {
                 onMessageBuyer={messageBuyer}
               />
             )}
-            {tab === "orders" && <OrdersPanel />}
+            {tab === "orders" && <OrdersPanel uid={user?.uid} />}
+            {tab === "payments" && (
+              <SellerPayments uid={user?.uid} profile={profile} />
+            )}
             {tab === "rewards" && <RewardsPanel profile={profile} />}
             {tab === "referrals" && <ReferralsPanel profile={profile} />}
             {tab === "profile" && <ProfilePanel profile={profile} />}

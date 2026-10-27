@@ -15,6 +15,7 @@ import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../utils/theme";
 import { cartHelpers, syncCart, useCartItems } from "../utils/Cart";
 import { isAdminUser } from "../utils/admin";
+import { isOrderAlert, orderAlertText } from "../utils/orders";
 
 const MenuIcon = () => (
   <svg
@@ -492,25 +493,34 @@ const timeAgo = (t) => {
   return `${Math.round(h / 24)}d ago`;
 };
 
-const NotificationBell = ({ uid, role, messageCount, notifCount, open, onToggle, onClose }) => {
+const NotificationBell = ({ uid, role, messageCount, notifCount, updateCount, open, onToggle, onClose }) => {
   const [alerts, setAlerts] = useState([]);
   const isSeller = role === "seller";
   const dash = isSeller ? "/seller" : "/buyer";
 
-  // Seller alerts, live while the panel is open
+  // Live while the panel is open: seller alerts (new orders, saves) + order updates for
+  // things this user bought
   useEffect(() => {
-    if (!open || !isSeller || !uid) return;
-    return onSnapshot(
-      query(collection(db, "notifications"), where("sellerUid", "==", uid)),
-      (snap) =>
-        setAlerts(
-          snap.docs
-            .map((d) => ({ id: d.id, ...d.data() }))
-            .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0))
-            .slice(0, 12),
-        ),
-      (e) => console.error("Alerts:", e),
-    );
+    if (!open || !uid) return;
+    const lists = { sales: [], mine: [] };
+    const publish = () =>
+      setAlerts(
+        [...lists.sales, ...lists.mine]
+          .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0))
+          .slice(0, 15),
+      );
+    const listen = (field, key) =>
+      onSnapshot(
+        query(collection(db, "notifications"), where(field, "==", uid)),
+        (snap) => {
+          lists[key] = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          publish();
+        },
+        (e) => console.error("Alerts:", e),
+      );
+    const subs = [listen("recipientUid", "mine")];
+    if (isSeller) subs.push(listen("sellerUid", "sales"));
+    return () => subs.forEach((u) => u());
   }, [open, isSeller, uid]);
 
   const markAllRead = async () => {
@@ -521,7 +531,15 @@ const NotificationBell = ({ uid, role, messageCount, notifCount, open, onToggle,
     await batch.commit().catch((e) => console.error("Mark read failed:", e));
   };
 
-  const total = messageCount + (isSeller ? notifCount : 0);
+  const total = messageCount + (isSeller ? notifCount : 0) + (updateCount || 0);
+  const alertLink = (a) =>
+    !isOrderAlert(a)
+      ? "/seller?tab=notifications"
+      : a.recipientUid
+        ? isSeller
+          ? "/seller?tab=orders&view=purchases"
+          : "/buyer?tab=orders"
+        : "/seller?tab=orders";
 
   return (
     <>
@@ -548,7 +566,7 @@ const NotificationBell = ({ uid, role, messageCount, notifCount, open, onToggle,
           <div className="md:hidden fixed top-14 right-2 left-2 sm:left-auto sm:w-96 z-60 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden text-left">
             <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
               <p className="text-sm font-bold text-foreground">Notifications</p>
-              {isSeller && alerts.some((a) => !a.read) && (
+              {alerts.some((a) => !a.read) && (
                 <button
                   type="button"
                   onClick={markAllRead}
@@ -581,27 +599,32 @@ const NotificationBell = ({ uid, role, messageCount, notifCount, open, onToggle,
                   <span className="w-2 h-2 rounded-full bg-primary shrink-0" />
                 )}
               </Link>
-              {isSeller &&
-                (alerts.length === 0 ? (
-                  <p className="px-4 py-6 text-center text-xs text-foreground/45">
-                    No alerts yet. You'll see when buyers save your items.
-                  </p>
-                ) : (
-                  alerts.map((a) => (
+              {isSeller && alerts.length === 0 && (
+                <p className="px-4 py-6 text-center text-xs text-foreground/45">
+                  No alerts yet. New orders and saves of your items show up here.
+                </p>
+              )}
+              {alerts.map((a) => (
                     <Link
                       key={a.id}
-                      to="/seller?tab=notifications"
+                      to={alertLink(a)}
                       onClick={onClose}
                       className={`flex items-start gap-3 px-4 py-3 border-b border-border/40 hover:bg-primary/5 ${a.read ? "" : "bg-primary/5"}`}
                     >
                       <span className="w-9 h-9 rounded-full bg-primary/12 text-primary flex items-center justify-center shrink-0 text-xs font-black">
-                        {(a.buyerName || "?")[0].toUpperCase()}
+                        {isOrderAlert(a) ? TAB_ICONS.orders : (a.buyerName || "?")[0].toUpperCase()}
                       </span>
                       <span className="flex-1 min-w-0">
                         <span className="block text-sm text-foreground">
-                          <span className="font-semibold">{a.buyerName || "A buyer"}</span>{" "}
-                          saved{" "}
-                          <span className="font-semibold">{a.listingName || "your item"}</span>
+                          {isOrderAlert(a) ? (
+                            orderAlertText(a)
+                          ) : (
+                            <>
+                              <span className="font-semibold">{a.buyerName || "A buyer"}</span>{" "}
+                              saved{" "}
+                              <span className="font-semibold">{a.listingName || "your item"}</span>
+                            </>
+                          )}
                         </span>
                         <span className="block text-[11px] text-foreground/45 mt-0.5">
                           {timeAgo(a.createdAt)}
@@ -609,9 +632,8 @@ const NotificationBell = ({ uid, role, messageCount, notifCount, open, onToggle,
                       </span>
                       {!a.read && <span className="mt-1.5 w-2 h-2 rounded-full bg-primary shrink-0" />}
                     </Link>
-                  ))
-                ))}
-              {!isSeller && messageCount === 0 && (
+              ))}
+              {!isSeller && messageCount === 0 && alerts.length === 0 && (
                 <p className="px-4 py-6 text-center text-xs text-foreground/45">
                   You're all caught up.
                 </p>
@@ -892,9 +914,13 @@ const CartDrawer = ({ open, onClose, cartItems = [], onRemove }) => {
                 ₦{total.toLocaleString()}
               </span>
             </div>
-            <button className="main-button w-full py-3 text-sm font-bold">
+            <Link
+              to="/checkout"
+              onClick={onClose}
+              className="main-button w-full py-3 text-sm font-bold flex items-center justify-center"
+            >
               Proceed to checkout
-            </button>
+            </Link>
           </div>
         )}
       </div>
@@ -935,6 +961,13 @@ const TAB_ICONS = {
   messages: (
     <TabIcon>
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </TabIcon>
+  ),
+  orders: (
+    <TabIcon>
+      <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
+      <line x1="3" y1="6" x2="21" y2="6" />
+      <path d="M16 10a4 4 0 0 1-8 0" />
     </TabIcon>
   ),
   dashboard: (
@@ -1207,6 +1240,7 @@ const Navbar = () => {
 
   const [messageCount, setMessageCount] = useState(0);
   const [notifCount, setNotifCount] = useState(0);
+  const [updateCount, setUpdateCount] = useState(0); // unread order updates (as a buyer)
 
   const tabBarTabs =
     role === "seller"
@@ -1237,6 +1271,7 @@ const Navbar = () => {
           { label: "Notifications", to: "/seller?tab=notifications", badge: notifCount },
           { label: "My Items", to: "/seller?tab=listings" },
           { label: "Orders", to: "/seller?tab=orders" },
+          { label: "Payments", to: "/seller?tab=payments" },
           { label: "Rewards", to: "/seller?tab=rewards" },
           { label: "Referrals", to: "/seller?tab=referrals" },
           { label: "Browse items", to: "/listings" },
@@ -1278,6 +1313,19 @@ const Navbar = () => {
       (error) => console.error("Notification badge listener error:", error),
     );
   }, [user, role]);
+
+  useEffect(() => {
+    if (!user) return;
+    return onSnapshot(
+      query(
+        collection(db, "notifications"),
+        where("recipientUid", "==", user.uid),
+        where("read", "==", false),
+      ),
+      (snap) => setUpdateCount(snap.size),
+      (error) => console.error("Order update badge listener error:", error),
+    );
+  }, [user]);
 
   useEffect(() => {
     if (!user || !profile?.role) return;
@@ -1398,6 +1446,7 @@ const Navbar = () => {
                 role={role}
                 messageCount={messageCount}
                 notifCount={notifCount}
+                updateCount={updateCount}
                 open={bellOpen}
                 onToggle={() => setBellOpen((o) => !o)}
                 onClose={() => setBellOpen(false)}

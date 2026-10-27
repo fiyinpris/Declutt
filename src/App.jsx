@@ -18,6 +18,8 @@ const AdminDashboard = lazy(() => import("./Component/AdminDashboard"));
 const ResetPassword = lazy(() => import("./Component/ResetPassword"));
 const About = lazy(() => import("./Component/About"));
 const Contact = lazy(() => import("./Component/Contact"));
+const Checkout = lazy(() => import("./Component/Checkout"));
+const CheckoutComplete = lazy(() => import("./Component/CheckoutComplete"));
 
 const PageLoading = () => (
   <div className="min-h-[60vh] flex items-center justify-center" role="status">
@@ -80,6 +82,23 @@ function App() {
               element={
                 <ProtectedRoute allowedRole="admin">
                   <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/checkout"
+              element={
+                <ProtectedRoute>
+                  <Checkout />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/checkout/complete"
+              element={
+                <ProtectedRoute>
+                  <CheckoutComplete />
                 </ProtectedRoute>
               }
             />

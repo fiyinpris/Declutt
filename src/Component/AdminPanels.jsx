@@ -70,6 +70,7 @@ export const AdminOverview = ({ onGo }) => {
       c(query(collection(db, "reports"), where("status", "==", "open"))),
       c(query(collection(db, "featureRequests"), where("status", "==", "open"))),
       c(query(collection(db, "contactMessages"), where("read", "==", false))),
+      c(query(collection(db, "orders"), where("status", "==", "disputed"))),
     ]).then((v) => {
       if (!dead)
         setCounts({
@@ -81,6 +82,7 @@ export const AdminOverview = ({ onGo }) => {
           reports: v[5],
           featured: v[6],
           support: v[7],
+          disputes: v[8],
         });
     });
     return () => {
@@ -95,6 +97,7 @@ export const AdminOverview = ({ onGo }) => {
     { label: "Open reports", value: counts?.reports, tab: "reports", alert: counts?.reports > 0 },
     { label: "Featured requests", value: counts?.featured, tab: "featured", alert: counts?.featured > 0 },
     { label: "Unread support", value: counts?.support, tab: "reports", alert: counts?.support > 0 },
+    { label: "Order disputes", value: counts?.disputes, tab: "orders", alert: counts?.disputes > 0 },
   ];
 
   return (
@@ -519,20 +522,3 @@ export const ConversationsPanel = ({ initialKey = null }) => {
     </Card>
   );
 };
-
-/* ───────────── Orders (no checkout yet) ───────────── */
-export const OrdersInfo = () => (
-  <Card title="Orders & transactions">
-    <div className="px-5 py-6 text-sm text-foreground/60 space-y-2">
-      <p>
-        Declutt doesn't take payments or create orders yet — buyers and sellers agree a
-        deal in chat and pay each other directly — so there are no orders or transactions
-        to manage here.
-      </p>
-      <p>
-        Once online checkout (e.g. Paystack) is added, orders and their statuses will
-        appear in this tab.
-      </p>
-    </div>
-  </Card>
-);

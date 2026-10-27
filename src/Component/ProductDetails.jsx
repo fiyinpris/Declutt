@@ -869,20 +869,22 @@ const ProductDetails = () => {
     setShowMsg(true);
   };
 
+  // Buy now → checkout (pay online with buyer protection, or pay on delivery)
   const handleBuy = () => {
     if (!listing) return;
-    if (listing.sellerContact) {
-      const text = encodeURIComponent(
-        `Hi! I want to buy your "${listing.name}" for ₦${Number(listing.price).toLocaleString()} on Declutt.`,
-      );
-      window.open(
-        `https://wa.me/234${listing.sellerContact.replace(/^0/, "")}?text=${text}`,
-        "_blank",
-        "noopener,noreferrer",
-      );
-    } else {
-      openMsg();
+    if (!user) {
+      showToast("Sign in to buy");
+      return;
     }
+    if (listing.sellerUid === uid) {
+      showToast("This is your own listing");
+      return;
+    }
+    if (listing.available === false) {
+      showToast("Sorry, this item has been sold");
+      return;
+    }
+    navigate(`/checkout?buy=${listing.id}&qty=${qty}`);
   };
 
   const handleCart = () => {
@@ -973,7 +975,7 @@ const ProductDetails = () => {
         onClick={handleBuy}
         className="w-full py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:bg-primary/90 active:scale-[0.98] transition-all"
       >
-        {listing.sellerContact ? "Contact on WhatsApp" : "Buy Now"}
+        Buy Now
       </button>
       <button
         onClick={handleCart}
@@ -1259,7 +1261,7 @@ const ProductDetails = () => {
           onClick={handleBuy}
           className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground text-sm font-bold hover:opacity-90 transition-all"
         >
-          {listing.sellerContact ? "WhatsApp" : "Buy Now"}
+          Buy Now
         </button>
       </div>
 

@@ -117,12 +117,18 @@ service cloud.firestore {
     }
 
     // ── Alerts, saved items, carts, public profiles ──────────────────────────
+    // Seller alerts (sellerUid) and buyer order updates (recipientUid). Browsers may only create
+    // "saved" alerts; order alerts come from the Declutt server.
     match /notifications/{notificationId} {
-      allow read, delete: if request.auth != null && request.auth.uid == resource.data.sellerUid;
+      allow read, delete: if request.auth != null
+        && (request.auth.uid == resource.data.sellerUid || request.auth.uid == resource.data.recipientUid);
       allow create: if request.auth != null
         && request.resource.data.buyerUid == request.auth.uid
-        && request.resource.data.read == false;
-      allow update: if request.auth != null && request.auth.uid == resource.data.sellerUid
+        && request.resource.data.read == false
+        && request.resource.data.get('type', 'saved') == 'saved'
+        && !('recipientUid' in request.resource.data);
+      allow update: if request.auth != null
+        && (request.auth.uid == resource.data.sellerUid || request.auth.uid == resource.data.recipientUid)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
     }
     match /savedItems/{savedId} {
@@ -173,6 +179,46 @@ service cloud.firestore {
       allow read: if request.auth != null && (resource.data.sellerUid == request.auth.uid || isAdmin());
       allow update, delete: if isAdmin();
     }
+    // ── Checkout & payouts ───────────────────────────────────────────────────
+    // Orders, checkouts and payouts are written ONLY by the Declutt server (/api with the
+    // Firebase Admin SDK), which works out prices and fees and checks who may change what.
+    // Browsers can only read their own.
+    match /orders/{orderId} {
+      allow read: if request.auth != null
+        && (resource.data.buyerUid == request.auth.uid
+          || resource.data.sellerUid == request.auth.uid
+          || isAdmin());
+      allow write: if false;
+    }
+    match /checkouts/{checkoutId} {
+      allow read: if request.auth != null
+        && (resource.data.buyerUid == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+    match /payouts/{payoutId} {
+      allow read: if request.auth != null
+        && (resource.data.sellerUid == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+    match /payoutRuns/{runId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+    // Payout bank accounts are added through the server (it checks the account with the bank).
+    // An admin can only approve a name mismatch.
+    match /sellerPayoutAccounts/{uid} {
+      allow read: if request.auth != null && (request.auth.uid == uid || isAdmin());
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nameOverride'])
+        && request.resource.data.nameOverride is bool;
+      allow create, delete: if false;
+    }
+    // Fees & policies (settings/fees): everyone can read them (checkout shows them); admins edit
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // Contact page: anyone can send; only admins can read, mark read or delete
     match /contactMessages/{messageId} {
       allow create: if request.resource.data.keys().hasOnly(['name', 'email', 'subject', 'message', 'uid', 'read', 'createdAt'])

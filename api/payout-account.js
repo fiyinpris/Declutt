@@ -2,7 +2,8 @@
  * POST /api/payout-account { bankCode, bankName, accountNumber } — a seller adds the bank
  * account their payouts go to. Paystack confirms the account and returns the account holder's
  * name; if it doesn't match the seller's name on Declutt, payouts stay ON HOLD until an admin
- * reviews it (like Jumia). Only the last 4 digits are stored on Declutt.
+ * reviews it (like Jumia). Only the seller and admins can read it (firestore.rules) — admins need
+ * the full number to pay sellers by bank transfer while Declutt is a Paystack Starter Business.
  */
 import {
   HttpError,
@@ -36,20 +37,29 @@ export default handle(["POST"], async (req, res) => {
     throw new HttpError(400, "We couldn't find that account. Check the bank and account number.");
   }
   const accountName = resolved.account_name;
-  const recipient = await paystack("/transferrecipient", {
-    method: "POST",
-    body: { type: "nuban", name: accountName, account_number: accountNumber, bank_code: bankCode, currency: "NGN" },
-  });
+  // For automatic payouts (Paystack Transfers). Starter Businesses can't use Transfers, so a
+  // failure here isn't fatal — Declutt then pays this seller manually.
+  let recipientCode = null;
+  try {
+    const recipient = await paystack("/transferrecipient", {
+      method: "POST",
+      body: { type: "nuban", name: accountName, account_number: accountNumber, bank_code: bankCode, currency: "NGN" },
+    });
+    recipientCode = recipient.recipient_code;
+  } catch (e) {
+    console.error("transferrecipient", e.message);
+  }
 
   const record = {
     bankCode,
     bankName,
+    accountNumber,
     accountLast4: accountNumber.slice(-4),
     accountName,
     sellerName: profile.name || "",
     nameMatches: namesMatch(profile.name, accountName),
     nameOverride: false, // an admin can approve a mismatch after checking
-    recipientCode: recipient.recipient_code,
+    recipientCode,
     verifiedAt: Timestamp.now(),
   };
   await db.doc(`sellerPayoutAccounts/${user.uid}`).set(record);

@@ -36,6 +36,7 @@ export const DEFAULT_FEES = {
   returnWindowDays: 7,
   autoConfirmDays: 7,
   payOnDelivery: true,
+  payoutMethod: "manual", // "manual" (admin pays by bank transfer) or "paystack" (automatic)
 };
 const withDefaults = (s = {}) => ({
   ...DEFAULT_FEES,

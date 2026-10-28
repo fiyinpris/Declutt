@@ -167,12 +167,185 @@ const PAYOUT_TONE = {
   on_hold: "bg-amber-500/12 text-amber-600",
 };
 
+/* Paying a seller by bank transfer (Paystack Starter Business): shows the exact amount and the
+   seller's bank details, then records the payout once the admin confirms they've sent it */
+const ManualPayoutDialog = ({ seller, onClose, onDone }) => {
+  const [info, setInfo] = useState(null);
+  const [error, setError] = useState("");
+  const [reference, setReference] = useState("");
+  const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    apiPost("payout-manual", { sellerUid: seller.uid, preview: true })
+      .then((r) => alive && setInfo(r))
+      .catch((e) => alive && setError(e.message));
+    return () => {
+      alive = false;
+    };
+  }, [seller.uid]);
+
+  const confirm = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const r = await apiPost("payout-manual", { sellerUid: seller.uid, amount: info.amount, reference });
+      onDone(`Recorded ${naira(r.amount)} paid to ${info.sellerName}.`);
+    } catch (e) {
+      if (e.data?.summary) {
+        setInfo(e.data.summary);
+        setSent(false);
+      }
+      setError(e.message);
+      setBusy(false);
+    }
+  };
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(info.bank.accountNumber);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard blocked — the number is on screen */
+    }
+  };
+
+  const bank = info?.bank;
+  const blocked = info && info.amount > 0 && (!bank || !bank.accountNumber || !bank.nameOk);
+
+  return (
+    <div className="fixed inset-0 z-80 flex items-end sm:items-center justify-center sm:p-4">
+      <div className="absolute inset-0 bg-black/45" onClick={busy ? undefined : onClose} />
+      <div className="relative w-full sm:max-w-md bg-card border border-border rounded-t-3xl sm:rounded-2xl p-5 space-y-4 text-left max-h-[92dvh] overflow-y-auto">
+        <p className="text-base font-black text-foreground">Pay {info?.sellerName || seller.name}</p>
+        {!info && !error && (
+          <div className="flex justify-center py-8 text-foreground/30">
+            <Spin s={22} />
+          </div>
+        )}
+        {info && (
+          <>
+            <div className="rounded-xl bg-primary/8 px-4 py-3">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-foreground/50">Amount to send</p>
+              <p className="text-3xl font-black text-primary">{naira(info.amount)}</p>
+              <p className="text-[11px] text-foreground/50 mt-1">
+                {info.orderCount} order{info.orderCount === 1 ? "" : "s"} · sales {naira(info.gross)} − commission{" "}
+                {naira(info.commission)}
+                {info.fulfilmentFee ? ` − fulfilment ${naira(info.fulfilmentFee)}` : ""}
+                {info.otherDeductions ? ` − fees owed & penalties ${naira(info.otherDeductions)}` : ""}
+              </p>
+            </div>
+
+            {info.amount > 0 &&
+              (!bank ? (
+                <p className="text-xs font-semibold text-red-500 bg-red-500/8 rounded-xl px-3 py-2">
+                  This seller hasn't added a bank account yet. Ask them to add one in Payments.
+                </p>
+              ) : (
+                <div className="border border-border rounded-xl divide-y divide-border/60 text-sm">
+                  <div className="flex justify-between gap-3 px-3.5 py-2.5">
+                    <span className="text-foreground/50">Bank</span>
+                    <span className="font-semibold text-foreground text-right">{bank.bankName}</span>
+                  </div>
+                  <div className="flex justify-between items-center gap-3 px-3.5 py-2.5">
+                    <span className="text-foreground/50">Account number</span>
+                    {bank.accountNumber ? (
+                      <span className="flex items-center gap-2">
+                        <span className="font-black text-foreground tracking-wider">{bank.accountNumber}</span>
+                        <button type="button" onClick={copy} className="text-[11px] font-bold text-primary">
+                          {copied ? "Copied" : "Copy"}
+                        </button>
+                      </span>
+                    ) : (
+                      <span className="text-xs font-semibold text-amber-600 text-right">
+                        Not saved — ask the seller to add their bank account again
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex justify-between gap-3 px-3.5 py-2.5">
+                    <span className="text-foreground/50">Account name</span>
+                    <span className="font-semibold text-foreground text-right">{bank.accountName}</span>
+                  </div>
+                  {!bank.nameOk && (
+                    <p className="px-3.5 py-2.5 text-xs font-semibold text-amber-600">
+                      This name doesn't match the seller's Declutt name. Approve it under "Bank names to check" first.
+                    </p>
+                  )}
+                </div>
+              ))}
+
+            {!blocked && (
+              <>
+                {info.amount > 0 && (
+                  <>
+                    <p className="text-xs text-foreground/60 leading-relaxed">
+                      Send exactly <span className="font-bold text-foreground">{naira(info.amount)}</span> to this
+                      account from your bank app, then record it here. The seller sees it in their Payments tab.
+                    </p>
+                    <label className="block text-xs font-bold text-foreground/70">
+                      Transfer reference (optional)
+                      <input
+                        value={reference}
+                        onChange={(e) => setReference(e.target.value)}
+                        maxLength={100}
+                        placeholder="e.g. the session ID from your bank receipt"
+                        className="mt-1.5 w-full px-3.5 py-2.5 rounded-xl border border-border bg-background text-sm font-normal text-foreground placeholder:text-foreground/30 focus:outline-none focus:border-primary/60"
+                      />
+                    </label>
+                  </>
+                )}
+                <label className="flex items-start gap-2.5 text-sm text-foreground cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={sent}
+                    onChange={(e) => setSent(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 accent-[hsl(var(--primary))]"
+                  />
+                  {info.amount > 0
+                    ? `I've sent ${naira(info.amount)} to this account`
+                    : "Nothing to send — the fees this seller owed cancel out their sales. Settle them."}
+                </label>
+              </>
+            )}
+          </>
+        )}
+        {error && <p className="text-xs font-semibold text-red-500 bg-red-500/8 rounded-xl px-3 py-2">{error}</p>}
+        <div className="flex gap-2 justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="px-4 py-2.5 rounded-xl text-sm font-semibold text-foreground/60 hover:bg-border/40"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={confirm}
+            disabled={!info || blocked || !sent || busy}
+            className="main-button px-4 py-2.5 text-sm font-bold flex items-center gap-2 disabled:opacity-50"
+          >
+            {busy && <Spin s={13} />}
+            Mark as paid
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export const AdminPayoutsPanel = () => {
   const orders = useCollection(ordersQuery);
   const payouts = useCollection(payoutsQuery);
   const accounts = useCollection(accountsQuery);
+  const fees = useFeeSettings();
+  const manual = fees.payoutMethod !== "paystack";
   const [running, setRunning] = useState(null);
   const [result, setResult] = useState(null);
+  const [paying, setPaying] = useState(null);
 
   const run = async (payNow) => {
     if (payNow && !window.confirm("Send every seller their eligible balance now, instead of waiting for the monthly payout day?"))
@@ -183,7 +356,7 @@ export const AdminPayoutsPanel = () => {
       const r = await apiPost("payouts-run", { payNow });
       setResult({
         ok: true,
-        text: `Done — ${r.expired} unpaid checkouts closed, ${r.autoDelivered} auto-delivered, ${r.completed} completed${r.payoutDue ? `, ${r.paid} payouts sent, ${r.onHold} on hold, ${r.failed} failed` : ""}.`,
+        text: `Done — ${r.expired} unpaid checkouts closed, ${r.autoDelivered} auto-delivered, ${r.completed} completed${r.payoutDue ? `, ${r.paid} payouts sent, ${r.onHold} on hold, ${r.failed} failed` : ""}${r.manualDue ? `, ${r.manualDue} seller${r.manualDue === 1 ? "" : "s"} to pay by bank transfer` : ""}.`,
       });
     } catch (e) {
       setResult({ ok: false, text: e.message });
@@ -243,21 +416,33 @@ export const AdminPayoutsPanel = () => {
               {running === "check" && <Spin s={12} />}
               Run daily checks
             </button>
-            <button
-              type="button"
-              onClick={() => run(true)}
-              disabled={!!running}
-              className="main-button px-3.5 py-2 text-xs font-bold flex items-center gap-1.5 disabled:opacity-60"
-            >
-              {running === "pay" && <Spin s={12} />}
-              Pay all eligible now
-            </button>
+            {!manual && (
+              <button
+                type="button"
+                onClick={() => run(true)}
+                disabled={!!running}
+                className="main-button px-3.5 py-2 text-xs font-bold flex items-center gap-1.5 disabled:opacity-60"
+              >
+                {running === "pay" && <Spin s={12} />}
+                Pay all eligible now
+              </button>
+            )}
           </div>
         }
       >
         <p className="text-sm text-foreground/65 leading-relaxed">
-          Sellers are paid automatically for each calendar month on the 5th business day after it
-          closes — next on <span className="font-bold text-foreground">{fmtDate(nextPayoutDate().getTime())}</span>.
+          {manual ? (
+            <>
+              You pay sellers yourself: by the 5th business day after each month closes — next by{" "}
+              <span className="font-bold text-foreground">{fmtDate(nextPayoutDate().getTime())}</span> — send each
+              seller their "Ready" amount by bank transfer, then click <span className="font-bold text-foreground">Mark as paid</span>.
+            </>
+          ) : (
+            <>
+              Sellers are paid automatically for each calendar month on the 5th business day after it
+              closes — next on <span className="font-bold text-foreground">{fmtDate(nextPayoutDate().getTime())}</span>.
+            </>
+          )}{" "}
           Every morning the server also closes unpaid checkouts, confirms delivery on orders shipped
           long ago and releases orders whose return window has ended.
         </p>
@@ -308,6 +493,7 @@ export const AdminPayoutsPanel = () => {
                   <th className="font-semibold py-2.5 px-2 text-right">Ready</th>
                   <th className="font-semibold py-2.5 px-2 text-right">Owes</th>
                   <th className="font-semibold py-2.5 px-4">Bank account</th>
+                  {manual && <th className="py-2.5 px-4" />}
                 </tr>
               </thead>
               <tbody>
@@ -330,6 +516,19 @@ export const AdminPayoutsPanel = () => {
                           <span className="text-amber-600 font-semibold">Name mismatch</span>
                         )}
                       </td>
+                      {manual && (
+                        <td className="py-2 px-4 text-right">
+                          {s.eligible > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setPaying(s)}
+                              className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-[11px] font-bold whitespace-nowrap hover:bg-primary/90"
+                            >
+                              Mark as paid
+                            </button>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -354,6 +553,17 @@ export const AdminPayoutsPanel = () => {
         </Card>
       )}
 
+      {paying && (
+        <ManualPayoutDialog
+          seller={paying}
+          onClose={() => setPaying(null)}
+          onDone={(text) => {
+            setPaying(null);
+            setResult({ ok: true, text });
+          }}
+        />
+      )}
+
       <Card title="Payout history" pad={false}>
         {history.length === 0 ? (
           <p className="px-5 py-8 text-center text-sm text-foreground/40">No payouts yet.</p>
@@ -366,7 +576,13 @@ export const AdminPayoutsPanel = () => {
                     {p.sellerName} · {naira(p.amount)}
                   </p>
                   <p className="text-[11px] text-foreground/45">
-                    {fmtDate(p.createdAt, true)} · {p.cycle === "manual" ? "paid early" : `for ${p.cycle}`} ·{" "}
+                    {fmtDate(p.createdAt, true)} ·{" "}
+                    {p.method === "manual"
+                      ? `bank transfer${p.reference ? ` (ref ${p.reference})` : ""}`
+                      : p.cycle === "early" || p.cycle === "manual"
+                        ? "paid early"
+                        : `for ${p.cycle}`}{" "}
+                    ·{" "}
                     {p.bankName} ••••{p.accountLast4} · sales {naira(p.gross)} − commission {naira(p.commission)}
                     {p.fulfilmentFee ? ` − fulfilment ${naira(p.fulfilmentFee)}` : ""}
                     {p.otherDeductions ? ` − other ${naira(p.otherDeductions)}` : ""}
@@ -427,6 +643,7 @@ export const FeeSettingsPanel = () => {
       returnWindowDays: Math.round(num(values.returnWindowDays, 1, 30)),
       autoConfirmDays: Math.round(num(values.autoConfirmDays, 1, 30)),
       payOnDelivery: !!values.payOnDelivery,
+      payoutMethod: values.payoutMethod === "paystack" ? "paystack" : "manual",
     };
     setSaving(true);
     setNote(null);
@@ -541,6 +758,42 @@ export const FeeSettingsPanel = () => {
                 </span>
               </span>
             </label>
+            <div>
+              <p className="text-xs font-black uppercase tracking-wide text-foreground/45 mb-2.5">
+                How sellers get paid
+              </p>
+              <div className="grid gap-2">
+                {[
+                  [
+                    "manual",
+                    "I pay sellers myself",
+                    "For a Paystack Starter Business. By payout day, send each seller their balance by bank transfer, then click “Mark as paid” in Payouts.",
+                  ],
+                  [
+                    "paystack",
+                    "Automatic Paystack transfers",
+                    "Registered Business only. Declutt sends payouts from your Paystack balance on payout day.",
+                  ],
+                ].map(([id, title, sub]) => (
+                  <label
+                    key={id}
+                    className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer ${(values.payoutMethod || "manual") === id ? "border-primary bg-primary/5" : "border-border"}`}
+                  >
+                    <input
+                      type="radio"
+                      name="payoutMethod"
+                      checked={(values.payoutMethod || "manual") === id}
+                      onChange={() => set("payoutMethod", id)}
+                      className="mt-1 accent-[hsl(var(--primary))]"
+                    />
+                    <span className="text-sm text-foreground">
+                      {title}
+                      <span className="block text-[11px] text-foreground/45">{sub}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
             {note && (
               <p className={`text-xs font-semibold rounded-xl px-3 py-2 ${note.ok ? "text-emerald-600 bg-emerald-500/10" : "text-red-500 bg-red-500/8"}`}>
                 {note.text}

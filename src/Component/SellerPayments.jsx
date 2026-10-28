@@ -183,7 +183,7 @@ const BankAccount = ({ account, profileName }) => {
             )}
           </div>
           <p className="text-[11px] text-foreground/40">
-            We check the account with your bank through Paystack. Declutt only keeps the last 4 digits.
+            We check the account with your bank through Paystack. Only you and Declutt can see these details.
           </p>
         </form>
       )}
@@ -456,6 +456,7 @@ const SellerPayments = ({ uid, profile }) => {
                   <p className="text-[11px] text-foreground/45">
                     {fmtDate(p.paidAt || p.createdAt)} · {p.bankName} ••••{p.accountLast4} ·{" "}
                     {p.orderIds?.length || 0} orders
+                    {p.method === "manual" && ` · bank transfer${p.reference ? ` (ref ${p.reference})` : ""}`}
                   </p>
                   <p className="text-[11px] text-foreground/45">
                     Sales {naira(p.gross)} − commission {naira(p.commission)}

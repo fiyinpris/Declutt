@@ -127,6 +127,9 @@ export const DEFAULT_SETTINGS = {
   returnWindowDays: 7, // after delivery, before the seller's money is released
   autoConfirmDays: 7, // a shipped order counts as delivered after this many days
   payOnDelivery: true,
+  // "manual": an admin pays sellers by bank transfer and records it (Paystack Starter Business)
+  // "paystack": automatic Paystack Transfers on payout day (Registered Business only)
+  payoutMethod: "manual",
 };
 export const loadSettings = async (db) => {
   const s = (await db.doc("settings/fees").get()).data() || {};
@@ -342,6 +345,103 @@ export const settlePayout = async (db, payoutId, ok, error) => {
     ),
   );
   await batch.commit();
+};
+
+/* ── Seller balances & payouts ── */
+
+/** Writes [ref, data] updates in batches of 400. */
+export const commitUpdates = async (db, updates) => {
+  for (let i = 0; i < updates.length; i += 400) {
+    const batch = db.batch();
+    updates.slice(i, i + 400).forEach(([ref, data]) => batch.update(ref, data));
+    await batch.commit();
+  }
+};
+
+/**
+ * What each seller can be paid now: completed online sales (their net after commission and
+ * fulfilment fee), minus fees owed on completed pay-on-delivery orders and penalties — oldest
+ * first, as far as the sales cover them (the rest waits for the next payout).
+ * `cutoff`: only orders completed before this time (the monthly run pays the month that closed).
+ */
+export const sellerBalances = async (db, cutoff = Infinity) => {
+  const before = (d) => ms(d.data().completedAt) < cutoff;
+  const [eligible, owed, penalties] = await Promise.all([
+    db.collection("orders").where("payoutStatus", "==", "eligible").get(),
+    db.collection("orders").where("payoutStatus", "==", "commission_owed").get(),
+    db.collection("orders").where("penaltyStatus", "==", "owed").get(),
+  ]);
+  const sellers = new Map();
+  const bucket = (uid) => {
+    if (!sellers.has(uid)) sellers.set(uid, { sales: [], deductions: [] });
+    return sellers.get(uid);
+  };
+  eligible.docs.filter(before).forEach((d) => bucket(d.data().sellerUid).sales.push(d));
+  owed.docs.filter(before).forEach((d) =>
+    bucket(d.data().sellerUid).deductions.push({
+      kind: "pod",
+      doc: d,
+      amount: (Number(d.data().commission) || 0) + (Number(d.data().fulfilmentFee) || 0),
+      at: ms(d.data().completedAt),
+    }),
+  );
+  penalties.docs.forEach((d) =>
+    bucket(d.data().sellerUid).deductions.push({
+      kind: "penalty",
+      doc: d,
+      amount: Number(d.data().penalty) || 0,
+      at: ms(d.data().updatedAt),
+    }),
+  );
+  for (const b of sellers.values()) {
+    const sum = (k) => b.sales.reduce((n, d) => n + (Number(d.data()[k]) || 0), 0);
+    b.gross = sum("total");
+    b.commission = sum("commission");
+    b.fulfilment = sum("fulfilmentFee");
+    let amount = sum("sellerNet");
+    b.settled = [];
+    b.deductions
+      .sort((x, y) => x.at - y.at)
+      .forEach((x) => {
+        if (amount - x.amount >= 0) {
+          amount -= x.amount;
+          b.settled.push(x);
+        }
+      });
+    b.amount = amount;
+    b.deductionTotal = b.settled.reduce((n, x) => n + x.amount, 0);
+  }
+  return sellers;
+};
+
+export const newPayoutId = () => `payout_${crypto.randomUUID().replace(/-/g, "")}`;
+
+/** Saves a payout and moves its orders to "processing"; settlePayout() finishes it. */
+export const recordPayout = async (db, payoutId, sellerUid, b, acct, extra) => {
+  const podIds = b.settled.filter((x) => x.kind === "pod").map((x) => x.doc.id);
+  const penaltyIds = b.settled.filter((x) => x.kind === "penalty").map((x) => x.doc.id);
+  await commitUpdates(db, [
+    ...b.sales.map((d) => [d.ref, { payoutStatus: "processing", payoutId }]),
+    ...podIds.map((id) => [db.doc(`orders/${id}`), { payoutStatus: "processing", payoutId }]),
+    ...penaltyIds.map((id) => [db.doc(`orders/${id}`), { penaltyStatus: "processing", penaltyPayoutId: payoutId }]),
+  ]);
+  await db.doc(`payouts/${payoutId}`).set({
+    sellerUid,
+    gross: b.gross,
+    commission: b.commission,
+    fulfilmentFee: b.fulfilment,
+    otherDeductions: b.deductionTotal, // fees on pay-on-delivery orders + penalties
+    amount: b.amount,
+    orderIds: [...b.sales.map((d) => d.id), ...podIds],
+    podOrderIds: podIds,
+    penaltyOrderIds: penaltyIds,
+    bankName: acct?.bankName || "",
+    accountName: acct?.accountName || "",
+    accountLast4: acct?.accountLast4 || "",
+    status: "processing",
+    createdAt: Timestamp.now(),
+    ...extra,
+  });
 };
 
 /** Bank name check: at least two words of the seller's name (or the only word) appear on the account. */

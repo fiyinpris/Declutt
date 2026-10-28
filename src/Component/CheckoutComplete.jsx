@@ -79,7 +79,6 @@ const CheckoutComplete = () => {
               <Spin s={26} />
             </Badge>
             <h1 className="text-xl font-black text-foreground">Confirming your payment…</h1>
-            <p className="text-sm text-foreground/55">This only takes a moment. Please don't close this page.</p>
           </>
         )}
 
@@ -93,16 +92,6 @@ const CheckoutComplete = () => {
             <h1 className="text-xl sm:text-2xl font-black text-foreground">
               {state === "paid" ? "Payment successful" : "Order placed"}
             </h1>
-            <p className="text-sm text-foreground/60 leading-relaxed">
-              {state === "paid"
-                ? "We've told the seller. Declutt holds your payment until you confirm you've received your order — then the seller gets paid."
-                : "We've told the seller. Pay them when your item arrives, and check it before you pay."}
-            </p>
-            {result?.orders > 1 && (
-              <p className="text-xs text-foreground/45">
-                Your items come from {result.orders} sellers, so you'll see {result.orders} orders.
-              </p>
-            )}
             <div className="flex flex-col sm:flex-row gap-2.5 justify-center pt-2">
               <Link to={ordersLink} className="main-button text-sm px-5 py-2.5 font-semibold">
                 Track my order
@@ -123,10 +112,7 @@ const CheckoutComplete = () => {
               <Spin s={26} />
             </Badge>
             <h1 className="text-xl font-black text-foreground">Waiting for your bank…</h1>
-            <p className="text-sm text-foreground/55 leading-relaxed">
-              Paystack hasn't confirmed the payment yet. If you paid by transfer this can take a
-              minute. You don't need to pay again.
-            </p>
+            <p className="text-sm text-foreground/55">You don't need to pay again.</p>
             <button
               type="button"
               onClick={() => {
@@ -152,7 +138,7 @@ const CheckoutComplete = () => {
             </h1>
             <p className="text-sm text-foreground/55 leading-relaxed">
               {state === "failed"
-                ? "No order was placed. If money left your account, it'll be refunded automatically."
+                ? "No order was placed."
                 : result?.message}
             </p>
             <div className="flex flex-col sm:flex-row gap-2.5 justify-center pt-2">

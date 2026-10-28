@@ -304,11 +304,7 @@ const Checkout = () => {
                 checked={method === "delivery"}
                 onChange={() => setMethod("delivery")}
                 title="Delivery"
-                sub={
-                  Number(fees.deliveryFee) > 0
-                    ? `${naira(fees.deliveryFee)} per seller. The seller sends it to your address.`
-                    : "The seller sends it to your address."
-                }
+                sub={Number(fees.deliveryFee) > 0 ? `${naira(fees.deliveryFee)} per seller` : "To your address"}
                 icon={
                   <Ico s={18} r>
                     <rect x="1" y="3" width="15" height="13" />
@@ -324,7 +320,7 @@ const Checkout = () => {
                 checked={method === "pickup"}
                 onChange={() => setMethod("pickup")}
                 title="Pick up"
-                sub="Collect it from the seller. They'll message you where and when."
+                sub="Collect it from the seller"
                 icon={
                   <Ico s={18} r>
                     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
@@ -365,7 +361,7 @@ const Checkout = () => {
                   maxLength={100}
                 />
               </Field>
-              <Field label="Phone number" error={errors.phone} htmlFor="co-phone" hint="The seller uses this to reach you">
+              <Field label="Phone number" error={errors.phone} htmlFor="co-phone">
                 <input
                   id="co-phone"
                   type="tel"
@@ -435,8 +431,7 @@ const Checkout = () => {
                 checked={!payOnDelivery}
                 onChange={() => setPayment("online")}
                 title="Pay now"
-                badge="Buyer protection"
-                sub="Card, bank transfer or USSD on Paystack's secure page. Declutt holds your money until you receive your order."
+                sub="Card, bank transfer or USSD"
                 icon={
                   <Ico s={18} r>
                     <rect x="1" y="4" width="22" height="16" rx="2" />
@@ -451,7 +446,7 @@ const Checkout = () => {
                   checked={payOnDelivery}
                   onChange={() => setPayment("pay_on_delivery")}
                   title={method === "pickup" ? "Pay at pickup" : "Pay on delivery"}
-                  sub="Pay the seller (cash or transfer) when you get the item. Check it before you pay."
+                  sub="Cash or transfer when you get the item"
                   icon={
                     <Ico s={18} r>
                       <rect x="2" y="6" width="20" height="12" rx="2" />
@@ -537,12 +532,6 @@ const Checkout = () => {
             </div>
           </div>
 
-          {sellerCount > 1 && (
-            <p className="text-xs text-foreground/50 bg-border/25 rounded-xl px-3 py-2">
-              Items from {sellerCount} sellers come as {sellerCount} separate orders.
-            </p>
-          )}
-
           {serverError && (
             <p role="alert" className="text-xs font-semibold text-red-500 bg-red-500/8 rounded-xl px-3 py-2">
               {serverError}
@@ -564,26 +553,15 @@ const Checkout = () => {
                 : `Pay ${naira(total)} securely`}
           </button>
 
-          <div className="flex items-start gap-2.5 text-xs text-foreground/55 leading-relaxed">
-            <span className="text-emerald-600 shrink-0 mt-0.5">
-              <Ico s={16} r>
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                <path d="m9 12 2 2 4-4" />
+          {!payOnDelivery && (
+            <p className="flex items-center justify-center gap-1.5 text-[11px] text-foreground/45">
+              <Ico s={12} r>
+                <rect x="3" y="11" width="18" height="11" rx="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
               </Ico>
-            </span>
-            {payOnDelivery ? (
-              <span>
-                You pay the seller when the item arrives. After delivery you have{" "}
-                {fees.returnWindowDays} days to report a problem to Declutt.
-              </span>
-            ) : (
-              <span>
-                Declutt keeps your payment safe until you confirm delivery. If something's wrong,
-                report it within {fees.returnWindowDays} days of delivery and we'll sort it out or
-                refund you. Declutt never sees your card details.
-              </span>
-            )}
-          </div>
+              Secured by Paystack
+            </p>
+          )}
         </aside>
       </form>
     </div>

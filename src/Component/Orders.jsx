@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { collection, onSnapshot, query, where } from "firebase/firestore";
+import { collection, doc, getDoc, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "../firebase";
 import { apiPost } from "../utils/api";
 import {
@@ -28,7 +28,7 @@ const HISTORY_LABEL = {
   confirmed: "Seller accepted",
   shipped: "Sent / ready for pickup",
   delivered: "Delivered",
-  completed: "Completed — seller paid",
+  completed: "Completed",
   disputed: "Problem reported",
   cancelled: "Cancelled",
   refunded: "Refunded",
@@ -55,6 +55,37 @@ const useOrders = (uid, as) => {
     );
   }, [uid, as]);
   return orders;
+};
+
+/* Product photo for an order line. Listing photos are stored on the listing itself (orders only
+   keep web links), so load it from there once per listing. */
+const imageCache = new Map(); // listingId → Promise<string | null>
+const listingImage = (id) => {
+  if (!imageCache.has(id))
+    imageCache.set(
+      id,
+      getDoc(doc(db, "listings", id))
+        .then((s) => s.data()?.imageUrl || null)
+        .catch(() => null),
+    );
+  return imageCache.get(id);
+};
+const ItemThumb = ({ item }) => {
+  const [loaded, setLoaded] = useState(null);
+  useEffect(() => {
+    if (item.imageUrl) return;
+    let alive = true;
+    listingImage(item.listingId).then((u) => alive && setLoaded(u));
+    return () => {
+      alive = false;
+    };
+  }, [item.imageUrl, item.listingId]);
+  const src = item.imageUrl || loaded;
+  return (
+    <div className="w-12 h-12 rounded-lg overflow-hidden bg-border/30 shrink-0">
+      {src && <img src={src} alt="" className="w-full h-full object-cover" />}
+    </div>
+  );
 };
 
 /* Asks for a reason before cancelling / reporting a problem */
@@ -182,7 +213,7 @@ export const OrderCard = ({ order: o, viewer, fees, admin = false }) => {
       text:
         viewer === "buyer"
           ? o.paymentStatus === "paid"
-            ? "Your payment will be refunded to the card or account you paid with."
+            ? "You'll get a full refund."
             : null
           : o.paymentStatus === "paid"
             ? `The buyer gets a full refund.${fees?.sellerCancelPenalty > 0 ? ` Cancelling a paid order costs ${naira(fees.sellerCancelPenalty)}, taken from your next payout.` : ""}`
@@ -249,9 +280,6 @@ export const OrderCard = ({ order: o, viewer, fees, admin = false }) => {
           onClick: () =>
             setDialog({
               title: "Report a problem",
-              text: o.paymentStatus === "paid"
-                ? "Declutt keeps holding the seller's money while we look into it. If the item isn't as described, you'll get a refund."
-                : "Declutt will look into it with the seller.",
               label: "What's wrong?",
               placeholder: "e.g. The fridge doesn't cool, and the listing said it works",
               required: 10,
@@ -260,6 +288,9 @@ export const OrderCard = ({ order: o, viewer, fees, admin = false }) => {
               onSubmit: (reason) => run("dispute", { reason }),
             }),
         }),
+        <span key="until" className="text-[11px] text-foreground/45">
+          until {fmtDate(windowEnds)}
+        </span>,
       );
     if (["pending_payment", "placed"].includes(o.status))
       actions.push(btn("cancel", "Cancel order", { danger: true, onClick: cancelDialog }));
@@ -298,9 +329,7 @@ export const OrderCard = ({ order: o, viewer, fees, admin = false }) => {
       <div className="space-y-2">
         {o.items?.map((i) => (
           <Link key={i.listingId} to={`/product/${i.listingId}`} className="flex items-center gap-3 group">
-            <div className="w-12 h-12 rounded-lg overflow-hidden bg-border/30 shrink-0">
-              {i.imageUrl && <img src={i.imageUrl} alt="" className="w-full h-full object-cover" />}
-            </div>
+            <ItemThumb item={i} />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-foreground truncate group-hover:text-primary">{i.name}</p>
               <p className="text-xs text-foreground/45">
@@ -311,31 +340,9 @@ export const OrderCard = ({ order: o, viewer, fees, admin = false }) => {
         ))}
       </div>
 
-      {/* What's happening / what to do next */}
-      {o.status === "pending_payment" && viewer === "buyer" && (
-        <p className="text-xs text-amber-600 bg-amber-500/10 rounded-xl px-3 py-2">
-          Payment wasn't completed. This order is cancelled automatically if it isn't paid within an hour.
-        </p>
-      )}
-      {o.status === "placed" && isSeller && !admin && (
-        <p className="text-xs text-amber-600 bg-amber-500/10 rounded-xl px-3 py-2">
-          New order — accept it so the buyer knows it's coming.
-        </p>
-      )}
-      {o.status === "delivered" && viewer === "buyer" && now < windowEnds && (
-        <p className="text-xs text-foreground/55 bg-border/25 rounded-xl px-3 py-2">
-          Something wrong? You can report a problem until {fmtDate(windowEnds)}.
-        </p>
-      )}
-      {o.status === "delivered" && isSeller && !admin && (
-        <p className="text-xs text-foreground/55 bg-border/25 rounded-xl px-3 py-2">
-          {pod ? "Delivered." : "Delivered. Your money is released"} after the buyer's return window ends on{" "}
-          {fmtDate(windowEnds)}.
-        </p>
-      )}
       {o.status === "disputed" && (
         <p className="text-xs text-red-500 bg-red-500/8 rounded-xl px-3 py-2">
-          <span className="font-bold">Problem reported:</span> {o.disputeReason} — Declutt is reviewing it.
+          <span className="font-bold">Problem reported:</span> {o.disputeReason}
         </p>
       )}
       {["cancelled", "refunded"].includes(o.status) && (o.cancelReason || o.resolutionNote) && (
@@ -388,7 +395,7 @@ export const OrderCard = ({ order: o, viewer, fees, admin = false }) => {
                       : "Nothing was paid"
                   : pod
                     ? `Collect ${naira(o.total)} from the buyer`
-                    : "Paid online to Declutt"}
+                    : "Paid online"}
               </span>
               <Pill cls={payoutStatus(o).cls}>{payoutStatus(o).label}</Pill>
             </div>
@@ -458,11 +465,8 @@ export const OrdersList = ({ uid, viewer, empty }) => {
         <Spin s={24} />
       </div>
     );
-  // Sellers don't need to see checkouts that were never paid
-  const orders =
-    viewer === "seller"
-      ? all.filter((o) => o.status !== "pending_payment" && !(o.status === "cancelled" && o.paymentStatus === "unpaid"))
-      : all;
+  // Checkouts that were never paid (abandoned or failed) aren't orders yet — hide them
+  const orders = all.filter((o) => o.paymentStatus !== "unpaid");
   const filters = ORDER_FILTERS.filter(
     (f) => f.id === "all" || orders.some(f.match),
   );

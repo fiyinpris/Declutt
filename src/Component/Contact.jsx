@@ -388,7 +388,7 @@ const Contact = () => {
                     maxLength={LIMITS.name}
                     aria-invalid={!!err("name")}
                     aria-describedby={err("name") ? "contact-name-error" : undefined}
-                    placeholder="Ada Obi"
+                    placeholder=""
                     className={inputCls(err("name"))}
                   />
                 </Field>
@@ -404,7 +404,7 @@ const Contact = () => {
                     maxLength={LIMITS.email}
                     aria-invalid={!!err("email")}
                     aria-describedby={err("email") ? "contact-email-error" : undefined}
-                    placeholder="you@example.com"
+                    placeholder=""
                     className={inputCls(err("email"))}
                   />
                 </Field>

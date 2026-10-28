@@ -443,10 +443,20 @@ export const FeeSettingsPanel = () => {
   const testServer = async () => {
     setCheck({ busy: true });
     try {
-      const r = await api("banks");
-      setCheck({ ok: true, text: `Connected to Paystack (${r.banks.length} banks loaded).` });
+      const r = await api("setup-check");
+      const ok = r.firebase === "ok" && r.paystack === "ok";
+      setCheck({
+        ok,
+        lines: [
+          r.firebase === "ok" ? "✓ Firebase server key works" : `✗ Firebase: ${r.firebase}`,
+          r.paystack === "ok"
+            ? `✓ Paystack key works (${r.mode === "live" ? "LIVE — real money" : "test mode"})`
+            : `✗ Paystack: ${r.paystack}`,
+          r.cron ? "✓ CRON_SECRET is set" : "✗ CRON_SECRET is missing (daily payouts job won't run)",
+        ],
+      });
     } catch (e) {
-      setCheck({ ok: false, text: e.message });
+      setCheck({ ok: false, lines: [e.message] });
     }
   };
 
@@ -583,8 +593,12 @@ export const FeeSettingsPanel = () => {
             {check?.busy && <Spin s={12} />}
             Test connection
           </button>
-          {check?.text && (
-            <p className={`font-semibold ${check.ok ? "text-emerald-600" : "text-red-500"}`}>{check.text}</p>
+          {check?.lines && (
+            <ul className={`space-y-1 font-semibold ${check.ok ? "text-emerald-600" : "text-red-500"}`}>
+              {check.lines.map((l) => (
+                <li key={l}>{l}</li>
+              ))}
+            </ul>
           )}
         </div>
       </Card>

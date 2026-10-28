@@ -30,8 +30,14 @@ const firebase = () => {
   if (cached) return cached;
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
   if (!raw) throw new HttpError(503, "Checkout isn't set up yet (server key missing).");
-  const json = raw.trim().startsWith("{") ? raw : Buffer.from(raw, "base64").toString("utf8");
-  const app = getApps()[0] || initializeApp({ credential: cert(JSON.parse(json)) });
+  let app;
+  try {
+    const json = raw.trim().startsWith("{") ? raw : Buffer.from(raw, "base64").toString("utf8");
+    app = getApps()[0] || initializeApp({ credential: cert(JSON.parse(json)) });
+  } catch (e) {
+    console.error("FIREBASE_SERVICE_ACCOUNT", e.message);
+    throw new HttpError(503, "Checkout isn't set up correctly yet (the Firebase server key isn't valid).");
+  }
   cached = { db: getFirestore(app), auth: getAuth(app) };
   return cached;
 };
@@ -76,8 +82,12 @@ export const appUrl = (req) =>
     `https://${req.headers["x-forwarded-host"] || req.headers.host}`).replace(/\/$/, "");
 
 /* ── Paystack ── */
+// Pasted keys sometimes pick up spaces, line breaks or quotes — ignore those
+export const paystackKey = () =>
+  (process.env.PAYSTACK_SECRET_KEY || "").trim().replace(/^["']+|["']+$/g, "").trim();
+
 export const paystack = async (path, { method = "GET", body } = {}) => {
-  const key = process.env.PAYSTACK_SECRET_KEY;
+  const key = paystackKey();
   if (!key) throw new HttpError(503, "Online payments aren't set up yet.");
   const r = await fetch(`https://api.paystack.co${path}`, {
     method,
@@ -85,6 +95,8 @@ export const paystack = async (path, { method = "GET", body } = {}) => {
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await r.json().catch(() => ({}));
+  if (r.status === 401 || /invalid key/i.test(data.message || ""))
+    throw new HttpError(503, "Online payments aren't set up correctly yet (Paystack rejected the secret key).");
   if (!r.ok || data.status === false)
     throw new HttpError(r.status >= 500 ? 502 : 400, data.message || "The payment provider returned an error.");
   return data.data;
@@ -92,7 +104,7 @@ export const paystack = async (path, { method = "GET", body } = {}) => {
 
 /** Paystack signs webhooks with HMAC-SHA512 of the raw body using the secret key. */
 export const validPaystackSignature = (rawBody, signature) => {
-  const key = process.env.PAYSTACK_SECRET_KEY;
+  const key = paystackKey();
   if (!key || !signature) return false;
   const expected = crypto.createHmac("sha512", key).update(rawBody).digest("hex");
   const a = Buffer.from(expected);
